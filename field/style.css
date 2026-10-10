@@ -1,0 +1,619 @@
+/* 字体 DotGothic16(Fontworks、SIL Open Font License 1.1。assets/font/OFL.txt)。ゲームと一緒に置き、外から読みこまない(D301) */
+@font-face {
+  font-family: "DotGothic16";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/font/DotGothic16-Regular.woff2") format("woff2");
+}
+
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #f4f1e9;
+  --paper: #fffdf8;
+  --ink: #202020;
+  --muted: #66645f;
+  --line: #d8d2c5;
+  --accent: #b7442a;
+  --shadow: 0 10px 28px rgba(46, 38, 26, 0.1);
+}
+
+html, body {
+  overscroll-behavior: none;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  background: var(--bg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+}
+
+.field-header {
+  padding: 32px 24px 20px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 253, 248, 0.82);
+  text-align: center;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 14px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+.field-header h1 {
+  margin: 0 0 8px;
+  font-size: clamp(26px, 5vw, 38px);
+  letter-spacing: -0.02em;
+}
+
+.lead {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.field-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 8px 24px; /* 画面の外の見出しをなくしたので、ゲームの画面を上に寄せる(D258) */
+}
+
+.game-frame {
+  position: relative;
+  width: min(960px, 100%);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  touch-action: none;
+}
+
+#fieldCanvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: none;
+}
+
+/* 全画面(パソコン): 画面の幅いっぱいにすると、16:9 のモニターでは下がはみ出して切れていた(タイトルの確かめの窓など)。
+   縦と横の両方が収まる大きさにして、まん中に置く。あまりは黒 */
+.game-frame:fullscreen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0;
+  background: #000;
+}
+.game-frame:fullscreen #fieldCanvas {
+  width: min(100vw, calc(100vh * 1.6));
+  height: auto;
+}
+.game-frame:-webkit-full-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0;
+  background: #000;
+}
+.game-frame:-webkit-full-screen #fieldCanvas {
+  width: min(100vw, calc(100vh * 1.6));
+  height: auto;
+}
+
+.intro-hint {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: rgba(32, 32, 32, 0.7);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: opacity 900ms ease;
+}
+
+.intro-hint.hidden {
+  opacity: 0;
+}
+
+.fragment-box {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  padding: 16px 20px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+
+.fragment-title {
+  margin: 0 0 6px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.fragment-text {
+  margin: 0;
+  white-space: pre-line;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.story-overlay[hidden] {
+  display: none;
+}
+
+.story-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px;
+  /* 会話の窓はキャンバスに描く。ここはクリックを受けるだけ */
+  background: transparent;
+  cursor: pointer;
+  animation: story-fade-in 260ms ease;
+}
+
+@keyframes story-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.story-card {
+  width: min(560px, 100%);
+  padding: 20px 24px 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  cursor: default;
+}
+
+.story-title {
+  margin: 0 0 10px;
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.story-text {
+  margin: 0 0 12px;
+  min-height: 4.8em;
+  font-size: 15px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.story-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+.field-status {
+  width: min(960px, 100%);
+  text-align: right;
+}
+
+.inventory-text[hidden] {
+  display: none;
+}
+
+.inventory-text {
+  margin: 0 0 4px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.fade-overlay {
+  position: absolute;
+  inset: 0;
+  background: #0c0b10;
+  opacity: 0;
+  pointer-events: none;
+  /* 明けるほう(フェードイン)はゆっくり。入った直後に動く人や車椅子が位置につく間も隠れるように */
+  transition: opacity 1500ms ease-in-out;
+}
+
+.fade-overlay.on {
+  opacity: 1;
+  transition: opacity 450ms ease;
+}
+
+.story-title[hidden] {
+  display: none;
+}
+
+.progress-text {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.joystick {
+  display: none;
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  background: rgba(255, 253, 248, 0.35);
+  border: 1px solid rgba(216, 210, 197, 0.7);
+  box-shadow: var(--shadow);
+  touch-action: none;
+  z-index: 50;
+}
+
+.joystick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 40px;
+  height: 40px;
+  margin-left: -20px;
+  margin-top: -20px;
+  border-radius: 50%;
+  background: rgba(183, 68, 42, 0.85);
+  box-shadow: var(--shadow);
+  transition: transform 100ms ease-out;
+}
+
+.joystick.active .joystick-knob {
+  transition: none;
+}
+
+.fullscreen-btn {
+  /* ゲームの中のほかの窓と同じ、黒地に白いドットの枠のアイコン */
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  width: 39px;
+  height: 39px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #000 url("data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2013%2013%22%20shape-rendering%3D%22crispEdges%22%3E%3Cg%20fill%3D%22%23fff%22%3E%3Crect%20x%3D%221%22%20y%3D%220%22%20width%3D%2211%22%20height%3D%221%22/%3E%3Crect%20x%3D%221%22%20y%3D%2212%22%20width%3D%2211%22%20height%3D%221%22/%3E%3Crect%20x%3D%220%22%20y%3D%221%22%20width%3D%221%22%20height%3D%2211%22/%3E%3Crect%20x%3D%2212%22%20y%3D%221%22%20width%3D%221%22%20height%3D%2211%22/%3E%3Crect%20x%3D%223%22%20y%3D%223%22%20width%3D%223%22%20height%3D%221%22/%3E%3Crect%20x%3D%223%22%20y%3D%223%22%20width%3D%221%22%20height%3D%223%22/%3E%3Crect%20x%3D%227%22%20y%3D%223%22%20width%3D%223%22%20height%3D%221%22/%3E%3Crect%20x%3D%229%22%20y%3D%223%22%20width%3D%221%22%20height%3D%223%22/%3E%3Crect%20x%3D%223%22%20y%3D%229%22%20width%3D%223%22%20height%3D%221%22/%3E%3Crect%20x%3D%223%22%20y%3D%227%22%20width%3D%221%22%20height%3D%223%22/%3E%3Crect%20x%3D%227%22%20y%3D%229%22%20width%3D%223%22%20height%3D%221%22/%3E%3Crect%20x%3D%229%22%20y%3D%227%22%20width%3D%221%22%20height%3D%223%22/%3E%3C/g%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+  cursor: pointer;
+  z-index: 6;
+  opacity: 0.85;
+}
+
+.fullscreen-btn.is-full {
+  background-image: url("data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2013%2013%22%20shape-rendering%3D%22crispEdges%22%3E%3Cg%20fill%3D%22%23fff%22%3E%3Crect%20x%3D%221%22%20y%3D%220%22%20width%3D%2211%22%20height%3D%221%22/%3E%3Crect%20x%3D%221%22%20y%3D%2212%22%20width%3D%2211%22%20height%3D%221%22/%3E%3Crect%20x%3D%220%22%20y%3D%221%22%20width%3D%221%22%20height%3D%2211%22/%3E%3Crect%20x%3D%2212%22%20y%3D%221%22%20width%3D%221%22%20height%3D%2211%22/%3E%3Crect%20x%3D%223%22%20y%3D%225%22%20width%3D%223%22%20height%3D%221%22/%3E%3Crect%20x%3D%225%22%20y%3D%223%22%20width%3D%221%22%20height%3D%223%22/%3E%3Crect%20x%3D%227%22%20y%3D%225%22%20width%3D%223%22%20height%3D%221%22/%3E%3Crect%20x%3D%227%22%20y%3D%223%22%20width%3D%221%22%20height%3D%223%22/%3E%3Crect%20x%3D%223%22%20y%3D%227%22%20width%3D%223%22%20height%3D%221%22/%3E%3Crect%20x%3D%225%22%20y%3D%227%22%20width%3D%221%22%20height%3D%223%22/%3E%3Crect%20x%3D%227%22%20y%3D%227%22%20width%3D%223%22%20height%3D%221%22/%3E%3Crect%20x%3D%227%22%20y%3D%227%22%20width%3D%221%22%20height%3D%223%22/%3E%3C/g%3E%3C/svg%3E");
+}
+
+.fullscreen-btn:active {
+  opacity: 1;
+}
+
+.joystick.touch-enabled {
+  display: block;
+}
+
+.action-btn {
+  display: none;
+  position: fixed;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid rgba(216, 210, 197, 0.7);
+  box-shadow: var(--shadow);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+  text-align: center;
+  line-height: 46px;
+  touch-action: none;
+  z-index: 50;
+}
+
+.action-btn.touch-enabled {
+  display: block;
+}
+
+.action-btn-a {
+  background: rgba(183, 68, 42, 0.85);
+}
+
+.action-btn-b {
+  background: rgba(110, 108, 100, 0.85);
+}
+
+.action-btn.hint {
+  animation: btn-hint 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes btn-hint {
+  from { box-shadow: 0 0 0 0 rgba(255, 236, 170, 0.9); transform: scale(1); }
+  to { box-shadow: 0 0 0 10px rgba(255, 236, 170, 0); transform: scale(1.15); }
+}
+
+.action-btn:active {
+  filter: brightness(1.1);
+}
+
+.field-footer {
+  padding: 24px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  text-align: center;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .joystick {
+    display: block;
+  }
+}
+
+html.landscape-compact,
+body.landscape-compact {
+  height: 100%;
+  overflow: hidden;
+}
+
+body.landscape-compact {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+}
+
+body.landscape-compact .field-header {
+  flex: 0 0 auto;
+  padding: 4px 12px;
+}
+
+body.landscape-compact .field-header h1,
+body.landscape-compact .field-header .lead {
+  display: none;
+}
+
+body.landscape-compact .back-link {
+  margin-bottom: 0;
+}
+
+body.landscape-compact .field-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 6px 12px;
+  gap: 4px;
+  justify-content: center;
+}
+
+body.landscape-compact .game-frame {
+  /* exact width/height are computed and set inline by field/app/layout.js
+     (fitGameFrame) — CSS aspect-ratio + flexbox sizing resolves
+     inconsistently between browser engines, so we don't rely on it here */
+  flex: 0 0 auto;
+  width: auto;
+  max-width: 100%;
+}
+
+body.landscape-compact .field-status {
+  flex: 0 0 auto;
+}
+
+body.landscape-compact .field-footer {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  .field-header {
+    padding: 24px 16px 16px;
+  }
+}
+
+/* 一枚絵を見ているあいだは、絵にかぶらないようスティックとボタンを薄く */
+body.viewing .joystick,
+body.viewing .action-btn {
+  opacity: 0.25;
+}
+
+/* ---- ステータス画面: 小さなキャンバスをドットのまま拡大(描くのは field/app/status.js) ---- */
+.status-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background: #000;
+}
+
+.status-overlay[hidden] {
+  display: none;
+}
+
+.status-overlay canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.action-btn-c {
+  background: rgba(40, 40, 40, 0.85);
+}
+
+
+/* ---- スマホ: 携帯ゲーム機の本体(D263、todo 57)。ゲームの画面は本体のくぼみに、ボタンは本体の面に(画面にかぶらない) ----
+   横はゲームウォッチのように左に十字キー、右に A・B・C・TIME。縦は上に画面、下にボタン。位置と大きさは field/app/layout.js(layoutConsole)が決める
+   本体の絵(todo 60、D271)は PixelLab で描いたドット絵の部品(docs/assets/console/)。すべて 2 倍で置く。本体の題字は出さない(D272) */
+.console-bezel {
+  display: none;
+}
+
+/* TIME(D269): ゲームウォッチの右上の小さなボタン(スマホの本体だけ) */
+.action-btn-t {
+  background: rgba(40, 40, 40, 0.85);
+}
+
+/* さわっても拡大・選択・長押しのメニューが出ないように(ボタンを連打すると画面が拡大されていた) */
+html.console,
+body.console {
+  height: 100%;
+  overflow: hidden;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+body.console {
+  --face: #d6d0c4;
+  --face-dark: #c4bdaf;
+  --rim: #96443a;
+  background: var(--face) url("assets/console/face.png") repeat;
+  background-size: 192px 96px;
+  image-rendering: pixelated;
+}
+
+body.console .field-wrap {
+  padding: 0;
+}
+
+/* 画面のくぼみ。ふちの絵(bezel.png)は画面とは別の要素で、画面のまわりにかぶせる */
+body.console .game-frame {
+  position: fixed;
+  border: 0;
+  border-radius: 2px;
+  box-shadow: none;
+}
+
+body.console .console-bezel {
+  display: block;
+  position: fixed;
+  z-index: 3;
+  pointer-events: none;
+  border: 16px solid transparent;
+  border-image: url("assets/console/bezel.png") 16 / 16px stretch;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.18));
+}
+
+/* 十字キー: スティックの入れ物をそのまま使い、見た目を十字キーの絵に */
+body.console .joystick {
+  border: 0;
+  border-radius: 50%;
+  box-shadow: none;
+  background: url("assets/console/cross.png") center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+}
+
+body.console .joystick::before,
+body.console .joystick::after {
+  display: none;
+}
+
+/* 押している所を丸で示す(押しているあいだだけ) */
+body.console .joystick-knob {
+  display: none;
+  width: 30%;
+  height: 30%;
+  margin-left: -15%;
+  margin-top: -15%;
+  background: rgba(183, 68, 42, 0.7);
+  border: 2px solid rgba(255, 253, 248, 0.6);
+  box-shadow: none;
+  transition: none;
+  z-index: 1;
+}
+
+body.console .joystick.active .joystick-knob {
+  display: block;
+}
+
+/* ボタン。文字はボタンのまん中に(ドットの字体は字面が下に寄るので、行の高さでなく字の高さで中央に置く) */
+body.console .action-btn.touch-enabled {
+  display: flex;
+}
+
+body.console .action-btn {
+  padding: 0;
+  line-height: 1 !important;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  box-shadow: none;
+  font-family: "DotGothic16", sans-serif;
+  background-color: transparent;
+  background-position: center;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  color: #fbf8f2;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+
+body.console .action-btn-a,
+body.console .action-btn-b {
+  padding-top: 0.21em; /* A と B は字面が少し上に寄るので、その分だけ下げる(実寸で測って合わせた) */
+}
+
+body.console .action-btn-a { background-image: url("assets/console/btn_a.png"); }
+body.console .action-btn-b { background-image: url("assets/console/btn_b.png"); }
+
+/* C と TIME は同じ楕円(作者「time と cのボタンサイズ合わせて」) */
+body.console .action-btn-c,
+body.console .action-btn-t {
+  background-image: url("assets/console/pill.png");
+  border-radius: 0;
+  color: #e8e4dc;
+}
+
+body.console .action-btn-c {
+  font-size: 13px;
+}
+
+body.console .action-btn-t {
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+/* 押した絵は面が少し沈むので、文字も下げる */
+body.console .action-btn.pressed {
+  filter: none;
+  text-indent: 0;
+}
+body.console .action-btn-a.pressed { background-image: url("assets/console/btn_a_p.png"); padding-top: 0.45em; }
+body.console .action-btn-b.pressed { background-image: url("assets/console/btn_b_p.png"); padding-top: 0.45em; }
+body.console .action-btn-c.pressed,
+body.console .action-btn-t.pressed {
+  background-image: url("assets/console/pill_p.png");
+  padding-top: 2px;
+}
+
+/* 時計(D269)のあいだは、全画面のボタンも隠す */
+body.watching .fullscreen-btn {
+  display: none;
+}

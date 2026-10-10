@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <!-- 読みこむ先を、このサイトの中だけに限る(外のサーバーに何も問い合わせない D301) -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="何もない懲罰空間を歩きまわり、ぼぎだぢの世界の断片を見つけていく">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>ぼぎだぢ - 懲罰空間</title>
+  <meta http-equiv="Cache-Control" content="no-cache">
+  <script src="./fresh.js?v=281"></script>
+  <link rel="stylesheet" href="./style.css?v=281">
+</head>
+<body>
+
+  <!-- スマホでは画面ぜんたいが携帯ゲーム機の本体になる(D263)。本体の名前 -->
+  <main class="field-wrap">
+    <div class="game-frame">
+      <canvas id="fieldCanvas" width="960" height="600" aria-label="懲罰空間"></canvas>
+
+      <!-- エラーのときだけ使う(最初の一言はキャンバスに描く) -->
+      <div id="introHint" class="intro-hint hidden"></div>
+
+      <div id="storyOverlay" class="story-overlay" hidden>
+      </div>
+
+      <!-- ステータス画面(C キー / C ボタン)。480×300 のキャンバスに描いて、ぼかさずに 2 倍へ(マップの絵と同じドット) -->
+      <div id="statusOverlay" class="status-overlay" hidden>
+        <canvas id="statusCanvas" width="480" height="300" aria-label="ステータス"></canvas>
+      </div>
+
+      <div id="fadeOverlay" class="fade-overlay on"></div>
+
+      <button type="button" id="fullscreenBtn" class="fullscreen-btn" aria-label="全画面表示"></button>
+    </div>
+
+  </main>
+
+  <div id="consoleBezel" class="console-bezel" aria-hidden="true"></div>
+  <div id="joystick" class="joystick" aria-hidden="true">
+    <div id="joystickKnob" class="joystick-knob"></div>
+  </div>
+
+  <button type="button" id="actionBtnB" class="action-btn action-btn-b" aria-label="キャンセル">B</button>
+  <button type="button" id="actionBtnA" class="action-btn action-btn-a" aria-label="決定">A</button>
+  <button type="button" id="actionBtnC" class="action-btn action-btn-c" aria-label="ステータス">C</button>
+  <button type="button" id="actionBtnT" class="action-btn action-btn-t" aria-label="時計">TIME</button>
+
+
+  <script src="./audio.js?v=281"></script>
+  <script src="./rpg.js?v=281"></script>
+  <script src="./worlds/common.js?v=281"></script>
+  <script src="./worlds/lake.js?v=281"></script>
+  <script src="./worlds/void.js?v=281"></script>
+  <script src="./worlds/haihei.js?v=281"></script>
+  <script src="./worlds/kasumi.js?v=281"></script>
+  <script src="./worlds/banana.js?v=281"></script>
+  <script src="./worlds/suzuki.js?v=281"></script>
+  <script src="./worlds/takarabune.js?v=281"></script>
+  <script src="./worlds/noroi.js?v=281"></script>
+  <script src="./worlds/padre.js?v=281"></script>
+  <script src="./worlds/kinsei.js?v=281"></script>
+  <script src="./worlds/bomber.js?v=281"></script>
+  <script src="./worlds/finale.js?v=281"></script>
+  <script src="./worlds/index.js?v=281"></script>
+  <script src="./app/layout.js?v=281"></script>
+  <script src="./app/dialog.js?v=281"></script>
+  <script src="./app/game.js?v=281"></script>
+  <script src="./app/status.js?v=281"></script>
+  <script src="./app/title.js?v=281"></script>
+  <script src="./app/watch.js?v=281"></script>
+  <script src="./app/input.js?v=281"></script>
+  <script src="./app/loop.js?v=281"></script>
+</body>
+</html>

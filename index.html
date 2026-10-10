@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<!-- 読みこむ先を、このサイトの中だけに限る(外のサーバーに何も問い合わせない D301) -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ぼぎだぢ</title>
+<meta name="description" content="何もない懲罰空間を歩きまわり、ぼぎだぢの世界の断片を見つけていく。ブラウザで遊べる、ドット絵の小さな RPG。無料。">
+<meta property="og:title" content="ぼぎだぢ">
+<meta property="og:description" content="何もない懲罰空間を歩きまわり、ぼぎだぢの世界の断片を見つけていく。ブラウザで遊べる、ドット絵の小さな RPG。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://bibiman1.github.io/bogidachi/">
+<meta property="og:image" content="https://bibiman1.github.io/bogidachi/ogp.png">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+@font-face { font-family: "DotGothic16"; font-display: swap; src: url("./field/assets/font/DotGothic16-Regular.woff2") format("woff2"); }
+:root { --bg: #f7f6f2; --fg: #26252b; --muted: #6c6a72; --line: #d8d5cc; --win: #111; --win-fg: #fff; --accent: #b1312a; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); }
+body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif; line-height: 1.8; }
+main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+h1, h2, .play, .ver { font-family: "DotGothic16", sans-serif; font-weight: 400; }
+h1 { font-size: 56px; margin: 8px 0 0; letter-spacing: 0.08em; text-align: center; }
+.ver { text-align: center; color: var(--muted); margin: 0 0 20px; }
+.shot { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 14px; image-rendering: pixelated; }
+.lead { font-size: 17px; text-align: center; margin: 20px 0; }
+.play { display: block; width: max-content; margin: 24px auto; padding: 14px 40px; font-size: 26px; color: var(--win-fg); background: var(--win); border: 4px double var(--win-fg); outline: 3px solid var(--win); text-decoration: none; }
+.play:hover, .play:focus { background: #333; }
+h2 { font-size: 24px; margin: 40px 0 8px; border-bottom: 1px solid var(--line); }
+table { border-collapse: collapse; width: 100%; }
+td, th { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+th { white-space: nowrap; font-weight: 600; }
+small, .muted { color: var(--muted); }
+.tip { text-align: center; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.tip a { font-weight: 700; color: var(--accent); }
+footer { text-align: center; color: var(--muted); font-size: 13px; margin-top: 48px; }
+@media (max-width: 520px) { h1 { font-size: 40px; } .play { font-size: 22px; padding: 12px 28px; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>ぼぎだぢ</h1>
+  <p class="ver">Ver.1.0</p>
+  <img class="shot" src="./ogp.png" width="960" height="600" alt="タイトル画面。何もない白い懲罰空間に、10 の台座と扉、きーの部屋">
+  <p class="lead">何もない懲罰空間を歩きまわり、<br>ぼぎだぢの世界の断片を見つけていく。</p>
+  <a class="play" href="./field/index.html">▶ あそぶ</a>
+  <p class="muted" style="text-align:center">無料。ブラウザでそのまま遊べます(インストール・登録はいりません)。音が出ます。</p>
+
+  <h2>あそびかた</h2>
+  <table>
+    <tr><th></th><th>パソコン</th><th>スマホ</th></tr>
+    <tr><td>あるく</td><td>矢印キー / WASD</td><td>十字キー</td></tr>
+    <tr><td>しらべる・きめる</td><td>Enter / Space / Z</td><td>A</td></tr>
+    <tr><td>もどる・とくぎ</td><td>X / Shift(もどるは Esc も)</td><td>B</td></tr>
+    <tr><td>ステータス</td><td>C</td><td>C</td></tr>
+  </table>
+  <p><small>画面の右上のボタンで全画面になります。スマホは、ホーム画面に追加しても遊べます。</small></p>
+
+  <h2>セーブと安心のこと</h2>
+  <ul>
+    <li>進み具合は、遊んでいる端末のブラウザの中にだけ自動で記録します。どこにも送りません。ブラウザのサイトデータを消すと、記録も消えます。</li>
+    <li>広告、アクセス解析、ログイン、Cookie はありません。このサイトの外のサーバーには、何も問い合わせません。</li>
+    <li>推奨環境: パソコンの Chrome / Edge / Safari / Firefox、iPhone の Safari、Android の Chrome(いずれも最新版)。</li>
+  </ul>
+
+
+  <h2>つくった人</h2>
+  <table>
+    <tr><th>原作・絵・世界とことば</th><td>bibiman1</td></tr>
+    <tr><th>ゲームデザイン</th><td>bibiman1 / Claude</td></tr>
+    <tr><th>プログラム・音・制作日記</th><td>Claude(Anthropic の AI)</td></tr>
+    <tr><th>ドット絵</th><td>PixelLab / 下絵 Claude</td></tr>
+  </table>
+  <p>人間の作者と AI で作りました。作っている様子は<a href="./docs/diary/index.html">制作日記</a>(AI が書いています)にあります。</p>
+
+  <h2>使わせてもらったもの</h2>
+  <table>
+    <tr><th>音楽</th><td>「Accordion Passion of the Roma」「Melancholic Accordion in the Rain」<br>Music by Iskander from Pixabay(Pixabay Content License)</td></tr>
+    <tr><th>音</th><td>赤ちゃんの笑い声 — reinsamba(<a href="https://creativecommons.org/licenses/by/3.0/deed.ja">CC BY 3.0</a>)、Wikimedia Commons「File:Baby Laugh.ogg」を音量を整えて使用<br>公園の遊び場 — foongaz(CC0)、Wikimedia Commons</td></tr>
+    <tr><th>文字</th><td>DotGothic16 — Fontworks(<a href="./field/assets/font/OFL.txt">SIL Open Font License 1.1</a>)</td></tr>
+    <tr><th>日記の表示</th><td>marked — <a href="./docs/diary/marked.LICENSE.md">MIT License</a></td></tr>
+  </table>
+
+  <footer>© bibiman1 ぼぎだぢ Ver.1.0</footer>
+</main>
+</body>
+</html>

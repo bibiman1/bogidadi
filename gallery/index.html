@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <!-- 読みこむ先を、このサイトの中だけに限る(D301) -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="ぼぎだぢの世界のイメージボード・手描き資料ギャラリー">
+  <title>ぼぎだぢ - 書庫</title>
+  <link rel="stylesheet" href="./style.css?v=4">
+</head>
+<body>
+  <header class="gallery-header">
+    <a class="back-link" href="../field/index.html">← 懲罰空間に戻る</a>
+    <h1>ぼぎだぢ 書庫</h1>
+    <p class="lead">世界観の元になった手描きスケッチ・資料写真と、断片からまとめられた用語集・作品解説、制作日記。</p>
+  </header>
+
+  <nav class="gallery-tabs" aria-label="資料の種類">
+    <button type="button" id="tabImages" class="gallery-tab active">資料写真</button>
+    <button type="button" id="tabGlossary" class="gallery-tab">用語集</button>
+    <button type="button" id="tabEssay" class="gallery-tab">作品解説</button>
+    <button type="button" id="tabDiary" class="gallery-tab">制作日記</button>
+  </nav>
+
+  <main class="gallery-wrap">
+    <div id="galleryGrid" class="gallery-grid"></div>
+    <div id="glossaryPanel" class="glossary-panel" hidden></div>
+    <div id="essayPanel" class="essay-panel" hidden></div>
+    <!-- 制作日記(D260): docs/diary の日記をそのまま読む -->
+    <div id="diaryPanel" class="diary-panel" hidden><iframe id="diaryFrame" title="ぼぎだぢ制作日記"></iframe></div>
+  </main>
+
+  <div id="lightbox" class="lightbox" hidden>
+    <button type="button" id="lightboxClose" class="lightbox-close" aria-label="閉じる">✕</button>
+    <button type="button" id="lightboxPrev" class="lightbox-nav lightbox-prev" aria-label="前の画像">‹</button>
+    <img id="lightboxImg" class="lightbox-img" alt="">
+    <button type="button" id="lightboxNext" class="lightbox-nav lightbox-next" aria-label="次の画像">›</button>
+    <p id="lightboxCount" class="lightbox-count"></p>
+  </div>
+
+  <footer class="gallery-footer">
+    <small>© Character Project</small>
+  </footer>
+
+  <script src="./script.js?v=6"></script>
+</body>
+</html>

@@ -1,0 +1,372 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #f4f1e9;
+  --paper: #fffdf8;
+  --ink: #202020;
+  --muted: #66645f;
+  --line: #d8d2c5;
+  --accent: #b7442a;
+  --shadow: 0 10px 28px rgba(46, 38, 26, 0.1);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  background: var(--bg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+}
+
+.gallery-header {
+  padding: 32px 24px 20px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 253, 248, 0.82);
+  text-align: center;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 14px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+.gallery-header h1 {
+  margin: 0 0 8px;
+  font-size: clamp(26px, 5vw, 38px);
+  letter-spacing: -0.02em;
+}
+
+.lead {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.gallery-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px 24px 0;
+}
+
+.gallery-tab {
+  padding: 9px 20px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.gallery-tab.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.gallery-wrap {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+.gallery-grid[hidden],
+.glossary-panel[hidden],
+.essay-panel[hidden] {
+  display: none;
+}
+
+.glossary-panel {
+  display: grid;
+  gap: 24px;
+}
+
+.glossary-intro {
+  margin: 0;
+  padding: 18px 22px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+
+.glossary-section {
+  margin: 0;
+}
+
+.glossary-section h2 {
+  margin: 0 0 12px;
+  font-size: 15px;
+  color: var(--accent);
+  letter-spacing: 0.04em;
+}
+
+.glossary-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.glossary-term {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+
+.glossary-term dt {
+  margin: 0 0 4px;
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.glossary-term dd {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.essay-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.essay-intro {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.essay-section {
+  padding: 22px 26px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+
+.essay-section h2 {
+  margin: 0 0 16px;
+  font-size: 17px;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+}
+
+.essay-section h3 {
+  margin: 20px 0 8px;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+}
+
+.essay-section h3:first-of-type {
+  margin-top: 0;
+}
+
+.essay-section p {
+  margin: 0 0 4px;
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+.essay-warning {
+  margin: 0 0 18px;
+  padding: 12px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: rgba(183, 68, 42, 0.08);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.7;
+}
+
+.essay-section ul {
+  margin: 12px 0;
+  padding-left: 20px;
+}
+
+.essay-section li {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 16px;
+}
+
+.gallery-item {
+  display: block;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+
+.gallery-item:hover,
+.gallery-item:focus-visible {
+  transform: translateY(-4px);
+  border-color: var(--accent);
+}
+
+.gallery-item img {
+  display: block;
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+}
+
+.gallery-footer {
+  padding: 24px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  text-align: center;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 18, 14, 0.88);
+  z-index: 100;
+}
+
+.lightbox[hidden] {
+  display: none;
+}
+
+.lightbox-img {
+  max-width: min(92vw, 1100px);
+  max-height: 84vh;
+  border-radius: 6px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 52px;
+  height: 52px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 30px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.lightbox-nav:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.lightbox-prev {
+  left: 16px;
+}
+
+.lightbox-next {
+  right: 16px;
+}
+
+.lightbox-count {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+}
+
+@media (max-width: 700px) {
+  .gallery-header {
+    padding: 24px 16px 16px;
+  }
+
+  .gallery-wrap {
+    padding: 24px 16px 48px;
+  }
+
+  .gallery-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+  }
+
+  .gallery-item img {
+    height: 120px;
+  }
+
+  .glossary-list {
+    grid-template-columns: 1fr;
+  }
+
+  .lightbox-nav {
+    width: 42px;
+    height: 42px;
+    font-size: 24px;
+  }
+}
+
+/* 制作日記(D260): 日記のページを書庫の中に埋めこむ */
+.diary-panel[hidden] {
+  display: none;
+}
+
+.diary-panel iframe {
+  display: block;
+  width: 100%;
+  height: 80vh;
+  border: 1px solid #d8d2c5;
+  border-radius: 12px;
+  background: #fff;
+}
