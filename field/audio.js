@@ -45,12 +45,7 @@
     }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
-    // iPhone のマナーモード(消音スイッチ)でも鳴らす(Safari 17 から。D303)
-    try {
-      if (navigator.audioSession) navigator.audioSession.type = "playback";
-    } catch (e) {
-      // 古い端末では、マナーモードのときは鳴らない
-    }
+    // iPhone のマナーモード(消音スイッチ)のときは鳴らさない(端末の決まりのまま。作者「マナーモードでは鳴らさない」D304)
     ctx = new AC();
     wake();
     bgmGain = ctx.createGain();
