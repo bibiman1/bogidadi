@@ -28,14 +28,31 @@
       // 保存できなくても続ける
     }
   }
+  // iPhone(Safari)は、指を離したとき(touchend / click)でないと音を始めさせない。触れた瞬間に作ると止まったままになり、
+  // ずっと無音だった(作者「アイフォンはずっと無音」)。どのきっかけでも、止まっていれば動かし、無音の一瞬を鳴らして目を覚まさせる
+  function wake() {
+    if (ctx.state !== "running") ctx.resume().catch(() => {});
+    const b = ctx.createBuffer(1, 1, 22050);
+    const s = ctx.createBufferSource();
+    s.buffer = b;
+    s.connect(ctx.destination);
+    s.start(0);
+  }
   function unlock() {
     if (ctx) {
-      if (ctx.state === "suspended") ctx.resume();
+      if (ctx.state !== "running") wake();
       return;
     }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
+    // iPhone のマナーモード(消音スイッチ)でも鳴らす(Safari 17 から。D303)
+    try {
+      if (navigator.audioSession) navigator.audioSession.type = "playback";
+    } catch (e) {
+      // 古い端末では、マナーモードのときは鳴らない
+    }
     ctx = new AC();
+    wake();
     bgmGain = ctx.createGain();
     sfxGain = ctx.createGain();
     bgmGain.gain.value = level(vol.bgm) * 0.5;
@@ -48,7 +65,7 @@
       bgm(k);
     }
   }
-  ["pointerdown", "keydown", "touchstart"].forEach((ev) => window.addEventListener(ev, unlock, { capture: true, passive: true }));
+  ["pointerdown", "keydown", "touchstart", "touchend", "pointerup", "click"].forEach((ev) => window.addEventListener(ev, unlock, { capture: true, passive: true }));
   function load(path) {
     if (!buffers[path])
       buffers[path] = fetch(BASE + path)
