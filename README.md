@@ -1,6 +1,6 @@
 # ぼぎだぢ Ver.1.0
 
-ブラウザで遊べるドット絵の小さな RPG。遊ぶ: https://bibiman1.github.io/bogidachi/
+ブラウザで遊べるドット絵の小さな RPG。遊ぶ: https://bibiman1.github.io/bogidadi/
 
 原作・絵: bibiman1 / プログラム: Claude(Anthropic)/ ドット絵: PixelLab
 
