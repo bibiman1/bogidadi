@@ -106,6 +106,7 @@ const VOID_FRAGMENTS = [
 
 const VOID_DOOR = { x: 22 * T, y: 4 * T }; // 扉の足もと。いちばん北、まん中の通り道の突き当たり(D257)
 let vDoorT = 0; // 扉が開いた時刻(灯りのふくらみ)。-1 は開くところを見せている最中
+let vJustPulled = false; // 全集 10 冊の引きを見せた直後(続けて扉を開くときは、同じ引きをもう一度見せない)
 const VOID = {
   tile: T,
   bg: "#f7f7f9",
@@ -241,23 +242,28 @@ const VOID = {
       if (!all || api.flag("doorOpen") || vDoorT < 0) return;
       vDoorT = -1; // 見せているあいだ(cut で onEnter がもう一度呼ばれても、くり返さない)
       api.freeze(3);
-      api.later(1400, () =>
-        api.showSeq(["v_pull1", "v_pull1c", "v_pull2", "v_pull3"], 2.6, () => {
-          api.cut("void", "start");
-          const p = api.player();
-          const d = VOID_DOOR;
-          api.camPath([
-            { t: 0, x: p.x, y: p.y, z: 1 },
-            { t: 2.4, x: d.x, y: d.y - 30, z: 1.5 },
-            { t: 5.4, x: d.x, y: d.y - 30, z: 1.5 },
-          ]);
-          api.later(3000, () => {
-            api.setFlag("doorOpen");
-            vDoorT = performance.now() / 1000;
-            api.sfx("chime");
-          });
-        })
-      );
+      const door = () => {
+        api.cut("void", "start");
+        const p = api.player();
+        const d = VOID_DOOR;
+        api.camPath([
+          { t: 0, x: p.x, y: p.y, z: 1 },
+          { t: 2.4, x: d.x, y: d.y - 30, z: 1.5 },
+          { t: 5.4, x: d.x, y: d.y - 30, z: 1.5 },
+        ]);
+        api.later(3000, () => {
+          api.setFlag("doorOpen");
+          vDoorT = performance.now() / 1000;
+          api.sfx("chime");
+        });
+      };
+      // 全集 10 冊と、すべての断片を同時にそろえて戻ったとき: 引きは 10 冊のほうで見せたので、すぐ扉へ(作者「演出が２回出る」)
+      if (vJustPulled) {
+        vJustPulled = false;
+        api.later(600, door);
+        return;
+      }
+      api.later(1400, () => api.showSeq(["v_pull1", "v_pull1c", "v_pull2", "v_pull3"], 2.6, door));
     };
     // 太宰治全集が 10 冊そろって戻ってきたら(D215): きーが「ださいおさむん」とつぶやき、カメラが引いて、月の裏側が見える。一度だけ
     const books = (window.BOGI_DAZAI || []).filter((b) => api.flagOf(`${b.w}.dazai`)).length;
@@ -267,6 +273,7 @@ const VOID = {
       api.later(1200, () => api.mutter("ださいおさむん", 2600));
       api.later(4200, () =>
         api.showSeq(["v_pull1", "v_pull1c", "v_pull2", "v_pull3"], 2.8, () => {
+          vJustPulled = all;
           api.cut("void", "start");
           openDoor();
         })
