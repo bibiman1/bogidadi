@@ -787,13 +787,14 @@ const ASSET_V = (() => {
       }
     }
 
-    // 調べても何もない物: すぐそばに絵のある物があれば、きーが「……」とだけ返す(説明はしない。
+    // 調べても何もない物: すぐそばに絵のある物があれば、きーが「……」とだけ返す(説明はしない。調べられる物なら、その物を調べる。
     // 無言だと、調べ方がちがうのか、何もないのかがわからない。批評会の「調べたら必ず一言」D308)
     function lookAt() {
       let best = null;
       let bd = Infinity;
       for (const o of visibleObjects()) {
-        if (!o.img || o.interact || o.noLook) continue;
+        if (!o.img || o.noLook) continue;
+        if (o.interact && o.canInteract && !o.canInteract(world.api)) continue;
         let d;
         if (o.solid) {
           const s = o.solid;
@@ -849,8 +850,14 @@ const ASSET_V = (() => {
       if (!pan && map.onA) return map.onA(world.api) !== false;
       if (pan) return false;
       if (!nearObj) {
-        if (!lookAt()) return false;
-        world.api.mutter("……", 1200);
+        // 横に長い物(車など)は、調べる点から遠いはしに立つと届かなかった。体のすぐそばなら、その物を調べる
+        // (はじめは「……」を返していて、車の回想に入れなくなった。批評会 2 回目)
+        const o = lookAt();
+        if (!o) return false;
+        player.vx = 0;
+        player.vy = 0;
+        if (o.interact) o.interact(world.api);
+        else world.api.mutter("……", 1200);
         return true;
       }
       player.vx = 0;
