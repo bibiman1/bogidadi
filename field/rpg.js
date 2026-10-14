@@ -41,6 +41,7 @@ const ASSET_V = (() => {
     let held = null; // { img, t0, sec, onDone } 手に入れた物を、きーの頭の上に掲げて見せる
     let observeFx = null; // { t0 } 見届けたしるし: 小さな光が、きーに降りてくる(D189)
     let toast = null; // { text, until }
+    let toastQueue = []; // 出ている間に来た表示は、順に出す(拾った物と、断片を終えたのが重なるとき)
     let clock = 0;
     let lastCamY = null;
     let lastCam = null; // ふだんのカメラの中心 { x, y }
@@ -164,6 +165,10 @@ const ASSET_V = (() => {
           pan = { y, t0: clock, hold: holdMs / 1000, onDone: onDone || null, from: lastCamY };
         },
         toast(text, sec) {
+          if (toast && toast.until > clock) {
+            if (toast.text !== text) toastQueue.push({ text, sec: sec || 2.4 });
+            return;
+          }
           toast = { text, until: clock + (sec || 2.4) };
         },
         say(pages, onDone) {
@@ -188,7 +193,7 @@ const ASSET_V = (() => {
           if (!host.state.items.includes(name)) host.state.items.push(name);
           host.save();
           api.sfx("item");
-          api.toast(`${name}`);
+          api.toast(`${name}`, 3.2); // 掲げる絵のあとでも読めるように、少し長く(D310)
         },
         // 使った道具を手放す(ペレットを海に投げ込む、など)
         takeItem(name) {
@@ -282,7 +287,12 @@ const ASSET_V = (() => {
         },
         // 断片の条件を満たした(記録だけ。退出は出口から)
         clear() {
-          if (!host.state.cleared.includes(w.id)) host.state.cleared.push(w.id);
+          if (!host.state.cleared.includes(w.id)) {
+            host.state.cleared.push(w.id);
+            // 終えたことが伝わるように、音と断片の名前だけ(説明はしない。批評会で 2 回とも、終えたかどうかがわからなかった D310)
+            api.sfx("chime");
+            api.later(400, () => api.toast(w.name, 3.2));
+          }
           host.save();
         },
         // 懲罰空間へ戻る
@@ -305,6 +315,7 @@ const ASSET_V = (() => {
       camPath = null; // 別の世界に入ったら、前の世界のカメラワークは持ちこさない(タイトルの引きから断片へ D262)
       pan = null;
       toast = null;
+      toastQueue = [];
       if (def.onEnterWorld) def.onEnterWorld(world.api); // 入るたびに、その回だけの状態をリセットする
       loadMap(def.start, spawnName || def.startSpawn);
     }
@@ -659,7 +670,11 @@ const ASSET_V = (() => {
       for (const o of map.objects) if (o.update) o.update(dt, t, world.api);
       // 場所による BGM の大きさ: マップの bgmLevel(数か、きーの位置から決める関数)。なければ 1
       if (window.bogiAudio) window.bogiAudio.bgmLevel(typeof map.bgmLevel === "function" ? map.bgmLevel(player, map) : map.bgmLevel ?? 1);
-      if (toast && toast.until < clock) toast = null;
+      if (toast && cutscene) toast.until += dt; // 一枚絵の下に隠れているあいだは、時間を止める(絵を閉じてから読めるように)
+      if (toast && toast.until < clock) {
+        const next = toastQueue.shift();
+        toast = next ? { text: next.text, until: clock + next.sec } : null;
+      }
 
       if (camPath) {
         const ks = camPath.keys;
@@ -787,14 +802,14 @@ const ASSET_V = (() => {
       }
     }
 
-    // 調べても何もない物: すぐそばに絵のある物があれば、きーが「……」とだけ返す(説明はしない。調べられる物なら、その物を調べる。
-    // 無言だと、調べ方がちがうのか、何もないのかがわからない。批評会の「調べたら必ず一言」D308)
+    // 体のすぐそばの、調べられる物: 調べる点から遠いはし(横に長い車など)に立っても、その物を調べる。
+    // 何もない物には何も返さない(D308 で「……」を返したが、作者「無駄にしらべさせてしまう」D309)
     function lookAt() {
       let best = null;
       let bd = Infinity;
       for (const o of visibleObjects()) {
-        if (!o.img || o.noLook) continue;
-        if (o.interact && o.canInteract && !o.canInteract(world.api)) continue;
+        if (!o.img || !o.interact || o.noLook) continue;
+        if (o.canInteract && !o.canInteract(world.api)) continue;
         let d;
         if (o.solid) {
           const s = o.solid;
@@ -850,14 +865,12 @@ const ASSET_V = (() => {
       if (!pan && map.onA) return map.onA(world.api) !== false;
       if (pan) return false;
       if (!nearObj) {
-        // 横に長い物(車など)は、調べる点から遠いはしに立つと届かなかった。体のすぐそばなら、その物を調べる
-        // (はじめは「……」を返していて、車の回想に入れなくなった。批評会 2 回目)
+        // 横に長い物(車など)は、調べる点から遠いはしに立つと届かなかった(批評会 2 回目)
         const o = lookAt();
         if (!o) return false;
         player.vx = 0;
         player.vy = 0;
-        if (o.interact) o.interact(world.api);
-        else world.api.mutter("……", 1200);
+        o.interact(world.api);
         return true;
       }
       player.vx = 0;

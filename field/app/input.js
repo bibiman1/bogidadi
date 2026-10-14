@@ -143,9 +143,15 @@ function resetJoy() {
   joyDir = null;
 }
 
+// 十字キーを短くタップしても、一歩ぶんは歩く(すぐ離すと、ほとんど動かなかった。批評会 2 回目、D310)
+const JOY_MIN_MS = 180;
+let joyDownAt = 0;
+let joyEndTimer = null;
 joystick.addEventListener("pointerdown", (e) => {
   e.preventDefault();
   if (watch.on) return toggleWatch(false);
+  clearTimeout(joyEndTimer);
+  joyDownAt = performance.now();
   joyActive = true;
   joyPointerId = e.pointerId;
   joystick.classList.add("active");
@@ -159,6 +165,12 @@ joystick.addEventListener("pointermove", (e) => {
 });
 const endJoy = (e) => {
   if (e.pointerId !== joyPointerId) return;
+  const left = JOY_MIN_MS - (performance.now() - joyDownAt);
+  if (left > 0 && e.type === "pointerup") {
+    joyPointerId = null; // 次に押すまで、向きだけ残す
+    joyEndTimer = setTimeout(resetJoy, left);
+    return;
+  }
   resetJoy();
 };
 joystick.addEventListener("pointerup", endJoy);
