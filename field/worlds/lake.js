@@ -805,7 +805,7 @@ const SHOP = {
     at("zabuton", 7.6 * T, 4.5 * T, {
       id: "chair",
       sortDy: -20,
-      range: 30,
+      range: 44, // 30 では、となりの座布団と取りちがえやすかった(批評会 D308)
       interact(api) {
         if (!api.flag("memory")) {
           api.mutter("……");
@@ -823,6 +823,8 @@ const SHOP = {
       },
     }),
     at("chabudai", 7.6 * T, 6.3 * T),
+    // 車の回想のあと、まだ座っていなければ、ちゃんの座布団だけがほのかに光って呼ぶ(ほかの座布団と見分けられるように。批評会 D308)
+    kLure({ id: "chair_lure", x: 7.6 * T, y: 4.5 * T, ly: -0.3 * T, lure: "255, 205, 150", keep: true, when: (api) => api.flag("memory") && !api.flag("ate") }),
     // 囲炉裏のまわりの座布団(奥は自在鉤の竿がかかるので空ける)
     at("zabuton", 9.5 * T, 6.4 * T, { sortDy: -20 }),
     at("zabuton", 13.4 * T, 6.4 * T, { sortDy: -20 }),

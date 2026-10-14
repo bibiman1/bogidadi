@@ -787,6 +787,32 @@ const ASSET_V = (() => {
       }
     }
 
+    // 調べても何もない物: すぐそばに絵のある物があれば、きーが「……」とだけ返す(説明はしない。
+    // 無言だと、調べ方がちがうのか、何もないのかがわからない。批評会の「調べたら必ず一言」D308)
+    function lookAt() {
+      let best = null;
+      let bd = Infinity;
+      for (const o of visibleObjects()) {
+        if (!o.img || o.interact || o.noLook) continue;
+        let d;
+        if (o.solid) {
+          const s = o.solid;
+          const dx = Math.max(0, Math.abs(player.x - (o.x + (s.dx || 0))) - s.w / 2);
+          const dy = Math.max(0, Math.abs(player.y - (o.y + (s.dy || 0))) - s.h / 2);
+          d = Math.hypot(dx, dy);
+          if (d > 16) continue;
+        } else {
+          d = Math.hypot(o.x - player.x, o.y + (o.sortDy || 0) - player.y);
+          if (d > 30) continue;
+        }
+        if (d < bd) {
+          bd = d;
+          best = o;
+        }
+      }
+      return best;
+    }
+
     function interact() {
       if (!world) return false;
       if (camPath && !cutscene) {
@@ -821,7 +847,12 @@ const ASSET_V = (() => {
       }
       // A ボタンをマップが自分で受けとる(競争の合図など、調べる物がない場面)
       if (!pan && map.onA) return map.onA(world.api) !== false;
-      if (pan || !nearObj) return false;
+      if (pan) return false;
+      if (!nearObj) {
+        if (!lookAt()) return false;
+        world.api.mutter("……", 1200);
+        return true;
+      }
       player.vx = 0;
       player.vy = 0;
       nearObj.interact(world.api);

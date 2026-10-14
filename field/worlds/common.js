@@ -21,7 +21,8 @@ const kSparkle = (ctx, x, y, s, a, rgb) => {
   ctx.fillStyle = `rgba(255, 255, 255, ${a})`;
   ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
 };
-const kWatch = ({ id, x, y, r, sec, when, fx, follow, lure, lx = 0, ly = -1.2 * T }) => ({
+// keep: 見届けたあとも呼ぶ光を残す(見届けとは別のしかけ。凍った湖のちゃんの座布団)
+const kWatch = ({ id, x, y, r, sec, when, fx, follow, lure, lx = 0, ly = -1.2 * T, keep }) => ({
   id,
   x,
   y,
@@ -43,7 +44,7 @@ const kWatch = ({ id, x, y, r, sec, when, fx, follow, lure, lx = 0, ly = -1.2 * 
     if (this.p >= 1) api.observe();
   },
   drawOver(ctx, sx, sy, t, api) {
-    if (!when(api) || api.flag("observed")) return;
+    if (!when(api) || (api.flag("observed") && !keep)) return;
     if (lure) {
       // 呼ぶ光: ゆっくり明滅する光と、まわりでまたたく小さな星
       const a = (1 - this.p) * (0.4 + Math.sin(t * 2.6) * 0.18);
@@ -64,8 +65,8 @@ const kWatch = ({ id, x, y, r, sec, when, fx, follow, lure, lx = 0, ly = -1.2 * 
   },
 });
 // 呼ぶ光だけ(見届けは別のしかけで決まるところ。廃兵院の望遠鏡)
-const kLure = ({ id, x, y, when, lure, lx = 0, ly = -1.2 * T }) => {
-  const w = kWatch({ id, x, y, r: 0, sec: 1, when, lure, lx, ly });
+const kLure = ({ id, x, y, when, lure, lx = 0, ly = -1.2 * T, keep }) => {
+  const w = kWatch({ id, x, y, r: 0, sec: 1, when, lure, lx, ly, keep });
   w.update = () => {};
   return w;
 };
