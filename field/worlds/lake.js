@@ -512,8 +512,9 @@ const ROAD = {
         near(api) {
           api.bubble("pi", "どけ");
         },
+        // 「古タイヤをみつけたらおしえろ」は、遊ぶ人が断片の目的と受け取って探しまわった(批評会 2・3 回目)。「どけ」だけにする(D311)
         interact(api) {
-          api.bubble("pi", "古タイヤをみつけたらおしえろ", 3600);
+          api.bubble("pi", "どけ");
         },
       },
       {}
@@ -824,7 +825,7 @@ const SHOP = {
     }),
     at("chabudai", 7.6 * T, 6.3 * T),
     // 車の回想のあと、まだ座っていなければ、ちゃんの座布団だけがほのかに光って呼ぶ(ほかの座布団と見分けられるように。批評会 D308)
-    kLure({ id: "chair_lure", x: 7.6 * T, y: 4.5 * T, ly: -0.3 * T, lure: "255, 205, 150", keep: true, when: (api) => api.flag("memory") && !api.flag("ate") }),
+    kLure({ id: "chair_lure", x: 7.6 * T, y: 4.5 * T, ly: -0.3 * T, lure: "255, 215, 160", keep: true, big: true, when: (api) => api.flag("memory") && !api.flag("ate") }),
     // 囲炉裏のまわりの座布団(奥は自在鉤の竿がかかるので空ける)
     at("zabuton", 9.5 * T, 6.4 * T, { sortDy: -20 }),
     at("zabuton", 13.4 * T, 6.4 * T, { sortDy: -20 }),

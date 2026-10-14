@@ -22,7 +22,7 @@ const kSparkle = (ctx, x, y, s, a, rgb) => {
   ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
 };
 // keep: 見届けたあとも呼ぶ光を残す(見届けとは別のしかけ。凍った湖のちゃんの座布団)
-const kWatch = ({ id, x, y, r, sec, when, fx, follow, lure, lx = 0, ly = -1.2 * T, keep }) => ({
+const kWatch = ({ id, x, y, r, sec, when, fx, follow, lure, lx = 0, ly = -1.2 * T, keep, big }) => ({
   id,
   x,
   y,
@@ -47,14 +47,16 @@ const kWatch = ({ id, x, y, r, sec, when, fx, follow, lure, lx = 0, ly = -1.2 * 
     if (!when(api) || (api.flag("observed") && !keep)) return;
     if (lure) {
       // 呼ぶ光: ゆっくり明滅する光と、まわりでまたたく小さな星
-      const a = (1 - this.p) * (0.4 + Math.sin(t * 2.6) * 0.18);
+      // big: 部屋の中で、入ったときに目に入る大きさと明るさ(凍った湖のちゃんの座布団。批評会で気づかれなかった D311)
+      const R = big ? 46 : 30;
+      const a = (1 - this.p) * (big ? 0.62 + Math.sin(t * 2.6) * 0.2 : 0.4 + Math.sin(t * 2.6) * 0.18);
       const cx = sx + lx;
       const cy = sy + ly;
-      const g = ctx.createRadialGradient(cx, cy, 1, cx, cy, 30);
+      const g = ctx.createRadialGradient(cx, cy, 1, cx, cy, R);
       g.addColorStop(0, `rgba(${lure}, ${a})`);
       g.addColorStop(1, `rgba(${lure}, 0)`);
       ctx.fillStyle = g;
-      ctx.fillRect(cx - 30, cy - 30, 60, 60);
+      ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
       for (let k = 0; k < 4; k++) {
         const ph = t * 1.7 + k * 1.9;
         const tw = Math.max(0, Math.sin(ph));
@@ -65,8 +67,8 @@ const kWatch = ({ id, x, y, r, sec, when, fx, follow, lure, lx = 0, ly = -1.2 * 
   },
 });
 // 呼ぶ光だけ(見届けは別のしかけで決まるところ。廃兵院の望遠鏡)
-const kLure = ({ id, x, y, when, lure, lx = 0, ly = -1.2 * T, keep }) => {
-  const w = kWatch({ id, x, y, r: 0, sec: 1, when, lure, lx, ly, keep });
+const kLure = ({ id, x, y, when, lure, lx = 0, ly = -1.2 * T, keep, big }) => {
+  const w = kWatch({ id, x, y, r: 0, sec: 1, when, lure, lx, ly, keep, big });
   w.update = () => {};
   return w;
 };

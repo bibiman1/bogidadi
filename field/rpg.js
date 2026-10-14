@@ -193,7 +193,9 @@ const ASSET_V = (() => {
           if (!host.state.items.includes(name)) host.state.items.push(name);
           host.save();
           api.sfx("item");
-          api.toast(`${name}`, 3.2); // 掲げる絵のあとでも読めるように、少し長く(D310)
+          // 持ち帰る物(断片ごとに 1 つ)は「どうぐ」でなく「おもいで」に入る。どこに入ったかを添える(「どうぐ なし」のままで、拾えたかわからなかった D311)
+          const souv = Object.values((window.BOGI_WORLDS.void || {}).souvenirs || {});
+          api.toast(souv.includes(name) ? `おもいで　${name}` : `${name}`, 3.2); // 掲げる絵のあとでも読めるように、少し長く(D310)
         },
         // 使った道具を手放す(ペレットを海に投げ込む、など)
         takeItem(name) {
@@ -289,9 +291,8 @@ const ASSET_V = (() => {
         clear() {
           if (!host.state.cleared.includes(w.id)) {
             host.state.cleared.push(w.id);
-            // 終えたことが伝わるように、音と断片の名前だけ(説明はしない。批評会で 2 回とも、終えたかどうかがわからなかった D310)
+            // 終えたことが伝わるように、音だけ(D310。断片の名前は出さない。作者「断片の名前でるのいらない」D312)
             api.sfx("chime");
-            api.later(400, () => api.toast(w.name, 3.2));
           }
           host.save();
         },
