@@ -193,9 +193,9 @@ const ASSET_V = (() => {
           if (!host.state.items.includes(name)) host.state.items.push(name);
           host.save();
           api.sfx("item");
-          // 持ち帰る物(断片ごとに 1 つ)は「どうぐ」でなく「おもいで」に入る。どこに入ったかを添える(「どうぐ なし」のままで、拾えたかわからなかった D311)
+          // 持ち帰る物(断片ごとに 1 つ。「おもいで」に入る)は、文字を出さない(掲げる絵と音だけ。作者「おもいで　氷のかけら　もいらない。」D313)
           const souv = Object.values((window.BOGI_WORLDS.void || {}).souvenirs || {});
-          api.toast(souv.includes(name) ? `おもいで　${name}` : `${name}`, 3.2); // 掲げる絵のあとでも読めるように、少し長く(D310)
+          if (!souv.includes(name)) api.toast(`${name}`, 3.2); // 掲げる絵のあとでも読めるように、少し長く(D310)
         },
         // 使った道具を手放す(ペレットを海に投げ込む、など)
         takeItem(name) {
