@@ -1,5 +1,5 @@
 // 断片「呪いの野犬」のダイナーのピンボール台「FREEWAY DOGS」(D327)。
-// 調べると台の画面に切りかわる。B が左のフリッパー、A が右のフリッパー、十字キーの下を押して離すと玉を打ち出す。玉は 3 つ。
+// 調べると台の画面に切りかわる。十字キーの左が左のフリッパー、A が右のフリッパー(D329)、十字キーの下を押して離すと玉を打ち出す。玉は 3 つ。
 // 進み具合とは関係しない。最高点だけ、台に残す(保存の flags の noroi.pinHigh)。
 // 盤面の絵はここで描き、頭の絵(backglass)は docs/assets/noroi/pinball/make.py
 "use strict";
@@ -11,12 +11,12 @@ const PB_W = 168;
 const PB_H = 280;
 const PB_R = 4; // 玉の半径
 const PB_G = 300; // 重力(盤面の傾き)
-const PB_FLIP = { len: 30, rest: 0.5, up: -0.42, wUp: 24, wDown: 12, thick: 3 };
+const PB_FLIP = { len: 38, rest: 0.5, up: -0.42, wUp: 24, wDown: 12, thick: 3 }; // 長さは絵(pb_flipper、支点から先まで 38 ドット)に合わせる(D330)
 const PB_LANE = { x: 157, rest: 264 }; // 打ち出しの通路
 const PB_BUMPERS = [
-  { x: 52, y: 96, r: 11, kind: "beko" }, // 赤べこの頭
-  { x: 112, y: 96, r: 11, kind: "drum" }, // ぽんぽんカーのドラム缶
-  { x: 82, y: 134, r: 11, kind: "duck" }, // とりぼぎかーの子がも
+  { x: 52, y: 96, r: 14, kind: "beko" }, // 赤べこの頭(半径は絵 pb_bump_* に合わせる D330)
+  { x: 112, y: 96, r: 14, kind: "drum" }, // ぽんぽんカーの燃えるドラム缶
+  { x: 82, y: 134, r: 14, kind: "duck" }, // とりぼぎかーの子がも
 ];
 const PB_TOPLANES = [66, 90, 114]; // 上の 3 つのレーン(全部ともすと 1000 点)
 const PB_POSTS = [54, 78, 102, 126];
@@ -30,8 +30,8 @@ const PB_WALLS = (() => {
     if (prev) w.push([prev[0], prev[1], p[0], p[1]]);
     prev = p;
   }
-  w.push([4, 84, 4, 206], [4, 206, 40, 246]); // 左の壁とすべり台
-  w.push([164, 84, 164, 284], [150, 104, 150, 284], [150, 206, 110, 246]); // 右の壁、通路の仕切り、右のすべり台
+  w.push([4, 84, 4, 206], [4, 206, 33, 246]); // 左の壁とすべり台
+  w.push([164, 84, 164, 284], [150, 104, 150, 284], [150, 206, 117, 246]); // 右の壁、通路の仕切り、右のすべり台
   w.push([150, 272, 164, 272]); // 打ち出し棒の頭
   for (const x of PB_POSTS) w.push([x, 32, x, 46]); // 上のレーンの仕切り
   return w;
@@ -41,7 +41,7 @@ const PB_SLINGS = [
   [130, 188, 114, 222],
 ];
 const pb = { x: 0, y: 0, vx: 0, vy: 0, live: false, balls: 3, score: 0, over: false, charge: 0, lanes: [false, false, false], flash: {}, flips: null, high: 0, t: 0, drainT: -1 };
-const pbFlipper = (left) => ({ left, px: left ? 40 : 110, py: 246, th: PB_FLIP.rest, w: 0 });
+const pbFlipper = (left) => ({ left, px: left ? 33 : 117, py: 246, th: PB_FLIP.rest, w: 0 });
 // フリッパーの画面での角度(左は右下へ、右は左下へのびる)
 const pbAng = (f) => (f.left ? f.th : Math.PI - f.th);
 const pbTip = (f) => ({ x: f.px + PB_FLIP.len * Math.cos(pbAng(f)), y: f.py + PB_FLIP.len * Math.sin(pbAng(f)) });
@@ -179,7 +179,7 @@ const N_PIN = {
     pb.t += dt;
     // フリッパー
     for (const f of pb.flips) {
-      const on = f.left ? inp.b : inp.a;
+      const on = f.left ? inp.x < -0.5 : inp.a; // 左のフリッパーは十字キーの左、右は A(作者「フリッパーは左とAで操作」D329)
       const target = on ? PB_FLIP.up : PB_FLIP.rest;
       const prevTh = f.th;
       const sp = on ? PB_FLIP.wUp : PB_FLIP.wDown;
@@ -264,7 +264,18 @@ const N_PIN = {
       ctx.fillRect(X + x - 3, Y + 50, 6, 4);
     });
     // バンパー(当たった直後は光る)
-    PB_BUMPERS.forEach((b, i) => pbBumper(ctx, X + b.x, Y + b.y, b, pb.t - (pb.flash["b" + i] ?? -9) < 0.12));
+    PB_BUMPERS.forEach((b, i) => {
+      const lit = pb.t - (pb.flash["b" + i] ?? -9) < 0.12;
+      const im = get("pb_bump_" + b.kind); // 絵(D330)。なければ手描き
+      if (!im) return pbBumper(ctx, X + b.x, Y + b.y, b, lit);
+      ctx.drawImage(im, Math.round(X + b.x - im.width / 2), Math.round(Y + b.y - im.height / 2));
+      if (lit) {
+        ctx.fillStyle = "rgba(255, 246, 200, 0.55)";
+        ctx.beginPath();
+        ctx.arc(X + b.x, Y + b.y, b.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    });
     // スリングショット
     PB_SLINGS.forEach((s, i) => {
       const lit = pb.t - (pb.flash["sling" + i] ?? -9) < 0.1;
@@ -281,8 +292,18 @@ const N_PIN = {
     ctx.fillRect(X + 152, Y + 273 + pk, 10, 3);
     ctx.fillStyle = "#806040";
     for (let y = Y + 277 + pk; y < Y + PB_H; y += 2) ctx.fillRect(X + 154, y, 6, 1);
-    // フリッパー
+    // フリッパー(絵 pb_flipper は右向き、支点が (8, 8)。右のフリッパーは左右を返す D330)
+    const fim = get("pb_flipper");
     for (const f of pb.flips) {
+      if (fim) {
+        ctx.save();
+        ctx.translate(X + f.px, Y + f.py);
+        if (!f.left) ctx.scale(-1, 1);
+        ctx.rotate(f.th);
+        ctx.drawImage(fim, -8, -8);
+        ctx.restore();
+        continue;
+      }
       const tip = pbTip(f);
       ctx.lineCap = "round";
       ctx.strokeStyle = "#b02a24";

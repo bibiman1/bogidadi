@@ -261,7 +261,7 @@ for (let i = 0; i < 46; i++) nMotes.push({ x: Math.random(), y: Math.random(), p
 const N_SHAFTS = [3, 7.5, 12.5]; // 光の帯の南のはし(マス)
 const N_DINER = nMap("diner", 20, 12, {
   bg: "#2a2420",
-  spawns: { door: { x: 10 * T, y: 10.5 * T, facing: "north" }, pinball: { x: 1.25 * T, y: 10.85 * T, facing: "north" } },
+  spawns: { door: { x: 10 * T, y: 10.5 * T, facing: "north" }, pinball: { x: 1.5 * T, y: 10.85 * T, facing: "north" } /* 左の壁のマスにかからない所(作者「ゲームしたあとにハマる」) */ },
   drawOverlay(ctx, ox, oy, t, api) {
     // ほこり: 光の帯の中だけ、ゆっくり上下に漂う
     for (const m of nMotes) {
