@@ -314,17 +314,16 @@ const N_DINER = nMap("diner", 20, 12, {
     },
     { id: "photo", x: 14.3 * T, y: 3.2 * T, w: 1, h: 1, headY: 2.2 * T, range: 48, interact: (api) => api.show("v_photo") },
     { id: "plaques", x: 13.2 * T, y: 3.2 * T, w: 1, h: 1, headY: 2.6 * T, range: 44, interact: (api) => api.show("v_plaque") }, // 一つ分あいた釘。並んだ札を調べると、クラブの札の大写し(作者「プラークのデザインを見せてあげればよい」)
-    { id: "calendar", x: 15.4 * T, y: 3.2 * T, w: 1, h: 1, headY: 2.2 * T, range: 44, interact: (api) => api.mutter("……", 1400) }, // 赤い丸の土曜日(仮)
     { id: "pinball", x: 1.9 * T, y: 9.3 * T, w: 1, h: 1, headY: 3.4 * T, range: 44, interact: (api) => { nPinT0 = nNow(); api.mutter("……", 1400); } }, // ピンボール(つぶやきは仮)
-    { id: "stopwatch", x: 15.2 * T, y: 6.9 * T, w: 1, h: 1, headY: 1.2 * T, range: 52, interact: (api) => api.mutter("……", 1400) }, // 地図と鍵とストップウォッチ(仮)
     {
       // ボックス席のテーブルの雑誌「BOGICAR GRAPHIC」(D320): 表紙から、A でめくって 6 台を 1 台ずつ(絵は docs/assets/noroi/magazine/make.py)
       id: "magazine",
-      x: 17.2 * T, // 調味料のびんの右。通路(テーブルの左のはし)から届くように、調べる距離は長め
+      x: 17.2 * T, // 調味料のびんの右
       y: 8.75 * T,
+      ix: -1.7 * T, // 調べる点は、通路(テーブルの左のはし)に寄せる。きーはテーブルの中へは入れない(作者「出ない」)
       w: 1,
       h: 1,
-      range: 64,
+      range: 40,
       headY: 0.6 * T,
       draw(ctx, sx, sy) {
         // 赤い題の帯の、少し斜めに置かれた一冊
