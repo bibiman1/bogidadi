@@ -382,10 +382,22 @@ const N_DINER = nMap("diner", 20, 12, {
 });
 // レコードがかかっていれば、そのまま(ピンボールから戻ったときに止めない)。nMap は Object.assign なので、あとから getter をつける
 Object.defineProperty(N_DINER, "bgm", { get: () => (nJukePlaying() ? window.bogiAudio.state().bgm : undefined) });
+// 店の外(ドライブイン跡)でも、レコードは小さく聞こえる。扉の前で 3 割、遠ざかるほど小さく(D339、作者「ダイナーの外でも小さく聞こえるようにして」)
+Object.defineProperty(N_DRIVEIN, "bgm", { get: () => (nJukePlaying() ? window.bogiAudio.state().bgm : undefined) });
+N_DRIVEIN.bgmLevel = (p) => (nJukePlaying() ? Math.max(0.05, 0.3 * (1 - Math.hypot(p.x - 14 * T, p.y - 5 * T) / (14 * T))) : 1);
 
 // D 旧国道の直線(ドラッグストリップ)。競争の画面と同じ場所(D140): 北と南に空っぽの木のスタンド、スタートの白線と信号の柱、東にゴールの線と計時の小屋
 // 炎を塗ったあと、野犬たちが北の路肩に並び、スタートの白線の手前に三台(ぽんぽんカー、赤べこ、ぼぎカー)
-const nRace = (api) => api.warp("race", "view");
+const nRace = (api, duel) => {
+  nDuelNext = duel || null;
+  api.warp("race", "view");
+};
+// 優勝のあとは、話しかけたマシンと一騎打ち(D341)。その前は、いつもの声だけ(または fallback)
+const nDuelOr = (id, fallback) => (api) => {
+  if (!api.flag("won")) return (fallback || nTalk(id))(api);
+  nTalk(id)(api);
+  api.later(900, () => nRace(api, id));
+};
 const N_STRIP = nMap("strip", 28, 12, {
   spawns: {
     west: { x: 1.2 * T, y: 6.6 * T, facing: "east" },
@@ -446,17 +458,17 @@ const N_STRIP = nMap("strip", 28, 12, {
       },
     }),
     nSprite("tree", "tree", 9 * T, 4.9 * T, 20, 65, { solid: { w: 12, h: 10, dy: -5 } }), // 信号の柱はスタートの白線(D140)
-    nSprite("toribogi", "tori_e", 12 * T, 4.4 * T, 93, 81, { hidden: (api) => !nAtStrip(api), range: 60, interact: nTalk("toribogi") }),
-    nSprite("kokeshi", "kokeshi_e", 15.4 * T, 4.4 * T, 72, 51, { hidden: (api) => !nAtStrip(api), range: 56, interact: nTalk("kokeshi") }),
-    nSprite("tansu", "tansu_e", 19.4 * T, 4.4 * T, 118, 89, { hidden: (api) => !nAtStrip(api), shake: true, range: 70, interact: nTalk("tansu") }),
+    nSprite("toribogi", "tori_e", 12 * T, 4.4 * T, 93, 81, { hidden: (api) => !nAtStrip(api), range: 60, interact: nDuelOr("toribogi") }),
+    nSprite("kokeshi", "kokeshi_e", 15.4 * T, 4.4 * T, 72, 51, { hidden: (api) => !nAtStrip(api), range: 56, interact: nDuelOr("kokeshi") }),
+    nSprite("tansu", "tansu_e", 19.4 * T, 4.4 * T, 118, 89, { hidden: (api) => !nAtStrip(api), shake: true, range: 70, interact: nDuelOr("tansu") }),
     nSprite("miton", "miton_s", 22.4 * T, 4.4 * T, 36, 66, { hidden: (api) => !nAtStrip(api), range: 50, interact: (api) => api.bubble("miton", "……", 1400) }),
-    nSprite("ponpon", "ponpon_e", 7.6 * T, 5.25 * T, 80, 59, { hidden: (api) => !nAtStrip(api), shake: true, range: 56, interact: nTalk("ponpon") }),
+    nSprite("ponpon", "ponpon_e", 7.6 * T, 5.25 * T, 80, 59, { hidden: (api) => !nAtStrip(api), shake: true, range: 56, interact: nDuelOr("ponpon") }),
     nSprite("akabeko", "akabeko_e", 7.6 * T, 6.9 * T, 67, 46, {
       hidden: (api) => !nAtStrip(api),
       shake: true,
       solid: { w: 58, h: 16, dy: -8 },
       range: 60,
-      interact: (api) => (api.flag("won") ? nTalk("akabeko")(api) : nRace(api)),
+      interact: nDuelOr("akabeko", (api) => nRace(api)),
     }),
     nSprite("bogicar", "bogicar_e_flame", 7.4 * T, 8.7 * T, 77, 37, {
       hidden: (api) => !nAtStrip(api),
@@ -485,6 +497,17 @@ const N_ROUNDS = [
   { id: "toribogi", img: "rcs_tori", name: "じゅんけっしょう", et: N_KI_ET + 1.4, lift: 0 },
   { id: "akabeko", img: "rcs_aka", name: "けっしょう", et: N_KI_ET + 0.9, lift: 0.2 },
 ];
+// 優勝のあとの一騎打ち(D341、作者「ドラッグレースは何回もチャレンジできるようにして。あと、車箪笥やこけしとも競争したい。」)
+// ドラッグストリップでマシンに話しかけると、そのマシンと何度でも。勝ち負けで進み具合は変わらない(タイムだけ)
+const N_DUEL = {
+  ponpon: N_ROUNDS[0],
+  toribogi: N_ROUNDS[1],
+  akabeko: N_ROUNDS[2],
+  tansu: { id: "tansu", img: "rcs_tansu", name: "くるまだんす", et: N_KI_ET + 1.2, lift: 0, rattle: 2 }, // ヘミ V8 の重い箱。出だしで引き出しがガタつく(みとんが中に乗る)
+  kokeshi: { id: "kokeshi", img: "rcs_kokeshi", name: "こけし", et: N_KI_ET + 0.6, lift: 0.1 }, // いちばん速い。反応が遅いと負ける
+};
+let nDuelNext = null; // 次の競争の一騎打ちの相手(nRace で決める)
+const nCurRd = () => (nr.duel ? N_DUEL[nr.duel] : N_ROUNDS[nr.round]);
 const N_PX = 3; // 1 m = 3 ドット
 const N_SNAP_HOLD = 0.35; // ぽんぽんカーの線が張って止まっている秒(D338)
 const N_SNAP_FLY = 1.0; // そこから峠へ飛んでいく秒
@@ -505,6 +528,7 @@ const nRaceReset = (api) => {
   nr.repT = -1;
   nr.flash = -1;
   nr.round = nRound(api);
+  nr.duel = nDuelNext;
   nRcPuffs.length = 0;
   nRrPuffs.length = 0;
 };
@@ -519,7 +543,7 @@ const nOpp = (rd, t) => {
 const nRaceState = () => {
   const real = nNow() - nr.t0;
   const s = nr.repT >= 0 ? nr.rep0 + (real - nr.repT) : real;
-  const rd = N_ROUNDS[nr.round];
+  const rd = nCurRd();
   const ki = nr.go < 0 ? 0 : Math.max(0, Math.min(N_RACE_D + 24, (s - nr.go) * (N_RACE_D / N_KI_ET))); // 無慣性なので、ゴールを過ぎたらその場でぴたりと止まる
   let opp = nr.foul >= 0 ? 0 : nOpp(rd, s - N_GREEN);
   let back = 0;
@@ -641,7 +665,7 @@ const nDrawCar = (ctx, im, ox, oy, lane, d, shake, lift) => {
   ctx.drawImage(im, Math.round(ox + x - w / 2), Math.round(oy + y - h + shake), Math.round(w), Math.round(h));
   return { x, y, f, w, h };
 };
-const N_REAR = { ponpon: "rc_pon_back", toribogi: "rc_tori_back", akabeko: "rc_aka_back" };
+const N_REAR = { ponpon: "rc_pon_back", toribogi: "rc_tori_back", akabeko: "rc_aka_back", tansu: "rc_tansu_back", kokeshi: "rc_kokeshi_back" };
 const nDrawRear = (ctx, ox, oy, get, api, st0) => {
   const { s, rd, ki, opp, back } = st0;
   const plate = get("rc_plate");
@@ -670,7 +694,7 @@ const nDrawRear = (ctx, ox, oy, get, api, st0) => {
   const drawOpp = () => {
     const st = s - N_GREEN;
     const lift = rd.lift && st > 0 && st < 1.1 && !back ? rd.lift * Math.sin((Math.PI * st) / 1.1) : 0;
-    const r = nDrawCar(ctx, oim, ox, oy, NR_LANE.opp, opp, shk(burn || (st > 0 && st < 0.8), 1), lift);
+    const r = nDrawCar(ctx, oim, ox, oy, NR_LANE.opp, opp, shk(burn || (st > 0 && st < (rd.rattle ? 1.2 : 0.8)), rd.rattle || 1), lift);
     if (!r) return;
     if (rd.snap) {
       // 線: 画面の左下の外(峠のドラム缶)から、ぽんぽんカーのエンジンの右へ
@@ -732,7 +756,8 @@ const N_RACE = {
     if (nr.end || nr.foul >= 0 || nr.go >= 0 || s < 3.4) return true;
     if (s < N_GREEN) {
       nr.foul = s; // 青より前は赤(フライング)
-      api.later(2000, () => nRaceReset(api));
+      if (nr.duel) api.later(2000, () => api.say(["フライング"], () => api.warp("strip", "start")));
+      else api.later(2000, () => nRaceReset(api));
       return true;
     }
     nr.go = s;
@@ -760,7 +785,12 @@ const N_RACE = {
       if (kiIn || oppIn || timeout) {
         nr.end = kiIn && !oppIn ? "win" : "lose";
         nr.endT = s;
-        if (nr.end === "win") {
+        if (nr.duel) {
+          // 一騎打ち: 勝っても負けても、タイムを出してドラッグストリップへ戻る(また話しかければ、もう一度)
+          const lines = nr.end === "win" ? ["かち"] : [nr.foul >= 0 ? "フライング" : "まけ"];
+          if (nr.go >= 0) lines.push(`リアクション　${(nr.go - N_GREEN).toFixed(3)}`, ...(kiIn ? [`イーティー　${(s - nr.go).toFixed(3)}`] : []));
+          api.later(nr.end === "win" ? 3400 : 2200, () => api.say(lines, () => api.warp("strip", "start")));
+        } else if (nr.end === "win") {
           const rt = (nr.go - N_GREEN).toFixed(3);
           const et = (s - nr.go).toFixed(3);
           const last = nr.round === N_ROUNDS.length - 1;
@@ -778,7 +808,7 @@ const N_RACE = {
               });
             }
           });
-        } else api.later(2200, () => nRaceReset(api)); // 負けたら、その回からやり直し
+        } else if (!nr.duel) api.later(2200, () => nRaceReset(api)); // 負けたら、その回からやり直し
       }
     }
     if (nr.repT < 0) {
@@ -831,7 +861,7 @@ const N_RACE = {
     const ofx = ox + N_SX + opp * N_PX - cam;
     let lift = rd.lift && st > 0 && st < 1.1 && !back ? rd.lift * Math.sin((Math.PI * st) / 1.1) : 0;
     if (st0.taut > 0) lift = -0.06 * Math.sin(Math.PI * (1 - st0.taut)); // 張った瞬間、前のめりに
-    const r = nDrawSide(ctx, oim, ofx, oy + N_GY.opp, st0.taut > 0 ? Math.round(Math.sin(s * 90) * 1.5) : shk(burn || (st > 0 && st < 0.8), 1), lift);
+    const r = nDrawSide(ctx, oim, ofx, oy + N_GY.opp, st0.taut > 0 ? Math.round(Math.sin(s * 90) * 1.5) : shk(burn || (st > 0 && st < (rd.rattle ? 1.2 : 0.8)), rd.rattle || 1), lift);
     if (r && rd.snap) {
       // 線: 画面の左の外(峠のドラム缶 = 過去)から、ぽんぽんカーのうしろへ。張ったときは真っすぐ、ふるえる
       const sag = st0.taut > 0 ? Math.sin(s * 70) * 2 : back > 0 ? 6 + back * 30 : Math.max(3, 40 * (1 - opp / N_RACE_D));
