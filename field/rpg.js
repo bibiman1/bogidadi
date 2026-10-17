@@ -113,6 +113,8 @@ const ASSET_V = (() => {
           if (cutscene && cutscene.img === imgKey) return;
           if (lastClosed && lastClosed.img === imgKey && clock - lastClosed.t < 1.5) return;
           cutscene = { img: imgKey, t0: clock, onDone: onDone || null, full: !!(opts && opts.full), into: (opts && opts.into) || null };
+          // { flip: 前の絵, spine: のどの位置(絵の幅に対する割合) } なら、本のページのように、前の絵の右側がのどへ倒れて次の絵になる(雑誌 D325)
+          if (opts && opts.flip) Object.assign(cutscene, { flip: opts.flip, spine: opts.spine != null ? opts.spine : 0.5 });
         },
         // 一枚絵を、だんだん速く切りかえながら寄っていく(ボタンを待たない)。steps: [{ img, sec, z0, z1, cx, cy, fadeIn }]
         // 最後に白く光り、光ったところで onDone(その裏でマップを切りかえる。白は flash で引かせる)
@@ -846,7 +848,7 @@ const ASSET_V = (() => {
           return true;
         }
         if (cutscene.seq || cutscene.burst || cutscene.outT0 != null) return true;
-        if (clock - cutscene.t0 < 0.6) return true;
+        if (clock - cutscene.t0 < (cutscene.flip ? FLIP_SEC + 0.1 : 0.6)) return true;
         const done = cutscene.onDone;
         if (cutscene.into) {
           // 絵は消さずに残し、裏で次のマップに切りかえてから、絵だけを薄くしていく
@@ -1436,11 +1438,13 @@ const ASSET_V = (() => {
         cutscene = null;
         return;
       }
-      const a = Math.min(1, el / 0.6) * (1 - out);
+      const a = (cutscene.flip ? 1 : Math.min(1, el / 0.6)) * (1 - out);
       ctx.fillStyle = `rgba(8, 8, 12, ${0.92 * a})`;
       ctx.fillRect(0, 0, VW, VH);
       const im = img(cutscene.img);
       if (!im) return;
+      const prev = cutscene.flip ? img(cutscene.flip) : null;
+      if (prev && el < FLIP_SEC && prev.width === im.width && prev.height === im.height) return drawFlip(prev, im, el / FLIP_SEC);
       // 枠の角の丸みやスマホのボタンで端が欠けないよう、まわりに余白を残して描く。
       // 整数倍でくっきり拡大してから、余白に収まる大きさへなめらかに縮める
       const fit = cutscene.full
@@ -1464,6 +1468,41 @@ const ASSET_V = (() => {
       ctx.drawImage(cutscene.buf.canvas, Math.round((VW - w) / 2), Math.round((VH - h) / 2), w, h);
       ctx.imageSmoothingEnabled = false;
       ctx.globalAlpha = 1;
+    }
+
+    // ページをめくる(雑誌 D325): 前半は前の絵の右側がのどへ縮み、後半は次の絵の左側がのどから広がる。下には次の絵の右側と前の絵の左側
+    const FLIP_SEC = 0.35;
+    function drawFlip(prev, im, k) {
+      const fit = Math.min((VW * 0.9) / im.width, (VH * 0.86) / im.height);
+      const w = Math.round(im.width * fit);
+      const h = Math.round(im.height * fit);
+      const x0 = Math.round((VW - w) / 2);
+      const y0 = Math.round((VH - h) / 2);
+      const sp = Math.round(im.width * cutscene.spine); // のど(絵の座標)
+      const dsp = x0 + Math.round(sp * fit); // のど(画面の座標)
+      ctx.imageSmoothingEnabled = false;
+      const part = (src, sx0, sx1, dx, dw) => {
+        if (sx1 - sx0 < 1 || Math.abs(dw) < 1) return;
+        ctx.drawImage(src, sx0, 0, sx1 - sx0, src.height, Math.round(dx), y0, Math.round(dw), h);
+      };
+      part(prev, 0, sp, x0, dsp - x0); // 前の絵の左
+      part(im, sp, im.width, dsp, x0 + w - dsp); // 次の絵の右
+      const shade = (x, ww, a) => {
+        ctx.fillStyle = `rgba(20, 14, 8, ${a})`;
+        ctx.fillRect(Math.round(Math.min(x, x + ww)), y0, Math.round(Math.abs(ww)), h);
+      };
+      if (k < 0.5) {
+        const f = 1 - k * 2; // 倒れていく前の絵の右側
+        const ww = (x0 + w - dsp) * f;
+        part(prev, sp, im.width, dsp, ww);
+        shade(dsp, ww, 0.35 * (1 - f));
+        shade(dsp + ww, (x0 + w - dsp) * 0.06 * (1 - f), 0.2); // 起き上がったページの影
+      } else {
+        const f = k * 2 - 1; // 倒れてくる次の絵の左側
+        const ww = (dsp - x0) * f;
+        part(im, 0, sp, dsp - ww, ww);
+        shade(dsp - ww, ww, 0.35 * (1 - f));
+      }
     }
 
     function clamp(v, a, b) {

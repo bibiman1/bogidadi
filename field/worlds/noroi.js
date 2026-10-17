@@ -337,7 +337,11 @@ const N_DINER = nMap("diner", 20, 12, {
         ctx.fillRect(sx - 4, sy - 5, 6, 2);
       },
       interact(api) {
-        const page = (i) => api.show(`v_mag_${i}`, i < 6 ? () => page(i + 1) : null);
+        // めくる音と、ページが倒れる効果(D325)。表紙ののどは表紙の左のはし、見開きののどは 238 ドット(make.py)
+        const page = (i) => {
+          api.sfx("page");
+          api.show(`v_mag_${i}`, i < 6 ? () => page(i + 1) : null, i > 0 ? { flip: `v_mag_${i - 1}`, spine: i === 1 ? 140 / 480 : 238 / 480 } : null);
+        };
         page(0);
       },
     },
