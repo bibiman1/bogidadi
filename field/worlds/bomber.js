@@ -126,7 +126,7 @@ const bPlan = (morning) => {
       b.ta = walk(j, b, b.img, k);
     });
     // 見せ場(D222): 並べ終えたら、列の手前に二列に整列して敬礼し、記念写真を一枚(D182 の写真のように)
-    for (let j = 0; j < n; j++) walk(j, { x: 640 + (j % 24) * 18 + (j >= 24 ? 9 : 0), y: j >= 24 ? 590 : 568 }, null);
+    for (let j = 0; j < n; j++) walk(j, { x: 640 + (j % 24) * 18 + (j >= 24 ? 9 : 0), y: j >= 24 ? 602 : 570 }, null); // 二列の間は 32px(引きの画面でも後ろの列が隠れない D315)
     B_SHOW.lined = Math.max(...free);
     B_SHOW.photo = B_SHOW.lined + 2.2; // シャッター
     B_SHOW.load = B_SHOW.photo + 9.5; // 写真のあと、機体を見せてから積みはじめる
@@ -714,8 +714,11 @@ const B_KICHI = {
     },
     bCrew("crew1", "crew_hawk", 14.6 * T, 17.3 * T, 0, {
       range: 40,
+      iy: 0, // 重なり順を変えても、調べる距離は足もとから
       line: [12.6 * T, 16.95 * T],
       update(dt, t, api) {
+        // 帽子を持って機体の向こう(北)へ歩くときは、翼の上を越えていく(機体の陰に隠れない。修理のぼぎと同じ)
+        this.sortDy = bS.phase === "back" && !bS.farewell && this.y < B_Y ? B_Y - this.y + 2 : 0;
         if (bS.farewell) return bWalkTo(this, this.line, dt);
         // 帰ってきたら、帽子を差し出しに、きーのほうへ歩いてくる
         if (bS.phase !== "back" || api.flag("cap")) return;
