@@ -308,7 +308,7 @@ window.BOGI_WORLDS = {
     images: Object.fromEntries(
       ["bg_pass", "bg_drivein", "bg_strip", "bg_diner", "drum", "fueler", "tree", "plaque", "v_custom", "v_finish", "v_photo",
         "rc_plate", "rc_lamps", "v_plaque", "rc_ki_back", "rc_ki_stick", "rc_bogi_back", "rc_pon_back", "rc_tori_back", "rc_aka_back", "pylon", "rc_tansu_back", "rc_kokeshi_back",
-        "rcs_sky", "rcs_stands", "rcs_road", "rcs_crowd", "rcs_tree", "rcs_ki", "rcs_ki_stick", "rcs_bogi", "rcs_pon", "rcs_tori", "rcs_aka", "rcs_tansu", "rcs_kokeshi",
+        "rcs_sky", "rcs_stands", "rcs_road", "rcs_crowd", "rcs_tree", "rcs_ki", "rcs_ki_stick", "rcs_bogi", "rcs_pon", "rcs_tori", "rcs_aka", "rcs_tansu", "rcs_kokeshi", "rcs_tori_tub", "rc_tori_tub", "kogamo",
         "ponpon_e", "ponpon_s", "akabeko_e", "akabeko_s", "tori_e", "tori_s", "kokeshi_e", "kokeshi_s", "tansu_e", "tansu_w", "miton_s",
         "bogicar_e_ki", "bogicar_e_stick", "bogicar_e_flame", "v_mag_0", "v_mag_1", "v_mag_2", "v_mag_3", "v_mag_4", "v_mag_5", "v_mag_6", "pb_backglass", "pb_field", "pb_bump_beko", "pb_bump_drum", "pb_bump_duck", "pb_flipper"]
         .map((k) => [k, `${k}.png`])

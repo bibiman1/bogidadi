@@ -604,7 +604,7 @@ const nProtest = (st0) => {
 // 車箪笥は絵に排気管が見えない、とりぼぎかーはジェットなので、なし
 const N_FLAME = {
   rcs_aka: [[56, 64, -1, 0.15]],
-  rc_aka_back: [[11, 42, -0.6, -1], [81, 42, 0.6, -1]],
+  rc_aka_back: [[31, 91, 0, 0], [61, 91, 0, 0]], // 胴の下、後輪の内がわの 3 つの口のまん中から手前へ(D355)
   rcs_pon: [[18, 33, -0.6, -1], [32, 34, -0.6, -1], [44, 34, -0.6, -1], [55, 35, -0.6, -1]],
   rc_pon_back: [[27, 31, -0.7, -1], [145, 31, 0.7, -1]],
   rcs_kokeshi: [[8, 62, -1, -0.35]],
@@ -628,6 +628,67 @@ const nFlameI = (st0) => {
   const pr = nProtest(st0);
   if (pr) I = pr.rev ? (Math.max(0, Math.sin(s * 11)) > 0.3 ? 1 : 0.3) : 0.2;
   return I;
+};
+// とりぼぎかーの子がもターボジェット(D352、D354。設計図 docs/assets/noroi/settei/tori_jet/)。
+// くちばしから噴く反動で、子がもは尻から進み、回転台は上から見て反時計回り。子がもを消した桶の絵の上に、
+// 2 羽を点対称に置いて、向きごとの絵(kogamo: 0 くちばし右、1 右手前、2 手前、3 右奥、4 奥。左向きは裏返す)で、奥から描く。
+// 毎コマ、その絵をマシンの絵の代わりに渡す(ウィリーのまわし、うしろの画面の縮みはそのまま)。速く回るとコマごとに飛んで、ストロボのようにちらつく
+const N_KOGAMO = {
+  rcs_tori: { tub: "rcs_tori_tub", cx: 39.5, cy: 31, rx: 13, ry: 3.4, rear: false },
+  rc_tori_back: { tub: "rc_tori_tub", cx: 51.5, cy: 57, rx: 14, ry: 4.5, rear: true },
+};
+const nKg = { s: -1, th: 0.6, cv: {} };
+const nKogamoW = (st0) => 1 + 16 * nFlameI(st0); // 回る速さ(回/秒): 待つ間はゆっくり、バーンナウトと走りで速く
+const nKogamo = (get, key, st0) => {
+  const K = N_KOGAMO[key];
+  const tub = K && get(K.tub);
+  const sh = get("kogamo");
+  if (!tub || !sh) return null;
+  const w = nKogamoW(st0);
+  let ds = st0.s - nKg.s;
+  if (ds < 0 || ds > 0.2) ds = 1 / 60;
+  if (st0.s !== nKg.s) nKg.th += 2 * Math.PI * w * ds;
+  nKg.s = st0.s;
+  let cv = nKg.cv[key];
+  if (!cv) {
+    cv = nKg.cv[key] = document.createElement("canvas");
+    cv.width = tub.width;
+    cv.height = tub.height;
+  }
+  const c = cv.getContext("2d");
+  c.imageSmoothingEnabled = false;
+  c.clearRect(0, 0, cv.width, cv.height);
+  c.drawImage(tub, 0, 0);
+  const ducks = [0, Math.PI].map((o) => {
+    const th = nKg.th + o;
+    const X = Math.cos(th), Y = Math.sin(th); // 上から見て X = 車の右、Y = 前
+    const bx = Math.sin(th), by = -Math.cos(th); // くちばし = 時計回りの接線
+    const right = K.rear ? bx : by;
+    const toward = K.rear ? -by : bx;
+    return { sx: K.cx + (K.rear ? X : Y) * K.rx, sy: K.cy + (K.rear ? -Y : X) * K.ry, depth: K.rear ? -Y : X, right, toward };
+  });
+  ducks.sort((a, b) => a.depth - b.depth);
+  for (const d of ducks) {
+    const phi = Math.atan2(d.right, d.toward);
+    const fr = [2, 1, 0, 3, 4][Math.min(4, Math.round(Math.abs(phi) / (Math.PI / 4)))];
+    const flip = d.right < -0.05;
+    const x = Math.round(d.sx), y = Math.round(d.sy);
+    c.save();
+    c.translate(x, y);
+    if (flip) c.scale(-1, 1);
+    c.drawImage(sh, fr * 32, 0, 32, 32, -16, -32, 32, 32);
+    c.restore();
+    // くちばしの噴流(白い筋)。回るほど長い
+    if (w > 1.5 && d.toward < 0.9) {
+      const L = Math.round(3 + 9 * Math.min(1, w / 14));
+      const tx = x + Math.round(d.right * 13), ty = y - 21;
+      for (let i = 0; i < L; i++) {
+        c.fillStyle = `rgba(250, 250, 255, ${0.85 * (1 - i / L)})`;
+        c.fillRect(Math.round(tx + d.right * i - d.toward * 0), Math.round(ty - d.toward * i * 0.35 + (Math.random() - 0.5)), 1 + (i < 3 ? 1 : 0), 1);
+      }
+    }
+  }
+  return cv;
 };
 // 炎を描く。(x, y) が口、(dx, dy) が向き、k が絵の倍率。毎コマ、形を 4 つから選びなおす(高速で切りかわる)。ときどき一瞬消える
 const N_FLAME_COL = ["#ffffff", "#fff4b0", "#ffc83a", "#ff8a1e", "#ff4a14", "#b8201a"];
@@ -868,7 +929,7 @@ const nDrawRear = (ctx, ox, oy, get, api, st0) => {
   const burn = s > 1 && s < 3.2;
   const shk = (on, a) => (on ? Math.round(Math.sin(s * 47) * a) : 0);
   // 相手(左の車線)。遠い方から描く
-  const oim = get(N_REAR[rd.id]);
+  const oim = (N_KOGAMO[N_REAR[rd.id]] && nKogamo(get, N_REAR[rd.id], st0)) || get(N_REAR[rd.id]); // とりぼぎかーは子がもが回る(D352)
   const kim = get("rc_bogi_back");
   const drawOpp = () => {
     const st = s - N_GREEN;
@@ -1043,7 +1104,7 @@ const N_RACE = {
     const shk = (on, a) => (on ? Math.round(Math.sin(s * 47) * a) : 0);
     const st = s - N_GREEN;
     // 相手(奥の車線)
-    const oim = get(rd.img);
+    const oim = (N_KOGAMO[rd.img] && nKogamo(get, rd.img, st0)) || get(rd.img); // とりぼぎかーは子がもが回る(D352)
     const pr = nProtest(st0);
     const ofx = ox + N_SX + (pr ? pr.pos : opp) * N_PX - cam;
     let lift = rd.lift && st > 0 && st < 1.1 && !back ? rd.lift * Math.sin((Math.PI * st) / 1.1) : 0;
