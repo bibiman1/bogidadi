@@ -89,6 +89,7 @@ window.addEventListener("keydown", (e) => {
 });
 window.addEventListener("keyup", (e) => {
   if (e.code === "KeyX" || e.code === "ShiftLeft" || e.code === "ShiftRight") rpg.releaseB();
+  if (e.code === "Enter" || e.code === "Space" || e.code === "KeyZ") rpg.releaseA(); // 押し続け(ピンボールのフリッパー)
   const dir = KEY_MAP[e.code];
   if (!dir) return;
   keys[dir] = false;
@@ -227,6 +228,7 @@ for (const b of [actionBtnA, actionBtnB, actionBtnC, actionBtnT]) {
   for (const ev of ["pointerup", "pointercancel", "pointerleave"]) b.addEventListener(ev, () => b.classList.remove("pressed"));
 }
 actionBtnB.addEventListener("pointerup", () => rpg.releaseB());
+for (const ev of ["pointerup", "pointercancel", "pointerleave"]) actionBtnA.addEventListener(ev, () => rpg.releaseA());
 actionBtnB.addEventListener("pointercancel", () => rpg.releaseB());
 actionBtnB.addEventListener("pointerleave", () => rpg.releaseB());
 

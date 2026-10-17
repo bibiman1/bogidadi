@@ -184,6 +184,9 @@ const ASSET_V = (() => {
         flag(name) {
           return !!host.state.flags[key(name)];
         },
+        flagValue(name) {
+          return host.state.flags[key(name)]; // 数などをそのまま(ピンボールの最高点)
+        },
         setFlag(name, value = true) {
           host.state.flags[key(name)] = value;
           host.save();
@@ -552,10 +555,14 @@ const ASSET_V = (() => {
       return can("hashiru") && walkT >= RUN_AFTER && player && player.moving;
     }
     function pressB() {
+      bHeld = true;
       if (!world || !player) return false;
+      if (map.onB) return map.onB(world.api) !== false; // マップが B を自分で受けとる(ピンボール)
       return jump();
     }
-    function releaseB() {}
+    function releaseB() {
+      bHeld = false;
+    }
 
     // まわる: ジョイスティック(矢印キー)で円を描くと、くるっと回る。map.onSpin(api, p) と、近くの o.buried が受けとる
     const SPIN_TIME = 0.8;
@@ -703,6 +710,7 @@ const ASSET_V = (() => {
         if (done) done();
       }
       if (cutscene) return;
+      if (map.input) map.input(world.api, dt, { a: aHeld, b: bHeld, x: input.x, y: input.y }); // 押し続け(ピンボール)
       if (clock < freezeUntil) return;
 
       // すべる床: 氷のタイル、または map.slippery(true か、追従の強さの数値。小さいほどつるつる)
@@ -832,7 +840,14 @@ const ASSET_V = (() => {
       return best;
     }
 
+    // ボタンを押し続けているか(ピンボールのフリッパー D327)。マップが map.input(api, dt, { a, b, x, y }) で受けとる
+    let aHeld = false;
+    let bHeld = false;
+    function releaseA() {
+      aHeld = false;
+    }
     function interact() {
+      aHeld = true;
       if (!world) return false;
       if (camPath && !cutscene) {
         // 見せ場を飛ばす: 最後の点へ行ったことにして、ふつうのカメラに戻りはじめる
@@ -1584,6 +1599,7 @@ const ASSET_V = (() => {
       jump,
       pressB,
       releaseB,
+      releaseA,
       hasAbility,
       image: (key) => img(key), // 会話の顔の絵など、今の世界の画像を host から使う
       get active() {

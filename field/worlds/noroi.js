@@ -261,7 +261,7 @@ for (let i = 0; i < 46; i++) nMotes.push({ x: Math.random(), y: Math.random(), p
 const N_SHAFTS = [3, 7.5, 12.5]; // 光の帯の南のはし(マス)
 const N_DINER = nMap("diner", 20, 12, {
   bg: "#2a2420",
-  spawns: { door: { x: 10 * T, y: 10.5 * T, facing: "north" } },
+  spawns: { door: { x: 10 * T, y: 10.5 * T, facing: "north" }, pinball: { x: 3.1 * T, y: 9.6 * T, facing: "west" } },
   drawOverlay(ctx, ox, oy, t, api) {
     // ほこり: 光の帯の中だけ、ゆっくり上下に漂う
     for (const m of nMotes) {
@@ -314,7 +314,7 @@ const N_DINER = nMap("diner", 20, 12, {
     },
     { id: "photo", x: 14.3 * T, y: 3.2 * T, w: 1, h: 1, headY: 2.2 * T, range: 48, interact: (api) => api.show("v_photo") },
     { id: "plaques", x: 13.2 * T, y: 3.2 * T, w: 1, h: 1, headY: 2.6 * T, range: 44, interact: (api) => api.show("v_plaque") }, // 一つ分あいた釘。並んだ札を調べると、クラブの札の大写し(作者「プラークのデザインを見せてあげればよい」)
-    { id: "pinball", x: 1.9 * T, y: 9.3 * T, w: 1, h: 1, headY: 3.4 * T, range: 44, interact: (api) => { nPinT0 = nNow(); api.mutter("……", 1400); } }, // ピンボール(つぶやきは仮)
+    { id: "pinball", x: 1.9 * T, y: 9.3 * T, w: 1, h: 1, headY: 3.4 * T, range: 44, interact: (api) => { nPinT0 = nNow(); api.later(500, () => api.warp("pinball", "view")); } }, // ピンボール: 灯りがまたたいてから、台の画面へ(D327。pinball.js)
     {
       // ボックス席のテーブルの雑誌「BOGICAR GRAPHIC」(D320): 表紙から、A でめくって 6 台を 1 台ずつ(絵は docs/assets/noroi/magazine/make.py)
       id: "magazine",

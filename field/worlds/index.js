@@ -310,14 +310,14 @@ window.BOGI_WORLDS = {
         "rc_plate", "rc_lamps", "v_plaque", "rc_ki_back", "rc_ki_stick", "rc_bogi_back", "rc_pon_back", "rc_tori_back", "rc_aka_back",
         "rcs_sky", "rcs_stands", "rcs_road", "rcs_crowd", "rcs_tree", "rcs_ki", "rcs_ki_stick", "rcs_bogi", "rcs_pon", "rcs_tori", "rcs_aka",
         "ponpon_e", "ponpon_s", "akabeko_e", "akabeko_s", "tori_e", "tori_s", "kokeshi_e", "kokeshi_s", "tansu_e", "tansu_w", "miton_s",
-        "bogicar_e_ki", "bogicar_e_stick", "bogicar_e_flame", "v_mag_0", "v_mag_1", "v_mag_2", "v_mag_3", "v_mag_4", "v_mag_5", "v_mag_6"]
+        "bogicar_e_ki", "bogicar_e_stick", "bogicar_e_flame", "v_mag_0", "v_mag_1", "v_mag_2", "v_mag_3", "v_mag_4", "v_mag_5", "v_mag_6", "pb_backglass"]
         .map((k) => [k, `${k}.png`])
         .concat([["ki", "./assets/worlds/lake/ki_walk.png"]])
     ),
     playerSprite: { img: "ki", cell: 64, frames: 7, footY: 17 },
     start: "pass",
     startSpawn: "start",
-    maps: { pass: N_PASS, drivein: N_DRIVEIN, diner: N_DINER, strip: N_STRIP, race: N_RACE },
+    maps: { pass: N_PASS, drivein: N_DRIVEIN, diner: N_DINER, strip: N_STRIP, race: N_RACE, pinball: N_PIN },
     onEnterWorld(api) {
       if (!api.flag("ponponGone") && nFuelT0 >= 0) api.setFlag("ponponGone");
       nFuelT0 = -1;

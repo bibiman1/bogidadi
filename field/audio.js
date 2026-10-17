@@ -245,6 +245,12 @@
     back: () => (tone("square", 990, 990, 0.05, 0.07), tone("square", 660, 660, 0.07, 0.07, 0.05)),
     // 紙をめくる音(雑誌 D325、D326)
     page: () => paper(),
+    // ピンボール(D327)
+    pb_flip: () => (noise(0.03, 0.25, 1600), tone("square", 150, 90, 0.04, 0.08)),
+    pb_bumper: () => (tone("square", 880, 840, 0.06, 0.1), tone("sine", 1320, 1300, 0.12, 0.08, 0.01)),
+    pb_sling: () => (tone("square", 520, 400, 0.04, 0.08), noise(0.02, 0.2, 3000)),
+    pb_lane: () => tone("triangle", 1500, 1500, 0.08, 0.1),
+    pb_launch: () => (noise(0.25, 0.3, 900), tone("sine", 120, 60, 0.2, 0.15)),
     shutter: () => (noise(0.03, 0.5, 5000), tone("square", 1800, 1500, 0.02, 0.12), noise(0.04, 0.4, 3000, 0.09)),
   };
   function sfx(name) {
