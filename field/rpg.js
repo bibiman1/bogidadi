@@ -113,8 +113,8 @@ const ASSET_V = (() => {
           if (cutscene && cutscene.img === imgKey) return;
           if (lastClosed && lastClosed.img === imgKey && clock - lastClosed.t < 1.5) return;
           cutscene = { img: imgKey, t0: clock, onDone: onDone || null, full: !!(opts && opts.full), into: (opts && opts.into) || null };
-          // { flip: 前の絵, spine: のどの位置(絵の幅に対する割合) } なら、本のページのように、前の絵の右側がのどへ倒れて次の絵になる(雑誌 D325)
-          if (opts && opts.flip) Object.assign(cutscene, { flip: opts.flip, spine: opts.spine != null ? opts.spine : 0.5 });
+          // { flip: 前の絵, page: { spine, right, top, bottom } } なら、本のページのように、前の絵の右ページがめくれて次の絵になる(雑誌 D325、D326)
+          if (opts && opts.flip) Object.assign(cutscene, { flip: opts.flip, page: Object.assign({ spine: 0.5, right: 1, top: 0, bottom: 1 }, opts.page || {}) });
         },
         // 一枚絵を、だんだん速く切りかえながら寄っていく(ボタンを待たない)。steps: [{ img, sec, z0, z1, cx, cy, fadeIn }]
         // 最後に白く光り、光ったところで onDone(その裏でマップを切りかえる。白は flash で引かせる)
@@ -1470,39 +1470,99 @@ const ASSET_V = (() => {
       ctx.globalAlpha = 1;
     }
 
-    // ページをめくる(雑誌 D325): 前半は前の絵の右側がのどへ縮み、後半は次の絵の左側がのどから広がる。下には次の絵の右側と前の絵の左側
-    const FLIP_SEC = 0.35;
+    // ページをめくる(雑誌 D325、D326): 紙の右下の角が持ち上がり、斜めの折り目が左へ進む。めくれた裏には、次の絵の左ページが映る
+    // page: 絵の中のページの枠(絵の幅・高さに対する割合)。spine はのど、right は右ページの右はし
+    const FLIP_SEC = 0.55;
     function drawFlip(prev, im, k) {
       const fit = Math.min((VW * 0.9) / im.width, (VH * 0.86) / im.height);
       const w = Math.round(im.width * fit);
       const h = Math.round(im.height * fit);
       const x0 = Math.round((VW - w) / 2);
       const y0 = Math.round((VH - h) / 2);
-      const sp = Math.round(im.width * cutscene.spine); // のど(絵の座標)
-      const dsp = x0 + Math.round(sp * fit); // のど(画面の座標)
+      const pg = cutscene.page;
+      const S = x0 + w * pg.spine;
+      const R = x0 + w * pg.right;
+      const T = y0 + h * pg.top;
+      const B = y0 + h * pg.bottom;
       ctx.imageSmoothingEnabled = false;
-      const part = (src, sx0, sx1, dx, dw) => {
-        if (sx1 - sx0 < 1 || Math.abs(dw) < 1) return;
-        ctx.drawImage(src, sx0, 0, sx1 - sx0, src.height, Math.round(dx), y0, Math.round(dw), h);
-      };
-      part(prev, 0, sp, x0, dsp - x0); // 前の絵の左
-      part(im, sp, im.width, dsp, x0 + w - dsp); // 次の絵の右
-      const shade = (x, ww, a) => {
-        ctx.fillStyle = `rgba(20, 14, 8, ${a})`;
-        ctx.fillRect(Math.round(Math.min(x, x + ww)), y0, Math.round(Math.abs(ww)), h);
-      };
-      if (k < 0.5) {
-        const f = 1 - k * 2; // 倒れていく前の絵の右側
-        const ww = (x0 + w - dsp) * f;
-        part(prev, sp, im.width, dsp, ww);
-        shade(dsp, ww, 0.35 * (1 - f));
-        shade(dsp + ww, (x0 + w - dsp) * 0.06 * (1 - f), 0.2); // 起き上がったページの影
-      } else {
-        const f = k * 2 - 1; // 倒れてくる次の絵の左側
-        const ww = (dsp - x0) * f;
-        part(im, 0, sp, dsp - ww, ww);
-        shade(dsp - ww, ww, 0.35 * (1 - f));
+      ctx.drawImage(prev, x0, y0, w, h);
+      const e = k * k * (3 - 2 * k);
+      // 角 C が、のどの向こうの左下 (2S - R, B) へ、少し持ち上がりながら移る
+      const C = { x: R, y: B };
+      const P = { x: R - e * 2 * (R - S), y: B - Math.sin(Math.PI * e) * (B - T) * 0.35 };
+      let nx = C.x - P.x;
+      let ny = C.y - P.y;
+      const nl = Math.hypot(nx, ny);
+      if (nl < 0.5) return;
+      nx /= nl;
+      ny /= nl;
+      const mx = (C.x + P.x) / 2;
+      const my = (C.y + P.y) / 2;
+      const side = (p) => (p.x - mx) * nx + (p.y - my) * ny; // 正: めくれている側
+      // 右ページの四角を、折り目で切る
+      const rect = [{ x: S, y: T }, { x: R, y: T }, { x: R, y: B }, { x: S, y: B }];
+      const cut = [];
+      for (let i = 0; i < 4; i++) {
+        const a = rect[i];
+        const b = rect[(i + 1) % 4];
+        const sa = side(a);
+        const sb = side(b);
+        if (sa >= 0) cut.push(a);
+        if ((sa >= 0) !== (sb >= 0)) {
+          const t = sa / (sa - sb);
+          cut.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+        }
       }
+      if (cut.length < 3) return;
+      const refl = (p) => {
+        const d = 2 * side(p);
+        return { x: p.x - d * nx, y: p.y - d * ny };
+      };
+      const path = (pts) => {
+        ctx.beginPath();
+        pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        ctx.closePath();
+      };
+      // 1. めくれたあとに見える、次の絵の右ページ。折り目の近くに影
+      ctx.save();
+      path(cut);
+      ctx.clip();
+      ctx.drawImage(im, x0, y0, w, h);
+      const g1 = ctx.createLinearGradient(mx, my, mx + nx * 40, my + ny * 40);
+      g1.addColorStop(0, "rgba(30, 20, 10, 0.35)");
+      g1.addColorStop(1, "rgba(30, 20, 10, 0)");
+      ctx.fillStyle = g1;
+      ctx.fillRect(0, 0, VW, VH);
+      ctx.restore();
+      // 2. めくれた紙の裏: 次の絵の左ページを、のどで裏返し、折り目で返した所に描く(2 回の裏返し = 回転)
+      const flap = cut.map(refl);
+      ctx.save();
+      path(flap);
+      ctx.clip();
+      const a = 1 - 2 * nx * nx;
+      const b = -2 * nx * ny;
+      const d = 1 - 2 * ny * ny;
+      const dot = mx * nx + my * ny;
+      ctx.transform(a, b, b, d, 2 * dot * nx, 2 * dot * ny); // 折り目で裏返す
+      ctx.transform(-1, 0, 0, 1, 2 * S, 0); // のどで裏返す
+      ctx.drawImage(im, x0, y0, w, h);
+      ctx.restore();
+      // 紙の丸み: 折り目から離れるほど明るく
+      ctx.save();
+      path(flap);
+      ctx.clip();
+      const g2 = ctx.createLinearGradient(mx, my, mx - nx * 60, my - ny * 60);
+      g2.addColorStop(0, "rgba(255, 250, 235, 0.0)");
+      g2.addColorStop(0.15, "rgba(255, 250, 235, 0.35)");
+      g2.addColorStop(1, "rgba(60, 45, 30, 0.25)");
+      ctx.fillStyle = g2;
+      ctx.fillRect(0, 0, VW, VH);
+      ctx.restore();
+      // めくれた紙のふち
+      ctx.strokeStyle = "rgba(80, 60, 40, 0.5)";
+      ctx.lineWidth = 1;
+      path(flap);
+      ctx.stroke();
     }
 
     function clamp(v, a, b) {

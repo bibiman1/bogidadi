@@ -337,10 +337,12 @@ const N_DINER = nMap("diner", 20, 12, {
         ctx.fillRect(sx - 4, sy - 5, 6, 2);
       },
       interact(api) {
-        // めくる音と、ページが倒れる効果(D325)。表紙ののどは表紙の左のはし、見開きののどは 238 ドット(make.py)
+        // めくる音と、紙がめくれる効果(D325、D326)
         const page = (i) => {
           api.sfx("page");
-          api.show(`v_mag_${i}`, i < 6 ? () => page(i + 1) : null, i > 0 ? { flip: `v_mag_${i - 1}`, spine: i === 1 ? 140 / 480 : 238 / 480 } : null);
+          // ページの枠(make.py): 表紙は x 140〜340、見開きはのど 238・右はし 466、どちらも y 8〜280
+          const box = i === 1 ? { spine: 140 / 480, right: 340 / 480 } : { spine: 238 / 480, right: 466 / 480 };
+          api.show(`v_mag_${i}`, i < 6 ? () => page(i + 1) : null, i > 0 ? { flip: `v_mag_${i - 1}`, page: Object.assign(box, { top: 8 / 288, bottom: 280 / 288 }) } : null);
         };
         page(0);
       },

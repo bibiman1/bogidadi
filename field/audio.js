@@ -195,6 +195,34 @@
     s.connect(f).connect(g).connect(sfxGain);
     s.start(t);
   }
+  // 紙をめくる音(D326): 高い帯域のこすれ(ザッ)に、紙の繊維のパチパチを混ぜ、最後に軽く落ちる(パサッ)
+  function paper() {
+    const t = ctx.currentTime;
+    const sr = ctx.sampleRate;
+    const dur = 0.42;
+    const b = ctx.createBuffer(1, Math.floor(sr * dur), sr);
+    const d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) {
+      const u = i / sr;
+      const swish = u < 0.3 ? Math.sin((Math.PI * u) / 0.3) ** 1.5 : 0; // こすれ: ふくらんで消える
+      const land = u > 0.3 ? Math.exp(-(u - 0.3) * 45) : 0; // 落ちる
+      const crackle = Math.random() < 0.012 ? 2.5 : 1; // 繊維のパチパチ
+      d[i] = (Math.random() * 2 - 1) * (swish * 0.55 * crackle + land * 0.8);
+    }
+    const s = ctx.createBufferSource();
+    s.buffer = b;
+    const hp = ctx.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 900;
+    const bp = ctx.createBiquadFilter();
+    bp.type = "peaking";
+    bp.frequency.value = 4200;
+    bp.gain.value = 6;
+    const g = ctx.createGain();
+    g.gain.value = 0.35;
+    s.connect(hp).connect(bp).connect(g).connect(sfxGain);
+    s.start(t);
+  }
   const SYNTH = {
     hyoshigi: () => (tone("square", 1400, 900, 0.05, 0.3), noise(0.04, 0.4, 4000)),
     clang: () => (tone("square", 880, 860, 0.18, 0.15), tone("sine", 1760, 1700, 0.25, 0.1)),
@@ -215,8 +243,8 @@
     cursor: () => tone("square", 1320, 1320, 0.035, 0.07),
     ok: () => (tone("square", 990, 990, 0.05, 0.08), tone("square", 1480, 1480, 0.07, 0.08, 0.05)),
     back: () => (tone("square", 990, 990, 0.05, 0.07), tone("square", 660, 660, 0.07, 0.07, 0.05)),
-    // 紙をめくる「パラッ」(雑誌 D325): 速く強いこすれのあと、軽く落ちる音
-    page: () => (noise(0.09, 0.22, 5200), noise(0.14, 0.12, 2200, 0.07), tone("sine", 180, 120, 0.06, 0.05, 0.16)),
+    // 紙をめくる音(雑誌 D325、D326)
+    page: () => paper(),
     shutter: () => (noise(0.03, 0.5, 5000), tone("square", 1800, 1500, 0.02, 0.12), noise(0.04, 0.4, 3000, 0.09)),
   };
   function sfx(name) {
