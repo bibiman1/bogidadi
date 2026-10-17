@@ -5,7 +5,7 @@
   const BASE = "./assets/sound/";
   // 真のエンディング(C)のスタッフロールは公園の遊び場の音、最後の声は赤ちゃんの笑い声(D292。出どころは assets/sound/CREDITS.md)
   // ダイナーのジュークボックスのレコード(D334。出どころは assets/sound/CREDITS.md)。調べるたびに次の 1 枚を、1 回だけかける
-  const BGM_FILES = { roll_c: "bgm/park.mp3", haihei: ["bgm/haihei_1.mp3", "bgm/haihei_2.mp3"], juke_1: "bgm/juke_sock_hop.mp3", juke_2: "bgm/juke_surfing.mp3" }; // 残りの 2 枚(Surf Shimmy、Sax, Rock, and Roll)は取れたら足す(D337) // 廃兵院は舞台の楽団の曲(作者がアップロード)。並べると、順にかけてくり返す // 例: { void: "bgm/void.mp3", lake: "bgm/lake.mp3" }
+  const BGM_FILES = { roll_c: "bgm/park.mp3", haihei: ["bgm/haihei_1.mp3", "bgm/haihei_2.mp3"], juke_1: "bgm/juke_sock_hop.mp3", juke_2: "bgm/juke_surfing.mp3", juke_3: "bgm/juke_sax_rock.mp3" }; // 3 枚目はロックンロール(D342)。Surf Shimmy は取れたら足す // 廃兵院は舞台の楽団の曲(作者がアップロード)。並べると、順にかけてくり返す // 例: { void: "bgm/void.mp3", lake: "bgm/lake.mp3" }
   const SFX_FILES = { baby_laugh: "rec/baby_laugh.mp3" }; // 例: { hyoshigi: "sfx/hyoshigi.mp3" }
   const KEY = "bogidachi.audio.v1";
   const vol = { bgm: 3, sfx: 4 }; // 0〜5

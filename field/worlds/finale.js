@@ -596,7 +596,7 @@ const F_CREDITS = [
 // 絵のあとに、まん中に字だけで出す(使った曲と音の出典と作者。todo 69、D301)。最後は、あそんでくれたあなた
 const F_CREDITS_TAIL = [
   ["音楽", ["「Accordion Passion of the Roma」", "「Melancholic Accordion in the Rain」", "Music by Iskander from Pixabay"]],
-  ["ジュークボックス", ["「Sock Hop」", "Kevin MacLeod（CC BY 3.0）", "「Surfing」 Komiku（CC0）", "Wikimedia Commons"]],
+  ["ジュークボックス", ["「Sock Hop」", "「Sax, Rock, and Roll」", "Kevin MacLeod（CC BY 3.0）", "「Surfing」 Komiku（CC0）", "Wikimedia Commons"]],
   ["音", ["赤ちゃんの笑い声", "reinsamba（CC BY 3.0）", "公園の遊び場", "foongaz（CC0）", "Wikimedia Commons"]],
   ["スペシャルサンクス", ["あそんでくれた", "あなた"]],
 ];

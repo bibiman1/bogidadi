@@ -19,7 +19,9 @@ const PB_FLIP = { len: 38, rest: 0.5, up: -0.42, wUp: 18, wDown: 12, thick: 3 };
 // 打ち出しの通路。打ち出し棒の頭は y 248、その下に巻いたバネ(作者「バネはちゃんと描写してほしい」)。ためると頭が下がり、バネが縮む
 const PB_LANE = { x: 157, rest: 240, head: 248, base: 278, pull: 14 };
 // 離すと 0.06 秒で頭が戻る(一度に戻すと、玉が頭の下へもぐる)
-const pbHeadY = () => PB_LANE.head + PB_LANE.pull * Math.max(pb.charge || 0, (pb.shotC || 0) * (1 - Math.min(1, (pb.t - (pb.shotT ?? -9)) / 0.06)));
+// 経過時間は 0〜1 におさえる(台を離れてまた遊ぶと pb.t が 0 に戻り、前のゲームの shotT が先の時刻になる。
+// 引き算がマイナスになって頭が画面の下へ消え、玉が落ち続けて勝手にゲームオーバーになっていた。作者「ばねがなくなって勝手にGAMEOVERになる」)
+const pbHeadY = () => PB_LANE.head + PB_LANE.pull * Math.max(pb.charge || 0, (pb.shotC || 0) * (1 - Math.max(0, Math.min(1, (pb.t - (pb.shotT ?? -9)) / 0.06))));
 const PB_BUMPERS = [
   { x: 52, y: 96, r: 14, kind: "beko" }, // 赤べこの頭(半径は絵 pb_bump_* に合わせる D330)
   { x: 112, y: 96, r: 14, kind: "drum" }, // ぽんぽんカーの燃えるドラム缶
@@ -55,7 +57,7 @@ const pbFlipper = (left) => ({ left, px: left ? 33 : 117, py: 246, th: PB_FLIP.r
 const pbAng = (f) => (f.left ? f.th : Math.PI - f.th);
 const pbTip = (f) => ({ x: f.px + PB_FLIP.len * Math.cos(pbAng(f)), y: f.py + PB_FLIP.len * Math.sin(pbAng(f)) });
 function pbNewBall() {
-  Object.assign(pb, { x: PB_LANE.x, y: PB_LANE.rest, vx: 0, vy: 0, live: true, charge: 0, drainT: -1, inPlay: false });
+  Object.assign(pb, { x: PB_LANE.x, y: PB_LANE.rest, vx: 0, vy: 0, live: true, charge: 0, drainT: -1, inPlay: false, shotC: 0, shotT: -9 });
 }
 function pbReset(api) {
   Object.assign(pb, { balls: 3, score: 0, over: false, lanes: [false, false, false], flash: {}, flips: [pbFlipper(true), pbFlipper(false)], t: 0 });

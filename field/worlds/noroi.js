@@ -269,7 +269,7 @@ const N_DRIVEIN = nMap("drivein", 28, 14, {
 // 壁の写真を調べると、レースの日の一枚絵(後ろ姿の見物人と、走る車。v_photo)
 let nJukeT0 = -1;
 let nJukeN = 0; // 最後にかけたレコード(0 はまだ)
-const N_JUKE = ["juke_1", "juke_2"]; // いまは 2 枚(D337)
+const N_JUKE = ["juke_1", "juke_2", "juke_3"]; // 3 枚(D337、D342)
 const nJukePlaying = () => !!window.bogiAudio && N_JUKE.includes(window.bogiAudio.state().bgm);
 let nPinT0 = -1;
 const nMotes = [];
@@ -326,7 +326,7 @@ const N_DINER = nMap("diner", 20, 12, {
       h: 1,
       headY: 2.4 * T,
       range: 56,
-      // 調べると、次のレコードを 1 枚かける(D334。いまは 2 枚を交互に D337)。かかっている間は灯りが光り続け、終わるとダイナーの静けさに戻る
+      // 調べると、次のレコードを 1 枚かける(D334。3 枚を順に D342)。かかっている間は灯りが光り続け、終わるとダイナーの静けさに戻る
       interact(api) {
         nJukeT0 = nNow();
         nJukeN = (nJukeN % N_JUKE.length) + 1;
