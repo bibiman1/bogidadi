@@ -11,10 +11,14 @@ const PB_W = 168;
 const PB_H = 280;
 const PB_R = 4; // 玉の半径
 // 玉の跳ね方(D331 で調整。作者「ピンボールの玉の跳ね方を調整して」): 前は重力 300、壁 0.45、バンパー +170、スリング +150、フリッパー 0.3・24 rad/s、上限 620、空気の抵抗なし
-const PB_TUNE = { g: 240, wallE: 0.35, postE: 0.4, slingE: 0.4, slingKick: 110, bumperE: 0.6, bumperKick: 120, flipE: 0.15, maxV: 480, drag: 0.15, launch0: 220, launchK: 300 };
+// D333(作者「玉は遅くていい」): D331 の値(重力 240、スリング +110、バンパー +120、上限 480、打ち出し 220+300)を、もう一段ゆっくりに
+const PB_TUNE = { g: 190, wallE: 0.35, postE: 0.4, slingE: 0.4, slingKick: 90, bumperE: 0.6, bumperKick: 100, flipE: 0.15, maxV: 380, drag: 0.15, launch0: 180, launchK: 240 };
 const PB_G = PB_TUNE.g; // 重力(盤面の傾き)
 const PB_FLIP = { len: 38, rest: 0.5, up: -0.42, wUp: 18, wDown: 12, thick: 3 }; // 長さは絵(pb_flipper、支点から先まで 38 ドット)に合わせる(D330)
-const PB_LANE = { x: 157, rest: 264 }; // 打ち出しの通路
+// 打ち出しの通路。打ち出し棒の頭は y 248、その下に巻いたバネ(作者「バネはちゃんと描写してほしい」)。ためると頭が下がり、バネが縮む
+const PB_LANE = { x: 157, rest: 240, head: 248, base: 278, pull: 14 };
+// 離すと 0.06 秒で頭が戻る(一度に戻すと、玉が頭の下へもぐる)
+const pbHeadY = () => PB_LANE.head + PB_LANE.pull * Math.max(pb.charge || 0, (pb.shotC || 0) * (1 - Math.min(1, (pb.t - (pb.shotT ?? -9)) / 0.06)));
 const PB_BUMPERS = [
   { x: 52, y: 96, r: 14, kind: "beko" }, // 赤べこの頭(半径は絵 pb_bump_* に合わせる D330)
   { x: 112, y: 96, r: 14, kind: "drum" }, // ぽんぽんカーの燃えるドラム缶
@@ -34,7 +38,6 @@ const PB_WALLS = (() => {
   }
   w.push([4, 84, 4, 206], [4, 206, 33, 246]); // 左の壁とすべり台
   w.push([164, 84, 164, 284], [150, 104, 150, 284], [150, 206, 117, 246]); // 右の壁、通路の仕切り、右のすべり台
-  w.push([150, 272, 164, 272]); // 打ち出し棒の頭
   for (const x of PB_POSTS) w.push([x, 32, x, 46]); // 上のレーンの仕切り
   return w;
 })();
@@ -55,7 +58,7 @@ function pbReset(api) {
   pb.high = Number(api.flagValue("pinHigh")) || 0;
   pbNewBall();
 }
-const pbInLane = () => pb.x > 150 && pb.y >= PB_LANE.rest - 1 && Math.hypot(pb.vx, pb.vy) < 30;
+const pbInLane = () => pb.x > 150 && pb.y >= PB_LANE.head - PB_R - 3 && Math.hypot(pb.vx, pb.vy) < 30;
 // 玉と線分(太さ th)の当たり。surf は線のその点の速さ。当たったら法線を返す
 function pbHitSeg(ax, ay, bx, by, th, e, surf) {
   const dx = bx - ax;
@@ -85,7 +88,19 @@ function pbHitSeg(ax, ay, bx, by, th, e, surf) {
   }
   return { nx, ny, vn };
 }
+// フリッパーを h 秒ぶん回す。1 コマでまとめて回すと、先が 1 度に 10 ドットほど飛び、玉を飛びこえて裏へ押し出していた
+// (作者「フリッパーをボールがすり抜ける事がある」)。玉が動いている間は pbStep の細かい刻みごとに呼ぶ
+function pbMoveFlips(h) {
+  for (const f of pb.flips) {
+    const target = f.on ? PB_FLIP.up : PB_FLIP.rest;
+    const sp = f.on ? PB_FLIP.wUp : PB_FLIP.wDown;
+    const prevTh = f.th;
+    f.th = f.th > target ? Math.max(target, f.th - sp * h) : Math.min(target, f.th + sp * h);
+    f.w = (f.th - prevTh) / Math.max(h, 1e-6);
+  }
+}
 function pbStep(api, h) {
+  pbMoveFlips(h);
   pb.vy += PB_G * h;
   const dr = 1 - PB_TUNE.drag * h; // 空気と盤面の抵抗(少しずつ遅くなる)
   pb.vx *= dr;
@@ -93,6 +108,8 @@ function pbStep(api, h) {
   pb.x += pb.vx * h;
   pb.y += pb.vy * h;
   for (const w of PB_WALLS) pbHitSeg(w[0], w[1], w[2], w[3], 0.5, PB_TUNE.wallE, null);
+  const hy = pbHeadY(); // 打ち出し棒の頭(ためると下がる)
+  pbHitSeg(150, hy, 164, hy, 0.5, PB_TUNE.wallE, null);
   // 通路の口の仕切り(一方通行): 玉が盤面に出たら閉じて、通路へ落ち戻らないようにする
   if (!pb.inPlay && pb.y < 96 && pb.x < 150) pb.inPlay = true;
   if (pb.inPlay) pbHitSeg(150, 100, 164, 92, 0.5, PB_TUNE.wallE, null);
@@ -188,20 +205,18 @@ const N_PIN = {
     // フリッパー
     for (const f of pb.flips) {
       const on = f.left ? inp.x < -0.5 : inp.a; // 左のフリッパーは十字キーの左、右は A(作者「フリッパーは左とAで操作」D329)
-      const target = on ? PB_FLIP.up : PB_FLIP.rest;
-      const prevTh = f.th;
-      const sp = on ? PB_FLIP.wUp : PB_FLIP.wDown;
       if (on && !f.on) api.sfx("pb_flip");
-      f.on = on;
-      f.th = f.th > target ? Math.max(target, f.th - sp * dt) : Math.min(target, f.th + sp * dt);
-      f.w = (f.th - prevTh) / Math.max(dt, 1e-4);
+      f.on = on; // 角度は玉と同じ細かい刻みで動かす(pbMoveFlips)
     }
+    if (!pb.live || pb.over) pbMoveFlips(dt);
     if (pb.over) return;
     // 打ち出し: 下を押してためる、離すと打つ。通路で止まっているときに上を押すと、台を離れる
     if (pb.live && pbInLane()) {
       if (inp.y > 0.5) pb.charge = Math.min(1, pb.charge + dt * 1.2);
       else if (pb.charge > 0) {
         pb.vy = -(PB_TUNE.launch0 + PB_TUNE.launchK * pb.charge);
+        pb.shotC = pb.charge;
+        pb.shotT = pb.t;
         pb.charge = 0;
         api.sfx("pb_launch");
       } else if (inp.y < -0.6) return pbLeave(api);
@@ -303,12 +318,8 @@ const N_PIN = {
       ctx.lineTo(X + 164, Y + 92);
       ctx.stroke();
     }
-    // 打ち出し棒(ためると縮む)
-    const pk = Math.round(pb.charge * 10);
-    ctx.fillStyle = "#c8c8d0";
-    ctx.fillRect(X + 152, Y + 273 + pk, 10, 3);
-    ctx.fillStyle = "#806040";
-    for (let y = Y + 277 + pk; y < Y + PB_H; y += 2) ctx.fillRect(X + 154, y, 6, 1);
+    // 打ち出し棒とバネ(ためると頭が下がり、巻いたバネが縮む。作者「バネはちゃんと描写してほしい」)
+    pbPlunger(ctx, X, Y);
     // フリッパー(絵 pb_flipper は右向き、支点が (8, 8)。右のフリッパーは左右を返す D330)
     const fim = get("pb_flipper");
     for (const f of pb.flips) {
@@ -351,6 +362,45 @@ const N_PIN = {
     }
   },
 };
+// 打ち出し棒: 後ろは盤面の絵のまま(作者「バネの後ろ、黒いけど、背景つけれる？」)。まん中の棒、巻いたバネ(7 巻き、手前の線は明るく、奥は暗く)、メッキの頭、底の台
+function pbPlunger(ctx, X, Y) {
+  const hy = Math.round(pbHeadY());
+  const x0 = X + 151;
+  ctx.fillStyle = "#6c7078"; // 棒
+  ctx.fillRect(X + 156, Y + hy + 3, 3, PB_LANE.base - hy - 3);
+  const y1 = Y + hy + 3;
+  const y2 = Y + PB_LANE.base;
+  const turns = 7;
+  const step = (y2 - y1) / turns;
+  for (let i = 0; i < turns; i++) {
+    const ya = Math.round(y1 + i * step);
+    const yb = Math.round(y1 + (i + 0.5) * step);
+    const yc = Math.round(y1 + (i + 1) * step);
+    // 奥の線(右上から左下へ、暗い)と手前の線(左から右へ、明るい)
+    ctx.strokeStyle = "#5a5e66";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(X + 162.5, ya + 0.5);
+    ctx.lineTo(X + 152.5, yb + 0.5);
+    ctx.stroke();
+    ctx.strokeStyle = "#2a2420"; // 手前の線の影(盤面の明るい絵の上でも見えるように)
+    ctx.beginPath();
+    ctx.moveTo(X + 152.5, yb + 1.5);
+    ctx.lineTo(X + 162.5, yc + 1.5);
+    ctx.stroke();
+    ctx.strokeStyle = "#e4e8f0";
+    ctx.beginPath();
+    ctx.moveTo(X + 152.5, yb + 0.5);
+    ctx.lineTo(X + 162.5, yc + 0.5);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "#e8ecf2"; // 頭(メッキ)
+  ctx.fillRect(x0, Y + hy, 13, 3);
+  ctx.fillStyle = "#9aa0aa";
+  ctx.fillRect(x0, Y + hy + 2, 13, 1);
+  ctx.fillStyle = "#4a3a2a"; // 底の台
+  ctx.fillRect(x0, Y + PB_LANE.base, 13, 2);
+}
 // 盤面の絵(一度だけ描く)。art(PixelLab の盤面の絵 pb_field、D328)があればそれに、当たり判定どおりのメッキの壁を重ねる。
 // なければ、ドラッグストリップの路面、白い線、チェッカーの帯、炎の絵を描く(盤面の絵の下絵にもした)
 function pbFieldArt(art) {
