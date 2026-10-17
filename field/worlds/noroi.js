@@ -568,6 +568,26 @@ const nRaceState = () => {
   }
   return { s, real, rd, ki, opp, back, taut };
 };
+// タイムスリップ(D346、作者「無慣性粘着駆動が卑怯という演出をいれたい」): ぼぎカーのイーティーは、押した時刻に関係なく毎回まったく同じ 2.400。
+// 最高速は「----」(はかれない)。相手の欄には、ふつうの数字。説明はせず、数字だけで気づかせる
+const nSlip = (rd, rt) => [
+  `リアクション　${rt}`,
+  `イーティー　${N_KI_ET.toFixed(3)}`,
+  `さいこうそく　----`,
+  rd.snap ? `あいて　ゴールせず` : `あいて　${(rd.et - 0.25 + Math.random() * 0.04).toFixed(3)}`,
+];
+// 負けた相手の抗議(D346): ゴールのあと、相手がぼぎカーのとなりへ戻ってきて、何度もエンジンをふかす。言葉はなく、音としぐさだけ
+// 返す値: null か { pos(m), rev(0〜1) }。ぽんぽんカーは峠へ引き戻されたので、しない
+const nProtest = (st0) => {
+  const { s, rd, ki, opp } = st0;
+  if (nr.end !== "win" || rd.snap || nr.repT < 0) return null;
+  const t = s - nr.endT;
+  if (t < 0.6) return null;
+  const target = ki + 6; // ぼぎカーのとなり、鼻先を少し前に
+  const sm = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+  const w = sm((t - 0.6) / 0.8);
+  return { pos: opp + (target - opp) * w, rev: t > 1.4 ? 1 : 0 };
+};
 // 競争の音(D344): 相手のエンジン(マシンごとの音色)、スキール音、ぼぎカーの風。毎コマ、時計から決める
 // cam: 横からの画面のカメラ(null ならうしろからの画面)。左右と遠さを、車の見える位置から決める(D345)
 const nRaceSound = (st0, cam) => {
@@ -607,6 +627,13 @@ const nRaceSound = (st0, cam) => {
   // ぼぎカーのタイヤ: バーンナウトと、押した瞬間
   let squealKi = s > 1 && s < 3.2 ? 0.7 : 0;
   if (nr.go >= 0 && s >= nr.go && s - nr.go < 0.4) squealKi = Math.max(squealKi, 1 - (s - nr.go) / 0.4);
+  // 負けた相手の抗議(D346): となりへ戻りながら低く、着いたら何度もふかす
+  const pr = nProtest(st0);
+  const oppAt = pr ? pr.pos : opp;
+  if (pr) {
+    rpm = pr.rev ? 0.25 + 0.7 * Math.max(0, Math.sin(s * 11)) : 0.3;
+    eng = pr.rev ? 1 : 0.6;
+  }
   let oppPan, kiPan, oppVol, kiVol;
   if (cam == null) {
     // うしろから: 相手は左、ぼぎカーは右の車線。走り出すと前へ遠のく
@@ -619,9 +646,9 @@ const nRaceSound = (st0, cam) => {
     const sx = (d) => N_SX + d * N_PX - cam;
     const pan = (x) => Math.max(-1, Math.min(1, (x - 240) / 260));
     const vol = (x) => Math.max(0.15, 1 - Math.abs(x - 240) / 700);
-    oppPan = pan(sx(opp));
+    oppPan = pan(sx(oppAt));
     kiPan = pan(sx(ki));
-    oppVol = 0.85 * vol(sx(opp));
+    oppVol = 0.85 * vol(sx(oppAt));
     kiVol = vol(sx(ki));
   }
   A.set({ rpm, eng, squeal, squealKi, wind, oppPan, kiPan, oppVol, kiVol });
@@ -847,22 +874,21 @@ const N_RACE = {
         nr.endT = s;
         if (nr.duel) {
           // 一騎打ち: 勝っても負けても、タイムを出してドラッグストリップへ戻る(また話しかければ、もう一度)
-          const lines = nr.end === "win" ? ["かち"] : [nr.foul >= 0 ? "フライング" : "まけ"];
-          if (nr.go >= 0) lines.push(`リアクション　${(nr.go - N_GREEN).toFixed(3)}`, ...(kiIn ? [`イーティー　${(s - nr.go).toFixed(3)}`] : []));
+          const lines = nr.end === "win" ? ["かち", ...nSlip(rd, (nr.go - N_GREEN).toFixed(3))] : [nr.foul >= 0 ? "フライング" : "まけ"];
+          if (nr.end !== "win" && nr.go >= 0) lines.push(`リアクション　${(nr.go - N_GREEN).toFixed(3)}`);
           api.later(nr.end === "win" ? 3400 : 2200, () => api.say(lines, () => api.warp("strip", "start")));
         } else if (nr.end === "win") {
           const rt = (nr.go - N_GREEN).toFixed(3);
-          const et = (s - nr.go).toFixed(3);
           const last = nr.round === N_ROUNDS.length - 1;
           api.later(3400, () => {
             if (last) {
               api.show("v_finish", () =>
-                api.say([`タイム　スリップ`, `リアクション　${rt}`, `イーティー　${et}`], () => {
+                api.say([`タイム　スリップ`, ...nSlip(rd, rt)], () => {
                   api.setFlag("won");
                   api.warp("strip", "finish");
                 }), { full: true });
             } else {
-              api.say([`タイム　スリップ`, `リアクション　${rt}`, `イーティー　${et}`, `つぎは　${N_ROUNDS[nr.round + 1].name}`], () => {
+              api.say([`タイム　スリップ`, ...nSlip(rd, rt), `つぎは　${N_ROUNDS[nr.round + 1].name}`], () => {
                 api.setFlag(nr.round === 0 ? "nrR1" : "nrR2");
                 nRaceReset(api);
               });
@@ -920,10 +946,13 @@ const N_RACE = {
     const st = s - N_GREEN;
     // 相手(奥の車線)
     const oim = get(rd.img);
-    const ofx = ox + N_SX + opp * N_PX - cam;
+    const pr = nProtest(st0);
+    const ofx = ox + N_SX + (pr ? pr.pos : opp) * N_PX - cam;
     let lift = rd.lift && st > 0 && st < 1.1 && !back ? rd.lift * Math.sin((Math.PI * st) / 1.1) : 0;
+    if (pr && pr.rev) lift = 0.05 * Math.max(0, Math.sin(s * 11)); // ふかすたびに、前がはね上がる(首を振るように)
     if (st0.taut > 0) lift = -0.06 * Math.sin(Math.PI * (1 - st0.taut)); // 張った瞬間、前のめりに
-    const r = nDrawSide(ctx, oim, ofx, oy + N_GY.opp, st0.taut > 0 ? Math.round(Math.sin(s * 90) * 1.5) : shk(burn || (st > 0 && st < (rd.rattle ? 1.2 : 0.8)), rd.rattle || 1), lift);
+    const r = nDrawSide(ctx, oim, ofx, oy + N_GY.opp, st0.taut > 0 ? Math.round(Math.sin(s * 90) * 1.5) : pr && pr.rev ? Math.round(Math.sin(s * 60) * 2) : shk(burn || (st > 0 && st < (rd.rattle ? 1.2 : 0.8)), rd.rattle || 1), lift);
+    if (r && pr && pr.rev && Math.sin(s * 11) > 0.6 && Math.random() < 0.5) nRcPuff(r.x0 - ox + cam + 10, N_GY.opp - 8, -50); // ふかした煙
     if (r && rd.snap) {
       // 線: 画面の左の外(峠のドラム缶 = 過去)から、ぽんぽんカーのうしろへ。張ったときは真っすぐ、ふるえる
       const sag = st0.taut > 0 ? Math.sin(s * 70) * 2 : back > 0 ? 6 + back * 30 : Math.max(3, 40 * (1 - opp / N_RACE_D));
