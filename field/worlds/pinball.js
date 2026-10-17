@@ -10,8 +10,10 @@ const PB_Y = 4;
 const PB_W = 168;
 const PB_H = 280;
 const PB_R = 4; // 玉の半径
-const PB_G = 300; // 重力(盤面の傾き)
-const PB_FLIP = { len: 38, rest: 0.5, up: -0.42, wUp: 24, wDown: 12, thick: 3 }; // 長さは絵(pb_flipper、支点から先まで 38 ドット)に合わせる(D330)
+// 玉の跳ね方(D331 で調整。作者「ピンボールの玉の跳ね方を調整して」): 前は重力 300、壁 0.45、バンパー +170、スリング +150、フリッパー 0.3・24 rad/s、上限 620、空気の抵抗なし
+const PB_TUNE = { g: 240, wallE: 0.35, postE: 0.4, slingE: 0.4, slingKick: 110, bumperE: 0.6, bumperKick: 120, flipE: 0.15, maxV: 480, drag: 0.15, launch0: 220, launchK: 300 };
+const PB_G = PB_TUNE.g; // 重力(盤面の傾き)
+const PB_FLIP = { len: 38, rest: 0.5, up: -0.42, wUp: 18, wDown: 12, thick: 3 }; // 長さは絵(pb_flipper、支点から先まで 38 ドット)に合わせる(D330)
 const PB_LANE = { x: 157, rest: 264 }; // 打ち出しの通路
 const PB_BUMPERS = [
   { x: 52, y: 96, r: 14, kind: "beko" }, // 赤べこの頭(半径は絵 pb_bump_* に合わせる D330)
@@ -46,7 +48,7 @@ const pbFlipper = (left) => ({ left, px: left ? 33 : 117, py: 246, th: PB_FLIP.r
 const pbAng = (f) => (f.left ? f.th : Math.PI - f.th);
 const pbTip = (f) => ({ x: f.px + PB_FLIP.len * Math.cos(pbAng(f)), y: f.py + PB_FLIP.len * Math.sin(pbAng(f)) });
 function pbNewBall() {
-  Object.assign(pb, { x: PB_LANE.x, y: PB_LANE.rest, vx: 0, vy: 0, live: true, charge: 0, drainT: -1 });
+  Object.assign(pb, { x: PB_LANE.x, y: PB_LANE.rest, vx: 0, vy: 0, live: true, charge: 0, drainT: -1, inPlay: false });
 }
 function pbReset(api) {
   Object.assign(pb, { balls: 3, score: 0, over: false, lanes: [false, false, false], flash: {}, flips: [pbFlipper(true), pbFlipper(false)], t: 0 });
@@ -85,19 +87,25 @@ function pbHitSeg(ax, ay, bx, by, th, e, surf) {
 }
 function pbStep(api, h) {
   pb.vy += PB_G * h;
+  const dr = 1 - PB_TUNE.drag * h; // 空気と盤面の抵抗(少しずつ遅くなる)
+  pb.vx *= dr;
+  pb.vy *= dr;
   pb.x += pb.vx * h;
   pb.y += pb.vy * h;
-  for (const w of PB_WALLS) pbHitSeg(w[0], w[1], w[2], w[3], 0.5, 0.45, null);
+  for (const w of PB_WALLS) pbHitSeg(w[0], w[1], w[2], w[3], 0.5, PB_TUNE.wallE, null);
+  // 通路の口の仕切り(一方通行): 玉が盤面に出たら閉じて、通路へ落ち戻らないようにする
+  if (!pb.inPlay && pb.y < 96 && pb.x < 150) pb.inPlay = true;
+  if (pb.inPlay) pbHitSeg(150, 100, 164, 92, 0.5, PB_TUNE.wallE, null);
   for (const x of PB_POSTS) {
-    const c = pbHitSeg(x, 32, x, 32, 2, 0.5, null);
+    const c = pbHitSeg(x, 32, x, 32, 2, PB_TUNE.postE, null);
     if (c) break;
   }
   for (const [i, s] of PB_SLINGS.entries()) {
-    const c = pbHitSeg(s[0], s[1], s[2], s[3], 1.5, 0.5, null);
+    const c = pbHitSeg(s[0], s[1], s[2], s[3], 1.5, PB_TUNE.slingE, null);
     if (c && c.vn < -40) {
       // はじき返す(スリングショット)
-      pb.vx += c.nx * 150;
-      pb.vy += c.ny * 150;
+      pb.vx += c.nx * PB_TUNE.slingKick;
+      pb.vy += c.ny * PB_TUNE.slingKick;
       pbScore(api, 10, "sling" + i);
       api.sfx("pb_sling");
     }
@@ -113,11 +121,11 @@ function pbStep(api, h) {
       pb.y = b.y + ny * (b.r + PB_R);
       const vn = pb.vx * nx + pb.vy * ny;
       if (vn < 0) {
-        pb.vx -= 2 * vn * nx;
-        pb.vy -= 2 * vn * ny;
+        pb.vx -= (1 + PB_TUNE.bumperE) * vn * nx;
+        pb.vy -= (1 + PB_TUNE.bumperE) * vn * ny;
       }
-      pb.vx += nx * 170;
-      pb.vy += ny * 170;
+      pb.vx += nx * PB_TUNE.bumperKick;
+      pb.vy += ny * PB_TUNE.bumperKick;
       pbScore(api, 100, "b" + i);
       api.sfx("pb_bumper");
     }
@@ -125,7 +133,7 @@ function pbStep(api, h) {
   for (const f of pb.flips) {
     const tip = pbTip(f);
     const ws = f.left ? f.w : -f.w; // 画面での回る速さ
-    pbHitSeg(f.px, f.py, tip.x, tip.y, PB_FLIP.thick, 0.3, (cx, cy) => ({ x: -ws * (cy - f.py), y: ws * (cx - f.px) }));
+    pbHitSeg(f.px, f.py, tip.x, tip.y, PB_FLIP.thick, PB_TUNE.flipE, (cx, cy) => ({ x: -ws * (cy - f.py), y: ws * (cx - f.px) }));
   }
   // 上のレーン
   if (pb.y > 34 && pb.y < 46 && pb.vy > 0)
@@ -142,9 +150,9 @@ function pbStep(api, h) {
       }
     });
   const sp = Math.hypot(pb.vx, pb.vy);
-  if (sp > 620) {
-    pb.vx *= 620 / sp;
-    pb.vy *= 620 / sp;
+  if (sp > PB_TUNE.maxV) {
+    pb.vx *= PB_TUNE.maxV / sp;
+    pb.vy *= PB_TUNE.maxV / sp;
   }
 }
 function pbScore(api, n, what) {
@@ -193,7 +201,7 @@ const N_PIN = {
     if (pb.live && pbInLane()) {
       if (inp.y > 0.5) pb.charge = Math.min(1, pb.charge + dt * 1.2);
       else if (pb.charge > 0) {
-        pb.vy = -(260 + 340 * pb.charge);
+        pb.vy = -(PB_TUNE.launch0 + PB_TUNE.launchK * pb.charge);
         pb.charge = 0;
         api.sfx("pb_launch");
       } else if (inp.y < -0.6) return pbLeave(api);
@@ -286,6 +294,15 @@ const N_PIN = {
       ctx.lineTo(X + s[2], Y + s[3]);
       ctx.stroke();
     });
+    // 通路の口の仕切り(玉が盤面に出たあと)
+    if (pb.inPlay) {
+      ctx.strokeStyle = "#d8dce4";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(X + 150, Y + 100);
+      ctx.lineTo(X + 164, Y + 92);
+      ctx.stroke();
+    }
     // 打ち出し棒(ためると縮む)
     const pk = Math.round(pb.charge * 10);
     ctx.fillStyle = "#c8c8d0";
