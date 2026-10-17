@@ -118,13 +118,26 @@ const nGlow = (ctx, x, y, r, rgb, a) => {
   ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
 };
 // ぽんぽんカーとドラム缶をつなぐ黒い線(たるんだ線。原理は説明しない D124)
-const nCable = (ctx, x0, y0, x1, y1, sag) => {
+const nCable = (ctx, x0, y0, x1, y1, sag, race) => {
+  const path = (dy) => {
+    ctx.beginPath();
+    ctx.moveTo(x0, y0 + dy);
+    ctx.quadraticCurveTo((x0 + x1) / 2, Math.max(y0, y1) + sag + dy, x1, y1 + dy);
+    ctx.stroke();
+  };
+  if (race) {
+    // 競争の画面: 路面にまぎれないよう、太い銅の線に、上のふちの光(D338、作者「引き戻される演出がわかりにくい」)
+    ctx.strokeStyle = "#5a3418";
+    ctx.lineWidth = 3;
+    path(0);
+    ctx.strokeStyle = race.taut ? "#ffd890" : "#e09848";
+    ctx.lineWidth = 1;
+    path(-1);
+    return;
+  }
   ctx.strokeStyle = "#141210";
   ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(x0, y0);
-  ctx.quadraticCurveTo((x0 + x1) / 2, Math.max(y0, y1) + sag, x1, y1);
-  ctx.stroke();
+  path(0);
 };
 
 // A 峠のトンネルの出口(入口で出口)。待避所に、ぽんぽんカーとドラム缶(れんがの上で木の葉が燃える)
@@ -255,6 +268,9 @@ const N_DRIVEIN = nMap("drivein", 28, 14, {
 // 南の窓からの光の帯の中で、ほこりがゆっくり舞う。ジュークボックスは、調べると泡が光ってのぼり、色の光が床を流れる(電気が来ていないわけは説明しない)
 // 壁の写真を調べると、レースの日の一枚絵(後ろ姿の見物人と、走る車。v_photo)
 let nJukeT0 = -1;
+let nJukeN = 0; // 最後にかけたレコード(0 はまだ)
+const N_JUKE = ["juke_1", "juke_2"]; // いまは 2 枚(D337)
+const nJukePlaying = () => !!window.bogiAudio && N_JUKE.includes(window.bogiAudio.state().bgm);
 let nPinT0 = -1;
 const nMotes = [];
 for (let i = 0; i < 46; i++) nMotes.push({ x: Math.random(), y: Math.random(), p: Math.random() * 6, s: Math.random() < 0.3 ? 2 : 1 });
@@ -274,9 +290,11 @@ const N_DINER = nMap("diner", 20, 12, {
       ctx.fillRect(Math.round(ox + xx), Math.round(oy + yy), m.s, m.s);
     }
     // ジュークボックス(1963 Seeburg のコンソール型 D141): 前の格子と下の灯りの帯が、色を変えながら光る
+    // レコードがかかっている間は光り続ける(音が出ない環境では 14 秒)
     const e = nJukeT0 < 0 ? -1 : nNow() - nJukeT0;
-    if (e >= 0 && e < 14) {
-      const a = Math.min(1, e / 0.8) * Math.min(1, (14 - e) / 2);
+    const on = nJukePlaying() ? 1e9 : 14;
+    if (e >= 0 && e < on) {
+      const a = Math.min(1, e / 0.8) * Math.min(1, (on - e) / 2);
       const jx = ox + 18.06 * T;
       const jy = oy + 1.4 * T;
       const cols = ["255, 90, 60", "255, 210, 80", "90, 220, 130", "90, 160, 240"];
@@ -296,6 +314,8 @@ const N_DINER = nMap("diner", 20, 12, {
       nGlow(ctx, ox + 1.2 * T, oy + 9.0 * T, 16, "255, 240, 150", (on ? 0.2 : 0.5) * Math.min(1, (3.2 - pe) / 0.6));
     }
   },
+  // レコードがかかっている間は、ジュークボックスに近いほど大きく聞こえる(店の反対のはしで半分くらい)
+  bgmLevel: (p) => (nJukePlaying() ? 1 - 0.5 * Math.min(1, Math.hypot(p.x - 18.06 * T, p.y - 3.3 * T) / (16 * T)) : 1),
   triggers: [{ id: "out", x: 9 * T, y: 11.55 * T, w: 2 * T, h: T, warp: { map: "drivein", spawn: "diner" } }],
   objects: [
     {
@@ -306,8 +326,18 @@ const N_DINER = nMap("diner", 20, 12, {
       h: 1,
       headY: 2.4 * T,
       range: 56,
+      // 調べると、次のレコードを 1 枚かける(D334。いまは 2 枚を交互に D337)。かかっている間は灯りが光り続け、終わるとダイナーの静けさに戻る
       interact(api) {
         nJukeT0 = nNow();
+        nJukeN = (nJukeN % N_JUKE.length) + 1;
+        const key = "juke_" + nJukeN;
+        if (window.bogiAudio)
+          window.bogiAudio.bgm(key, {
+            once: true,
+            onEnd: () => {
+              if (window.bogiAudio.state().bgm === key) window.bogiAudio.bgm("noroi");
+            },
+          });
         api.bubble("juke", "♪　　♪", 2600);
         api.later(3200, () => api.bubble("juke", "♪", 2200));
       },
@@ -350,6 +380,8 @@ const N_DINER = nMap("diner", 20, 12, {
     },
   ],
 });
+// レコードがかかっていれば、そのまま(ピンボールから戻ったときに止めない)。nMap は Object.assign なので、あとから getter をつける
+Object.defineProperty(N_DINER, "bgm", { get: () => (nJukePlaying() ? window.bogiAudio.state().bgm : undefined) });
 
 // D 旧国道の直線(ドラッグストリップ)。競争の画面と同じ場所(D140): 北と南に空っぽの木のスタンド、スタートの白線と信号の柱、東にゴールの線と計時の小屋
 // 炎を塗ったあと、野犬たちが北の路肩に並び、スタートの白線の手前に三台(ぽんぽんカー、赤べこ、ぼぎカー)
@@ -454,6 +486,8 @@ const N_ROUNDS = [
   { id: "akabeko", img: "rcs_aka", name: "けっしょう", et: N_KI_ET + 0.9, lift: 0.2 },
 ];
 const N_PX = 3; // 1 m = 3 ドット
+const N_SNAP_HOLD = 0.35; // ぽんぽんカーの線が張って止まっている秒(D338)
+const N_SNAP_FLY = 1.0; // そこから峠へ飛んでいく秒
 const N_SX = 196; // スタートの線(世界の x)。マシンの鼻先がここにそろう
 const N_FX = N_SX + N_RACE_D * N_PX; // ゴールの線
 const N_GY = { opp: 220, ki: 286 }; // 奥の車線と手前の車線の地面の y
@@ -467,6 +501,7 @@ const nRaceReset = (api) => {
   nr.go = -1;
   nr.end = null;
   nr.snapT = -1;
+  nr.snapSfx = false;
   nr.repT = -1;
   nr.flash = -1;
   nr.round = nRound(api);
@@ -488,16 +523,24 @@ const nRaceState = () => {
   const ki = nr.go < 0 ? 0 : Math.max(0, Math.min(N_RACE_D + 24, (s - nr.go) * (N_RACE_D / N_KI_ET))); // 無慣性なので、ゴールを過ぎたらその場でぴたりと止まる
   let opp = nr.foul >= 0 ? 0 : nOpp(rd, s - N_GREEN);
   let back = 0;
+  let taut = 0;
   if (rd.snap) {
     const lim = N_RACE_D * rd.snap;
     if (opp >= lim && nr.snapT < 0) nr.snapT = s;
     if (nr.snapT >= 0) {
-      const u = Math.min(1, (s - nr.snapT) / 1.2);
-      opp = lim * (1 - u) * (1 - u) - u * 90; // 線がのびきって、左の峠(過去)へ引き戻される
-      back = u;
+      // 線がのびきる: まず「ピン」と張って一瞬止まり(前へ少しのびる)、それからゴムのように左の峠(過去)へ飛んでいく(D338)
+      const d = s - nr.snapT;
+      if (d < N_SNAP_HOLD) {
+        opp = lim + 2 * Math.sin((Math.PI * d) / N_SNAP_HOLD);
+        taut = 1 - d / N_SNAP_HOLD;
+      } else {
+        const u = Math.min(1, (d - N_SNAP_HOLD) / N_SNAP_FLY);
+        opp = lim - (lim + 90) * u * u;
+        back = Math.max(0.001, u);
+      }
     }
   }
-  return { s, real, rd, ki, opp, back };
+  return { s, real, rd, ki, opp, back, taut };
 };
 // 白煙(うしろへ流れて広がり、消える)
 const nRcPuffs = [];
@@ -631,7 +674,7 @@ const nDrawRear = (ctx, ox, oy, get, api, st0) => {
     if (!r) return;
     if (rd.snap) {
       // 線: 画面の左下の外(峠のドラム缶)から、ぽんぽんカーのエンジンの右へ
-      nCable(ctx, ox - 30, oy + 310, ox + r.x + r.w * 0.35, oy + r.y - r.h * 0.55, back > 0 ? 6 : Math.max(4, 60 * (1 - opp / N_RACE_D)));
+      nCable(ctx, ox - 30, oy + 310, ox + r.x + r.w * 0.35, oy + r.y - r.h * 0.55, st0.taut > 0 ? 0 : back > 0 ? 6 : Math.max(4, 60 * (1 - opp / N_RACE_D)), { taut: st0.taut > 0 });
     }
     if ((burn || (st > 0.2 && st < 1.0)) && Math.random() < 0.35 && r.f > 0.25) {
       nRrPuff(r.x - r.w * 0.38, r.y - 4 * r.f, r.f);
@@ -703,6 +746,7 @@ const N_RACE = {
       nr.repT = nNow() - nr.t0;
       nr.rep0 = Math.min(nr.go, N_GREEN) - 0.5;
       nr.snapT = -1;
+      nr.snapSfx = false;
       nRcPuffs.length = 0;
       nr.flash = nr.repT;
     }
@@ -743,7 +787,20 @@ const N_RACE = {
     }
     // カメラ: 先を行く車の鼻先を画面の 300 に。ゴールの線が画面の 240 まで来たら止まる
     const lead = Math.max(ki, opp, 0);
-    const cam = Math.max(0, Math.min(N_FX - 240, N_SX + lead * N_PX - 300));
+    let cam = Math.max(0, Math.min(N_FX - 240, N_SX + lead * N_PX - 300));
+    // 1 回戦: ぼぎカーがゴールするか、線がのびきったら、カメラを左へ流して、ぽんぽんカーを画面のまん中に。
+    // 張って、飛んでいくのを見せてから、ゴールへ戻る(D338、作者「ポンポンカーが引き戻される演出がわかりにくい」)
+    if (rd.snap) {
+      const lim = N_RACE_D * rd.snap;
+      const t1 = Math.min(nr.end ? nr.endT : 1e9, nr.snapT >= 0 ? nr.snapT : 1e9);
+      if (t1 < 1e9) {
+        const sm = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+        let w = sm((s - t1) / 0.45);
+        if (nr.snapT >= 0) w *= 1 - sm((s - (nr.snapT + N_SNAP_HOLD + N_SNAP_FLY + 0.5)) / 0.5);
+        const pc = N_SX + (nr.snapT >= 0 ? lim : Math.min(opp, lim)) * N_PX - 300;
+        cam = cam + (pc - cam) * w;
+      }
+    }
     const sky = get("rcs_sky");
     if (sky) ctx.drawImage(sky, ox, oy);
     const pcam = cam * 0.35; // スタンドは遠いので、ゆっくり流れる
@@ -772,11 +829,19 @@ const N_RACE = {
     // 相手(奥の車線)
     const oim = get(rd.img);
     const ofx = ox + N_SX + opp * N_PX - cam;
-    const lift = rd.lift && st > 0 && st < 1.1 && !back ? rd.lift * Math.sin((Math.PI * st) / 1.1) : 0;
-    const r = nDrawSide(ctx, oim, ofx, oy + N_GY.opp, shk(burn || (st > 0 && st < 0.8), 1), lift);
+    let lift = rd.lift && st > 0 && st < 1.1 && !back ? rd.lift * Math.sin((Math.PI * st) / 1.1) : 0;
+    if (st0.taut > 0) lift = -0.06 * Math.sin(Math.PI * (1 - st0.taut)); // 張った瞬間、前のめりに
+    const r = nDrawSide(ctx, oim, ofx, oy + N_GY.opp, st0.taut > 0 ? Math.round(Math.sin(s * 90) * 1.5) : shk(burn || (st > 0 && st < 0.8), 1), lift);
     if (r && rd.snap) {
-      // 線: 画面の左の外(峠のドラム缶 = 過去)から、ぽんぽんカーのうしろへ
-      nCable(ctx, ox - 20, oy + N_GY.opp - 24, r.x0 + 14, r.y0 + r.h * 0.45, back > 0 ? 4 : Math.max(3, 40 * (1 - opp / N_RACE_D)));
+      // 線: 画面の左の外(峠のドラム缶 = 過去)から、ぽんぽんカーのうしろへ。張ったときは真っすぐ、ふるえる
+      const sag = st0.taut > 0 ? Math.sin(s * 70) * 2 : back > 0 ? 6 + back * 30 : Math.max(3, 40 * (1 - opp / N_RACE_D));
+      nCable(ctx, ox - 20, oy + N_GY.opp - 24, r.x0 + 14, r.y0 + r.h * 0.45, sag, { taut: st0.taut > 0 });
+      if (st0.taut > 0 && !nr.snapSfx) {
+        nr.snapSfx = true;
+        api.sfx("pon_snap");
+        api.shake(0.3, 2);
+      }
+      if (back > 0 && back < 0.9 && Math.random() < 0.3) nRcPuff(r.x0 - ox + cam + 60, N_GY.opp - 10, 30);
     }
     if (r && (burn || (st > 0.1 && st < 0.9)) && Math.random() < 0.45) nRcPuff(r.x0 - ox + cam + 22, N_GY.opp - 6, -40);
     // ぼぎカー(手前の車線)ときー

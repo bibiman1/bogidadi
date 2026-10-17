@@ -11,8 +11,9 @@ const PB_W = 168;
 const PB_H = 280;
 const PB_R = 4; // 玉の半径
 // 玉の跳ね方(D331 で調整。作者「ピンボールの玉の跳ね方を調整して」): 前は重力 300、壁 0.45、バンパー +170、スリング +150、フリッパー 0.3・24 rad/s、上限 620、空気の抵抗なし
+// D336(作者「無限に跳ね返るから点数がはいる。下向きの重力をすこしかけて」): 重力 190 → 240(左右のスリングの間を同じ高さで行き来し続けていた)
 // D333(作者「玉は遅くていい」): D331 の値(重力 240、スリング +110、バンパー +120、上限 480、打ち出し 220+300)を、もう一段ゆっくりに
-const PB_TUNE = { g: 190, wallE: 0.35, postE: 0.4, slingE: 0.4, slingKick: 90, bumperE: 0.6, bumperKick: 100, flipE: 0.15, maxV: 380, drag: 0.15, launch0: 180, launchK: 240 };
+const PB_TUNE = { g: 240, wallE: 0.35, postE: 0.4, slingE: 0.4, slingKick: 90, bumperE: 0.6, bumperKick: 100, flipE: 0.15, maxV: 380, drag: 0.15, launch0: 180, launchK: 240 };
 const PB_G = PB_TUNE.g; // 重力(盤面の傾き)
 const PB_FLIP = { len: 38, rest: 0.5, up: -0.42, wUp: 18, wDown: 12, thick: 3 }; // 長さは絵(pb_flipper、支点から先まで 38 ドット)に合わせる(D330)
 // 打ち出しの通路。打ち出し棒の頭は y 248、その下に巻いたバネ(作者「バネはちゃんと描写してほしい」)。ためると頭が下がり、バネが縮む
@@ -23,6 +24,9 @@ const PB_BUMPERS = [
   { x: 52, y: 96, r: 14, kind: "beko" }, // 赤べこの頭(半径は絵 pb_bump_* に合わせる D330)
   { x: 112, y: 96, r: 14, kind: "drum" }, // ぽんぽんカーの燃えるドラム缶
   { x: 82, y: 134, r: 14, kind: "duck" }, // とりぼぎかーの子がも
+  // 下の空いた所に、上へ弾き返す小さなバンパー 2 つ(D336、作者「上に反射するバンパーとかないから、スカスカになる」)。車のホイールキャップの形
+  { x: 52, y: 168, r: 8, kind: "cap", kick: 80, pts: 50 },
+  { x: 112, y: 168, r: 8, kind: "cap", kick: 80, pts: 50 },
 ];
 const PB_TOPLANES = [66, 90, 114]; // 上の 3 つのレーン(全部ともすと 1000 点)
 const PB_POSTS = [54, 78, 102, 126];
@@ -141,9 +145,9 @@ function pbStep(api, h) {
         pb.vx -= (1 + PB_TUNE.bumperE) * vn * nx;
         pb.vy -= (1 + PB_TUNE.bumperE) * vn * ny;
       }
-      pb.vx += nx * PB_TUNE.bumperKick;
-      pb.vy += ny * PB_TUNE.bumperKick;
-      pbScore(api, 100, "b" + i);
+      pb.vx += nx * (b.kick ?? PB_TUNE.bumperKick);
+      pb.vy += ny * (b.kick ?? PB_TUNE.bumperKick);
+      pbScore(api, b.pts ?? 100, "b" + i);
       api.sfx("pb_bumper");
     }
   }
@@ -183,6 +187,12 @@ const N_PIN = {
   tile: T,
   bg: "#1a1512",
   hidePlayer: true,
+  // ダイナーのジュークボックスのレコードがかかっていれば、台の前でもそのまま(少し小さく。D334)
+  get bgm() {
+    const k = window.bogiAudio && window.bogiAudio.state().bgm;
+    return k && k.startsWith("juke_") ? k : undefined;
+  },
+  bgmLevel: 0.7,
   map: kGrid(15, 9, () => false), // 画面とちょうど同じ広さ(カメラが動かない)
   legend: K_LEGEND,
   spawns: { view: { x: 7 * T, y: 4 * T, facing: "north" } },
@@ -483,6 +493,31 @@ function pbFieldArt(art) {
   return c;
 }
 function pbBumper(ctx, x, y, b, lit) {
+  if (b.kind === "cap") {
+    // ホイールキャップ: メッキの輪、まん中に赤い灯り(当たると光る)、5 本のスポーク
+    x = Math.round(x);
+    y = Math.round(y);
+    ctx.fillStyle = "#3a3a42";
+    ctx.beginPath();
+    ctx.arc(x, y + 1, b.r + 1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#d8dce4";
+    ctx.beginPath();
+    ctx.arc(x, y, b.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#8a8e98";
+    for (let k = 0; k < 5; k++) {
+      const a = (k * Math.PI * 2) / 5 - Math.PI / 2;
+      ctx.fillRect(Math.round(x + Math.cos(a) * (b.r - 3)) - 1, Math.round(y + Math.sin(a) * (b.r - 3)) - 1, 2, 2);
+    }
+    ctx.fillStyle = lit ? "#fff6c0" : "#c8282a";
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(x - 3, y - b.r + 1, 3, 1);
+    return;
+  }
   const cap = { beko: ["#c8282a", "#1a1a1a"], drum: ["#f0e4c8", "#c83a2a"], duck: ["#f09a2a", "#6a8a3a"] }[b.kind];
   ctx.fillStyle = "#e8ecf0";
   ctx.beginPath();

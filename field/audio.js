@@ -4,7 +4,8 @@
 (function () {
   const BASE = "./assets/sound/";
   // 真のエンディング(C)のスタッフロールは公園の遊び場の音、最後の声は赤ちゃんの笑い声(D292。出どころは assets/sound/CREDITS.md)
-  const BGM_FILES = { roll_c: "bgm/park.mp3", haihei: ["bgm/haihei_1.mp3", "bgm/haihei_2.mp3"] }; // 廃兵院は舞台の楽団の曲(作者がアップロード)。並べると、順にかけてくり返す // 例: { void: "bgm/void.mp3", lake: "bgm/lake.mp3" }
+  // ダイナーのジュークボックスのレコード(D334。出どころは assets/sound/CREDITS.md)。調べるたびに次の 1 枚を、1 回だけかける
+  const BGM_FILES = { roll_c: "bgm/park.mp3", haihei: ["bgm/haihei_1.mp3", "bgm/haihei_2.mp3"], juke_1: "bgm/juke_sock_hop.mp3", juke_2: "bgm/juke_surfing.mp3" }; // 残りの 2 枚(Surf Shimmy、Sax, Rock, and Roll)は取れたら足す(D337) // 廃兵院は舞台の楽団の曲(作者がアップロード)。並べると、順にかけてくり返す // 例: { void: "bgm/void.mp3", lake: "bgm/lake.mp3" }
   const SFX_FILES = { baby_laugh: "rec/baby_laugh.mp3" }; // 例: { hyoshigi: "sfx/hyoshigi.mp3" }
   const KEY = "bogidachi.audio.v1";
   const vol = { bgm: 3, sfx: 4 }; // 0〜5
@@ -95,7 +96,8 @@
     out.stop = () => oscs.forEach(([o, l]) => (o.stop(), l.stop()));
     return out;
   }
-  function bgm(key) {
+  // opts.once: くり返さず 1 回だけかけ、終わったら opts.onEnd(ジュークボックスのレコード)
+  function bgm(key, opts = {}) {
     if (!key) return;
     if (!ctx) {
       want = key;
@@ -148,7 +150,11 @@
         if (!buf) return start(droneNode(key));
         const s = ctx.createBufferSource();
         s.buffer = buf;
-        s.loop = true;
+        s.loop = !opts.once;
+        if (opts.once)
+          s.onended = () => {
+            if (cur === mine && opts.onEnd) opts.onEnd();
+          };
         start(s);
       });
     else start(droneNode(key));
@@ -251,6 +257,8 @@
     pb_sling: () => (tone("square", 520, 400, 0.04, 0.08), noise(0.02, 0.2, 3000)),
     pb_lane: () => tone("triangle", 1500, 1500, 0.08, 0.1),
     pb_launch: () => (noise(0.25, 0.3, 900), tone("sine", 120, 60, 0.2, 0.15)),
+    // ぽんぽんカーの線が張りきる「ビン」(ゴムの弦をはじいた音: 高い音がふるえながら下がる D338)
+    pon_snap: () => (tone("triangle", 520, 260, 0.45, 0.32), tone("sine", 1040, 300, 0.3, 0.12), tone("square", 130, 70, 0.25, 0.06)),
     shutter: () => (noise(0.03, 0.5, 5000), tone("square", 1800, 1500, 0.02, 0.12), noise(0.04, 0.4, 3000, 0.09)),
   };
   function sfx(name) {
