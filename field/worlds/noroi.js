@@ -317,6 +317,31 @@ const N_DINER = nMap("diner", 20, 12, {
     { id: "calendar", x: 15.4 * T, y: 3.2 * T, w: 1, h: 1, headY: 2.2 * T, range: 44, interact: (api) => api.mutter("……", 1400) }, // 赤い丸の土曜日(仮)
     { id: "pinball", x: 1.9 * T, y: 9.3 * T, w: 1, h: 1, headY: 3.4 * T, range: 44, interact: (api) => { nPinT0 = nNow(); api.mutter("……", 1400); } }, // ピンボール(つぶやきは仮)
     { id: "stopwatch", x: 15.2 * T, y: 6.9 * T, w: 1, h: 1, headY: 1.2 * T, range: 52, interact: (api) => api.mutter("……", 1400) }, // 地図と鍵とストップウォッチ(仮)
+    {
+      // ボックス席のテーブルの雑誌「BOGICAR GRAPHIC」(D320): 表紙から、A でめくって 6 台を 1 台ずつ(絵は docs/assets/noroi/magazine/make.py)
+      id: "magazine",
+      x: 17.2 * T, // 調味料のびんの右。通路(テーブルの左のはし)から届くように、調べる距離は長め
+      y: 8.75 * T,
+      w: 1,
+      h: 1,
+      range: 64,
+      headY: 0.6 * T,
+      draw(ctx, sx, sy) {
+        // 赤い題の帯の、少し斜めに置かれた一冊
+        ctx.fillStyle = "rgba(40, 30, 20, 0.25)";
+        ctx.fillRect(sx - 6, sy - 9, 13, 10);
+        ctx.fillStyle = "#e8e0cc";
+        ctx.fillRect(sx - 7, sy - 11, 12, 10);
+        ctx.fillStyle = "#b4281f";
+        ctx.fillRect(sx - 7, sy - 11, 12, 3);
+        ctx.fillStyle = "#5a3a28";
+        ctx.fillRect(sx - 4, sy - 5, 6, 2);
+      },
+      interact(api) {
+        const page = (i) => api.show(`v_mag_${i}`, i < 6 ? () => page(i + 1) : null);
+        page(0);
+      },
+    },
   ],
 });
 
