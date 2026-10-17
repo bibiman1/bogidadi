@@ -253,7 +253,10 @@ const N_PIN = {
       pbText(ctx, ox + 346, oy + 134, "GAME OVER", "#ff5a4a", 2);
     }
     // 盤面
-    if (!pb.field) pb.field = pbFieldArt();
+    if (!pb.field || (!pb.fieldArt && get("pb_field"))) {
+      pb.fieldArt = get("pb_field");
+      pb.field = pbFieldArt(pb.fieldArt);
+    }
     ctx.drawImage(pb.field, X, Y);
     // 上のレーンの灯り
     PB_TOPLANES.forEach((x, i) => {
@@ -310,12 +313,30 @@ const N_PIN = {
     }
   },
 };
-// 盤面の絵(一度だけ描く): ドラッグストリップの路面、白い線、チェッカーの帯、壁のメッキ、炎の絵
-function pbFieldArt() {
+// 盤面の絵(一度だけ描く)。art(PixelLab の盤面の絵 pb_field、D328)があればそれに、当たり判定どおりのメッキの壁を重ねる。
+// なければ、ドラッグストリップの路面、白い線、チェッカーの帯、炎の絵を描く(盤面の絵の下絵にもした)
+function pbFieldArt(art) {
   const c = document.createElement("canvas");
   c.width = PB_W;
   c.height = PB_H;
   const g = c.getContext("2d");
+  if (art) {
+    g.imageSmoothingEnabled = false;
+    g.drawImage(art, 0, 0, PB_W, PB_H);
+    g.strokeStyle = "rgba(200, 204, 214, 0.85)";
+    g.lineWidth = 1.5;
+    for (const w of PB_WALLS) {
+      g.beginPath();
+      g.moveTo(w[0], w[1]);
+      g.lineTo(w[2], w[3]);
+      g.stroke();
+    }
+    g.fillStyle = "#e0e4ec";
+    for (const x of PB_POSTS) g.fillRect(x - 2, 30, 4, 4);
+    g.fillStyle = "rgba(14, 10, 8, 0.85)";
+    g.fillRect(56, 268, 38, PB_H - 268); // 落ちる口
+    return c;
+  }
   g.fillStyle = "#3a2c22"; // 台の木
   g.fillRect(0, 0, PB_W, PB_H);
   // 天井の丸みに合わせた路面
