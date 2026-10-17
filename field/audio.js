@@ -382,9 +382,18 @@
     const wG = ctx.createGain();
     wG.gain.value = 0;
     wN.connect(wLp).connect(wG).connect(kiBus.g);
+    // 排気管の炎の破裂音(D349): 高めの雑音を、毎コマでたらめに開け閉めして「バリバリ」
+    const crN = keep(loopNoise(1.1));
+    const crHp = ctx.createBiquadFilter();
+    crHp.type = "bandpass";
+    crHp.frequency.value = 1100;
+    crHp.Q.value = 0.8;
+    const crG = ctx.createGain();
+    crG.gain.value = 0;
+    crN.connect(crHp).connect(shaper(30)).connect(crG).connect(oppBus.g);
     nodes.forEach((n) => n.start());
     out.gain.setTargetAtTime(1, ctx.currentTime, 0.05);
-    race = { kind, out, eng, o1, o2, lp, lfo, jetBp, jetG, sqG, sqKiG, wLp, wG, oppBus, kiBus, nodes, timer: 0 };
+    race = { kind, out, eng, o1, o2, lp, lfo, jetBp, jetG, sqG, sqKiG, wLp, wG, oppBus, kiBus, crG, nodes, timer: 0 };
   }
   // p: { rpm 0〜1, eng 0〜1(エンジンの大きさ), squeal 0〜1(相手のタイヤ), squealKi 0〜1(ぼぎカーのタイヤ), wind 0〜1,
   //      oppPan / kiPan -1(左)〜1(右), oppVol / kiVol 0〜1(カメラからの遠さ) }
@@ -408,6 +417,8 @@
     r.wLp.frequency.setTargetAtTime(300 + (p.wind || 0) * 2400, t, 0.08);
     r.wG.gain.setTargetAtTime((p.wind || 0) * 0.35, t, 0.08);
     r.sqKiG.gain.setTargetAtTime((p.squealKi || 0) * 0.45, t, 0.05);
+    const cr = p.crackle || 0;
+    r.crG.gain.setValueAtTime(Math.random() < cr * 0.85 ? 0.35 + Math.random() * 0.45 : 0, t); // バリバリバリ(D350)
     r.oppBus.g.gain.setTargetAtTime(p.oppVol ?? 1, t, 0.06);
     r.kiBus.g.gain.setTargetAtTime(p.kiVol ?? 1, t, 0.06);
     if (r.oppBus.pan) r.oppBus.pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, p.oppPan || 0)), t, 0.06);

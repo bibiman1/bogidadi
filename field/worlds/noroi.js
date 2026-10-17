@@ -535,11 +535,15 @@ const nRaceReset = (api) => {
   nRrPuffs.length = 0;
 };
 // 相手の位置(m)。青から少し遅れて出て、だんだん速く
+// ゴールのあとは慣性で走り抜け、N_BRAKE 秒のブレーキで止まる(D347。相手は無慣性ではない)
+const N_BRAKE = 1.2;
 const nOpp = (rd, t) => {
   const react = 0.25;
   if (t <= react) return 0;
-  const u = Math.min(1.2, (t - react) / (rd.et - react));
-  return N_RACE_D * Math.pow(u, 1.7);
+  if (t <= rd.et) return N_RACE_D * Math.pow((t - react) / (rd.et - react), 1.7);
+  const vf = (N_RACE_D * 1.7) / (rd.et - react); // ゴールでの速さ(m/秒)
+  const d = Math.min(N_BRAKE, t - rd.et);
+  return N_RACE_D + vf * d - (0.5 * vf * d * d) / N_BRAKE;
 };
 // 時計: うしろからの画面では本当の時間。横向きの再現シーンでは、青の少し前から同じ出来事をもう一度たどる
 const nRaceState = () => {
@@ -570,6 +574,8 @@ const nRaceState = () => {
 };
 // タイムスリップ(D346、作者「無慣性粘着駆動が卑怯という演出をいれたい」): ぼぎカーのイーティーは、押した時刻に関係なく毎回まったく同じ 2.400。
 // 最高速は「----」(はかれない)。相手の欄には、ふつうの数字。説明はせず、数字だけで気づかせる
+// 勝ってからタイムスリップを出すまで(ミリ秒)。相手が戻ってきて空ぶかしするのを待つ(D347)
+const nSlipDelay = (rd, s) => (rd.snap ? 3400 : Math.max(3400, (nProtestT0(rd) + N_PROTEST.back + N_PROTEST.rev - s) * 1000));
 const nSlip = (rd, rt) => [
   `リアクション　${rt}`,
   `イーティー　${N_KI_ET.toFixed(3)}`,
@@ -577,16 +583,99 @@ const nSlip = (rd, rt) => [
   rd.snap ? `あいて　ゴールせず` : `あいて　${(rd.et - 0.25 + Math.random() * 0.04).toFixed(3)}`,
 ];
 // 負けた相手の抗議(D346): ゴールのあと、相手がぼぎカーのとなりへ戻ってきて、何度もエンジンをふかす。言葉はなく、音としぐさだけ
+// 動き(D347、作者「走り抜けてから戻ってきて空ぶかししないとおかしいでしょ。ほかのマシンも無慣性駆動ってことになるじゃない。」):
+// ゴールを走り抜け(nOpp のブレーキで止まる)→ 0.3 秒おいて、バックでぼぎカーのとなりへ戻る(ゆっくり動きだし、ゆっくり止まる)→ 空ぶかし
 // 返す値: null か { pos(m), rev(0〜1) }。ぽんぽんカーは峠へ引き戻されたので、しない
+const N_PROTEST = { wait: 0.3, back: 1.8, rev: 2.2 };
+const nProtestT0 = (rd) => N_GREEN + rd.et + N_BRAKE + N_PROTEST.wait; // バックしはじめる時刻(競争の時計)
 const nProtest = (st0) => {
-  const { s, rd, ki, opp } = st0;
+  const { s, rd, ki } = st0;
   if (nr.end !== "win" || rd.snap || nr.repT < 0) return null;
-  const t = s - nr.endT;
-  if (t < 0.6) return null;
+  const t0 = nProtestT0(rd);
+  if (s < t0) return null;
+  const stop = nOpp(rd, rd.et + N_BRAKE + 1); // 止まった所
   const target = ki + 6; // ぼぎカーのとなり、鼻先を少し前に
   const sm = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
-  const w = sm((t - 0.6) / 0.8);
-  return { pos: opp + (target - opp) * w, rev: t > 1.4 ? 1 : 0 };
+  const w = sm((s - t0) / N_PROTEST.back);
+  return { pos: stop + (target - stop) * w, rev: s >= t0 + N_PROTEST.back ? 1 : 0, backing: s < t0 + N_PROTEST.back };
+};
+// 排気管の炎(D349、作者「排気管からは、炎がバリバリと出てくる演出をすると、強大なパワーを感じさせられるので、いれて」
+// 「それ以外でも排気管があるマシンには炎をえがいて」)。絵の中の排気管の口の位置(ドット)と、炎の向き。向き 0,0 は手前へ噴く(うしろから見た口)
+// 車箪笥は絵に排気管が見えない、とりぼぎかーはジェットなので、なし
+const N_FLAME = {
+  rcs_aka: [[56, 64, -1, 0.15]],
+  rc_aka_back: [[11, 42, -0.6, -1], [81, 42, 0.6, -1]],
+  rcs_pon: [[18, 33, -0.6, -1], [32, 34, -0.6, -1], [44, 34, -0.6, -1], [55, 35, -0.6, -1]],
+  rc_pon_back: [[27, 31, -0.7, -1], [145, 31, 0.7, -1]],
+  rcs_kokeshi: [[8, 62, -1, -0.35]],
+  rc_kokeshi_back: [[5, 66, 0, 0], [29, 66, 0, 0]],
+};
+// 炎の強さ(0〜1): バーンナウト、ステージのあおり、走っている間ずっと(ギアの変わり目は最大)、抗議の空ぶかし。
+// 大げさに(D350、作者「排気管の炎は大げさなほうがいい。バリバリバリバリバリってかんじで、排気煙のフレアパターンが高速で切り替わるとかっけえな」)
+const nFlameI = (st0) => {
+  const { s, rd, opp, back, taut } = st0;
+  const st = s - N_GREEN;
+  let I = 0;
+  if (s > 1 && s < 3.2) I = 0.8;
+  if (s >= 3.2 && st < 0) I = Math.max(0, Math.sin(s * 5)) > 0.6 ? 0.9 : 0.25; // ステージのあおり
+  if (st >= 0 && nr.foul < 0 && !back && !(taut > 0)) {
+    if (opp < N_RACE_D) {
+      I = 0.85;
+      const g = (Math.max(0, opp) / N_RACE_D) * 3.2;
+      if (g % 1 < 0.1 && g > 0.5) I = 1; // ギアが変わる瞬間に、ドカン
+    } else I = Math.max(0, 0.6 - (s - (N_GREEN + rd.et)) * 0.5); // ブレーキで、しだいにおさまる
+  }
+  const pr = nProtest(st0);
+  if (pr) I = pr.rev ? (Math.max(0, Math.sin(s * 11)) > 0.3 ? 1 : 0.3) : 0.2;
+  return I;
+};
+// 炎を描く。(x, y) が口、(dx, dy) が向き、k が絵の倍率。毎コマ、形を 4 つから選びなおす(高速で切りかわる)。ときどき一瞬消える
+const N_FLAME_COL = ["#ffffff", "#fff4b0", "#ffc83a", "#ff8a1e", "#ff4a14", "#b8201a"];
+const nFlameCol = (t) => N_FLAME_COL[Math.min(N_FLAME_COL.length - 1, Math.floor(t * N_FLAME_COL.length))];
+const nFlame = (ctx, x, y, dx, dy, I, k) => {
+  if (I <= 0.02 || Math.random() < 0.18) return; // バリバリ: 一瞬消える
+  const burst = dx === 0 && dy === 0;
+  const d = Math.hypot(dx, dy) || 1;
+  const ux0 = burst ? 0 : dx / d;
+  const uy0 = burst ? -0.35 : dy / d;
+  const pat = Math.floor(Math.random() * 4); // 0 長い噴射、1 扇、2 輝きの粒が並ぶ噴射、3 火の玉
+  // 光の輪(根もと)
+  ctx.fillStyle = `rgba(255, 190, 80, ${0.45 * I})`;
+  const g = Math.round((burst ? 10 : 8) * k * (0.6 + I * 0.7));
+  ctx.fillRect(Math.round(x - g), Math.round(y - g), g * 2, g * 2);
+  const tongue = (a, lenK, wK, diamonds) => {
+    const ux = burst ? Math.sin(a) * 0.7 : ux0 * Math.cos(a) - uy0 * Math.sin(a);
+    const uy = burst ? uy0 - Math.abs(Math.cos(a)) * 0.3 : ux0 * Math.sin(a) + uy0 * Math.cos(a);
+    const len = (14 + 50 * I) * k * lenK * (0.7 + Math.random() * 0.6);
+    const n = Math.max(3, Math.round(len));
+    for (let i = 0; i < n; i++) {
+      const t = i / n;
+      let w = Math.max(1, Math.round(7 * k * wK * (1 - t * 0.75) * (0.7 + Math.random() * 0.6)));
+      if (diamonds && i % Math.max(3, Math.round(6 * k)) < 2) w += Math.round(3 * k); // 衝撃波の輝き
+      const cx = Math.round(x + ux * i + (Math.random() - 0.5) * 2 * k);
+      const cy = Math.round(y + uy * i + (Math.random() - 0.5) * 2 * k);
+      ctx.fillStyle = nFlameCol(t);
+      ctx.fillRect(cx - (w >> 1), cy - (w >> 1), w, w);
+    }
+    return [x + ux * n, y + uy * n];
+  };
+  if (pat === 0) {
+    tongue(0, 1.2, 1.1, false);
+    tongue((Math.random() - 0.5) * 0.3, 0.7, 0.6, false);
+  } else if (pat === 1) {
+    for (let j = -2; j <= 2; j++) tongue(j * 0.32 + (Math.random() - 0.5) * 0.2, 0.55 + Math.random() * 0.3, 0.7, false);
+  } else if (pat === 2) {
+    tongue(0, 1.0, 0.8, true);
+  } else {
+    const [ex, ey] = tongue(0, 0.5, 0.9, false);
+    const R = Math.round((5 + 9 * I) * k * (0.8 + Math.random() * 0.4));
+    for (let yy = -R; yy <= R; yy++) {
+      const w = Math.floor(Math.sqrt(R * R - yy * yy));
+      const t = Math.abs(yy) / R;
+      ctx.fillStyle = nFlameCol(0.25 + t * 0.7);
+      ctx.fillRect(Math.round(ex - w), Math.round(ey + yy), 2 * w + 1, 1);
+    }
+  }
 };
 // 競争の音(D344): 相手のエンジン(マシンごとの音色)、スキール音、ぼぎカーの風。毎コマ、時計から決める
 // cam: 横からの画面のカメラ(null ならうしろからの画面)。左右と遠さを、車の見える位置から決める(D345)
@@ -651,7 +740,8 @@ const nRaceSound = (st0, cam) => {
     oppVol = 0.85 * vol(sx(oppAt));
     kiVol = vol(sx(ki));
   }
-  A.set({ rpm, eng, squeal, squealKi, wind, oppPan, kiPan, oppVol, kiVol });
+  const crackle = N_FLAME[rd.img] ? nFlameI(st0) : 0; // 炎が出ているときは、バリバリ(D349)
+  A.set({ rpm, eng, squeal, squealKi, wind, oppPan, kiPan, oppVol, kiVol, crackle });
 };
 // 白煙(うしろへ流れて広がり、消える)
 const nRcPuffs = [];
@@ -717,6 +807,8 @@ const NR_VP = { x: 240, y: 108 };
 const NR_LANE = { opp: 140, ki: 340 };
 const NR_CAR_Y = 274;
 const NR_Z0 = 10.9; // カメラからスタートまで(m)。白線(4 m 先)が絵の白線の高さ(y 228)にくる
+const NR_BACK = 1.4; // うしろから見た画面で、引き戻されたぽんぽんカーが止まる所(スタートのうしろ m)。カメラのうしろまで飛ぶと、排気管しか映らなかった(D353)
+const nRearD = (d) => (d < 0 ? -NR_BACK * (1 - Math.exp(d / NR_BACK)) : d);
 const NR_TREE = { xs: [232, 247], ys: [130, 146, 162, 177, 192], r: 8 }; // 灯り(左の列 = 相手、右の列 = ぼぎカー)
 // 奥行き: d(m)の所の大きさと y
 const nScale = (d) => NR_Z0 / (NR_Z0 + Math.max(-NR_Z0 * 0.7, d));
@@ -781,8 +873,14 @@ const nDrawRear = (ctx, ox, oy, get, api, st0) => {
   const drawOpp = () => {
     const st = s - N_GREEN;
     const lift = rd.lift && st > 0 && st < 1.1 && !back ? rd.lift * Math.sin((Math.PI * st) / 1.1) : 0;
-    const r = nDrawCar(ctx, oim, ox, oy, NR_LANE.opp, opp, shk(burn || (st > 0 && st < (rd.rattle ? 1.2 : 0.8)), rd.rattle || 1), lift);
+    const r = nDrawCar(ctx, oim, ox, oy, NR_LANE.opp, nRearD(opp), shk(burn || (st > 0 && st < (rd.rattle ? 1.2 : 0.8)), rd.rattle || 1), lift);
     if (!r) return;
+    if (N_FLAME[N_REAR[rd.id]] && oim) {
+      // うしろから: 絵の倍率(f)に合わせて、口の位置と炎の大きさを縮める(D349)
+      const I = nFlameI(st0);
+      const sy = r.h / oim.height;
+      for (const [ax, ay, dx, dy] of N_FLAME[N_REAR[rd.id]]) nFlame(ctx, ox + r.x - r.w / 2 + ax * r.f, oy + r.y - r.h + ay * sy, dx, dy, I, Math.max(0.6, r.f));
+    }
     if (rd.snap) {
       // 線: 画面の左下の外(峠のドラム缶)から、ぽんぽんカーのエンジンの右へ
       nCable(ctx, ox - 30, oy + 310, ox + r.x + r.w * 0.35, oy + r.y - r.h * 0.55, st0.taut > 0 ? 0 : back > 0 ? 6 : Math.max(4, 60 * (1 - opp / N_RACE_D)), { taut: st0.taut > 0 });
@@ -876,11 +974,11 @@ const N_RACE = {
           // 一騎打ち: 勝っても負けても、タイムを出してドラッグストリップへ戻る(また話しかければ、もう一度)
           const lines = nr.end === "win" ? ["かち", ...nSlip(rd, (nr.go - N_GREEN).toFixed(3))] : [nr.foul >= 0 ? "フライング" : "まけ"];
           if (nr.end !== "win" && nr.go >= 0) lines.push(`リアクション　${(nr.go - N_GREEN).toFixed(3)}`);
-          api.later(nr.end === "win" ? 3400 : 2200, () => api.say(lines, () => api.warp("strip", "start")));
+          api.later(nr.end === "win" ? nSlipDelay(rd, s) : 2200, () => api.say(lines, () => api.warp("strip", "start")));
         } else if (nr.end === "win") {
           const rt = (nr.go - N_GREEN).toFixed(3);
           const last = nr.round === N_ROUNDS.length - 1;
-          api.later(3400, () => {
+          api.later(nSlipDelay(rd, s), () => {
             if (last) {
               api.show("v_finish", () =>
                 api.say([`タイム　スリップ`, ...nSlip(rd, rt)], () => {
@@ -953,6 +1051,23 @@ const N_RACE = {
     if (st0.taut > 0) lift = -0.06 * Math.sin(Math.PI * (1 - st0.taut)); // 張った瞬間、前のめりに
     const r = nDrawSide(ctx, oim, ofx, oy + N_GY.opp, st0.taut > 0 ? Math.round(Math.sin(s * 90) * 1.5) : pr && pr.rev ? Math.round(Math.sin(s * 60) * 2) : shk(burn || (st > 0 && st < (rd.rattle ? 1.2 : 0.8)), rd.rattle || 1), lift);
     if (r && pr && pr.rev && Math.sin(s * 11) > 0.6 && Math.random() < 0.5) nRcPuff(r.x0 - ox + cam + 10, N_GY.opp - 8, -50); // ふかした煙
+    if (r && N_FLAME[rd.img]) {
+      const I = nFlameI(st0);
+      const gy = oy + N_GY.opp;
+      const pv = r.x0 + r.w * 0.2;
+      for (const [ax, ay, dx, dy] of N_FLAME[rd.img]) {
+        // 前がはね上がっているときは、絵と同じだけ口の位置もまわす
+        let px = r.x0 + ax, py = r.y0 + ay, vx = dx, vy = dy;
+        if (lift) {
+          const c = Math.cos(-lift), sn = Math.sin(-lift);
+          const qx = px - pv, qy = py - gy;
+          px = pv + qx * c - qy * sn;
+          py = gy + qx * sn + qy * c;
+          [vx, vy] = [dx * c - dy * sn, dx * sn + dy * c];
+        }
+        nFlame(ctx, px, py, vx, vy, I, 1);
+      }
+    }
     if (r && rd.snap) {
       // 線: 画面の左の外(峠のドラム缶 = 過去)から、ぽんぽんカーのうしろへ。張ったときは真っすぐ、ふるえる
       const sag = st0.taut > 0 ? Math.sin(s * 70) * 2 : back > 0 ? 6 + back * 30 : Math.max(3, 40 * (1 - opp / N_RACE_D));
