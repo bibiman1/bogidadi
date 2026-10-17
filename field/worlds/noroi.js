@@ -11,10 +11,10 @@
 // → 勝つと歓声、一枚絵、タイムスリップ → 道具「クラブの札」。トンネルからいつでも帰れる。台詞はエンジンの音だけで、すべて仮
 const N_GRIDS = {
   pass: [
-    "##################..########",
-    "##################..########",
-    "###...############..########",
-    "###...####..........########",
+    "############################", // 北の小道は通れない(口にパイロン。作者「余計な詮索でプレイヤーを混乱させたくない」D343)
+    "############################",
+    "###...######################",
+    "###...####........##########",
     "##..........................",
     "............................",
     "............................",
@@ -207,6 +207,8 @@ const N_PASS = nMap("pass", 28, 12, {
       },
     }),
     nSprite("drum", "drum", N_CAR0 - N_DRUM, 4.7 * T, 46, 62, { solid: { w: 34, h: 16, dy: -8 } }),
+    // 北の小道の口のパイロン(D343)。木の葉のぼぎは小道から来るが、きーは入れない
+    ...[18.3, 18.95, 19.6, 20.25, 20.9].map((x, k) => nSprite("pylon" + k, "pylon", x * T, 4.05 * T, 12, 16, {})),
     nSprite("fueler", "fueler", 18.9 * T, 1.2 * T, 26, 40, {
       range: 44,
       interact: (api) => api.bubble("fueler", "……", 1200), // 仮
@@ -493,9 +495,9 @@ const N_GREEN = 5.6; // 青の時刻(ステージ 3.4、黄 4.1、4.6、5.1)
 const N_KI_ET = 2.4; // ぼぎカーは無慣性: 押した瞬間に全速、ゴールまで 2.4 秒
 // 相手: ゴールまでの時間(青から)。ぼぎカーが勝つには、青から押すまでが (et - 2.4) 秒より短いこと
 const N_ROUNDS = [
-  { id: "ponpon", img: "rcs_pon", name: "１かいせん", et: 3.0, snap: 0.86, lift: 0.07 }, // バンジーで戻されるので、フライングしなければ勝てる
-  { id: "toribogi", img: "rcs_tori", name: "じゅんけっしょう", et: N_KI_ET + 1.4, lift: 0 },
-  { id: "akabeko", img: "rcs_aka", name: "けっしょう", et: N_KI_ET + 0.9, lift: 0.2 },
+  { id: "ponpon", img: "rcs_pon", name: "１かいせん", et: 3.0, snap: 0.86, lift: 0.07, snd: "pon" }, // バンジーで戻されるので、フライングしなければ勝てる
+  { id: "toribogi", img: "rcs_tori", name: "じゅんけっしょう", et: N_KI_ET + 1.4, lift: 0, snd: "jet" },
+  { id: "akabeko", img: "rcs_aka", name: "けっしょう", et: N_KI_ET + 0.9, lift: 0.2, snd: "v8" },
 ];
 // 優勝のあとの一騎打ち(D341、作者「ドラッグレースは何回もチャレンジできるようにして。あと、車箪笥やこけしとも競争したい。」)
 // ドラッグストリップでマシンに話しかけると、そのマシンと何度でも。勝ち負けで進み具合は変わらない(タイムだけ)
@@ -503,8 +505,8 @@ const N_DUEL = {
   ponpon: N_ROUNDS[0],
   toribogi: N_ROUNDS[1],
   akabeko: N_ROUNDS[2],
-  tansu: { id: "tansu", img: "rcs_tansu", name: "くるまだんす", et: N_KI_ET + 1.2, lift: 0, rattle: 2 }, // ヘミ V8 の重い箱。出だしで引き出しがガタつく(みとんが中に乗る)
-  kokeshi: { id: "kokeshi", img: "rcs_kokeshi", name: "こけし", et: N_KI_ET + 0.6, lift: 0.1 }, // いちばん速い。反応が遅いと負ける
+  tansu: { id: "tansu", img: "rcs_tansu", name: "くるまだんす", et: N_KI_ET + 1.2, lift: 0, rattle: 2, snd: "v8big" }, // ヘミ V8 の重い箱。出だしで引き出しがガタつく(みとんが中に乗る)
+  kokeshi: { id: "kokeshi", img: "rcs_kokeshi", name: "こけし", et: N_KI_ET + 0.6, lift: 0.1, snd: "bike" }, // いちばん速い。反応が遅いと負ける
 };
 let nDuelNext = null; // 次の競争の一騎打ちの相手(nRace で決める)
 const nCurRd = () => (nr.duel ? N_DUEL[nr.duel] : N_ROUNDS[nr.round]);
@@ -565,6 +567,64 @@ const nRaceState = () => {
     }
   }
   return { s, real, rd, ki, opp, back, taut };
+};
+// 競争の音(D344): 相手のエンジン(マシンごとの音色)、スキール音、ぼぎカーの風。毎コマ、時計から決める
+// cam: 横からの画面のカメラ(null ならうしろからの画面)。左右と遠さを、車の見える位置から決める(D345)
+const nRaceSound = (st0, cam) => {
+  const A = window.bogiAudio && window.bogiAudio.race;
+  if (!A) return;
+  const { s, rd, ki, opp, back, taut } = st0;
+  if (A.kind() !== rd.snd) A.start(rd.snd);
+  const st = s - N_GREEN;
+  let rpm = 0.08;
+  let eng = 0.35;
+  let squeal = 0;
+  if (s > 1 && s < 3.2) {
+    // バーンナウト: 空ぶかしとホイールスピン
+    rpm = 0.6 + 0.1 * Math.sin(s * 9);
+    eng = 0.85;
+    squeal = 0.85;
+  } else if (s >= 3.2 && st < 0) {
+    rpm = 0.22 + 0.18 * Math.max(0, Math.sin(s * 5)); // ステージで、ブォンブォンとあおる
+    eng = 0.6;
+  }
+  if (st >= 0 && nr.foul < 0) {
+    const u = Math.max(0, opp) / N_RACE_D;
+    const g = Math.min(2.95, u * 3.2); // 3 速まで。ギアが変わるたびに回転が落ちる
+    rpm = st < 0.25 ? 0.5 : 0.45 + 0.55 * (g - Math.floor(g));
+    eng = 1;
+    squeal = Math.max(0, 1 - st / 0.8);
+    if (opp >= N_RACE_D || (nr.end && !rd.snap)) {
+      const e = Math.max(0, s - (nr.endT || s));
+      rpm = Math.max(0.1, 0.7 - e * 0.4);
+      eng = Math.max(0.25, 1 - e * 0.5);
+    }
+    if (taut > 0) (rpm = 1), (eng = 1);
+    else if (back > 0) (rpm = 0.15 + 0.3 * (1 - back)), (eng = 0.5 * (1 - back) + 0.2);
+  }
+  if (nr.go >= 0 && s >= nr.go && s - nr.go < 0.5) squeal = Math.max(squeal, 1 - (s - nr.go) / 0.5);
+  const wind = nr.go >= 0 && s >= nr.go && ki < N_RACE_D ? 0.9 : 0;
+  // ぼぎカーのタイヤ: バーンナウトと、押した瞬間
+  let squealKi = s > 1 && s < 3.2 ? 0.7 : 0;
+  if (nr.go >= 0 && s >= nr.go && s - nr.go < 0.4) squealKi = Math.max(squealKi, 1 - (s - nr.go) / 0.4);
+  let oppPan, kiPan, oppVol, kiVol;
+  if (cam == null) {
+    // うしろから: 相手は左、ぼぎカーは右の車線。走り出すと前へ遠のく
+    oppPan = -0.6;
+    kiPan = 0.6;
+    oppVol = 1 / (1 + Math.max(0, opp) / 70);
+    kiVol = 1 / (1 + Math.max(0, ki) / 70);
+  } else {
+    // 横から: 画面の左右の位置で振り、画面のまん中(240)から離れるほど小さく。相手は奥の車線なので少し小さい
+    const sx = (d) => N_SX + d * N_PX - cam;
+    const pan = (x) => Math.max(-1, Math.min(1, (x - 240) / 260));
+    const vol = (x) => Math.max(0.15, 1 - Math.abs(x - 240) / 700);
+    oppPan = pan(sx(opp));
+    kiPan = pan(sx(ki));
+    oppVol = 0.85 * vol(sx(opp));
+    kiVol = vol(sx(ki));
+  }
+  A.set({ rpm, eng, squeal, squealKi, wind, oppPan, kiPan, oppVol, kiVol });
 };
 // 白煙(うしろへ流れて広がり、消える)
 const nRcPuffs = [];
@@ -812,6 +872,7 @@ const N_RACE = {
       }
     }
     if (nr.repT < 0) {
+      nRaceSound(st0, null);
       nDrawRear(ctx, ox, oy, get, api, st0);
       return;
     }
@@ -831,6 +892,7 @@ const N_RACE = {
         cam = cam + (pc - cam) * w;
       }
     }
+    nRaceSound(st0, cam);
     const sky = get("rcs_sky");
     if (sky) ctx.drawImage(sky, ox, oy);
     const pcam = cam * 0.35; // スタンドは遠いので、ゆっくり流れる

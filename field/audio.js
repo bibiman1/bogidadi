@@ -286,6 +286,143 @@
   function fromText(text) {
     for (const [re, name] of WORD_SFX) if (re.test(text)) return sfx(name);
   }
+  // ---- ドラッグレースの音(D344): エンジン(相手のマシンごとの音色)、スキール音、ぼぎカーの風 ----
+  // 続く音なので、競争の画面が毎コマ race.set() で大きさと回転を渡す。0.4 秒とどかなければ、自分で消える(画面を離れたとき)
+  let race = null;
+  function loopNoise(sec) {
+    const b = ctx.createBuffer(1, Math.floor(ctx.sampleRate * sec), ctx.sampleRate);
+    const d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const n = ctx.createBufferSource();
+    n.buffer = b;
+    n.loop = true;
+    return n;
+  }
+  function shaper(k) {
+    // ひずみ(爆音らしさ)
+    const ws = ctx.createWaveShaper();
+    const c = new Float32Array(1024);
+    for (let i = 0; i < 1024; i++) {
+      const x = (i / 1023) * 2 - 1;
+      c[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
+    }
+    ws.curve = c;
+    return ws;
+  }
+  // kind: v8(赤べこ)、v8big(車箪笥)、pon(ぽんぽんカー)、jet(とりぼぎかー)、bike(こけし)
+  function raceStart(kind) {
+    if (!ctx) return;
+    raceStop();
+    const out = ctx.createGain();
+    out.gain.value = 0;
+    const comp = ctx.createDynamicsCompressor(); // 爆音でも割れないように
+    out.connect(comp).connect(sfxGain);
+    const nodes = [];
+    const keep = (n) => (nodes.push(n), n);
+    // 左右と距離(D345): 相手の音(エンジン、相手のタイヤ)と、ぼぎカーの音(風、ぼぎカーのタイヤ)を別の道に分ける
+    const bus = () => {
+      const g = ctx.createGain();
+      const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+      if (pan) g.connect(pan).connect(out);
+      else g.connect(out);
+      return { g, pan };
+    };
+    const oppBus = bus();
+    const kiBus = bus();
+    // エンジン: のこぎり波 2 本 → ひずみ → ローパス。脈(爆発の粒)を音量のゆれで
+    const eng = ctx.createGain();
+    eng.gain.value = 0;
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    const pulse = ctx.createGain();
+    const lfo = keep(ctx.createOscillator());
+    lfo.type = kind === "bike" ? "square" : "sine";
+    const lfoG = ctx.createGain();
+    lfoG.gain.value = kind === "pon" ? 0.9 : kind === "bike" ? 0.6 : 0.35;
+    lfo.connect(lfoG).connect(pulse.gain);
+    pulse.gain.value = 0.6;
+    const o1 = keep(ctx.createOscillator());
+    const o2 = keep(ctx.createOscillator());
+    o1.type = "sawtooth";
+    o2.type = kind === "bike" ? "square" : "sawtooth";
+    const dist = shaper(kind === "jet" ? 2 : 14);
+    o1.connect(dist);
+    o2.connect(dist);
+    dist.connect(lp).connect(pulse).connect(eng).connect(oppBus.g);
+    // ジェット(とりぼぎかー): 雑音の「シュー」と、高いうなり
+    const jetN = keep(loopNoise(1.5));
+    const jetBp = ctx.createBiquadFilter();
+    jetBp.type = "bandpass";
+    jetBp.Q.value = 1.2;
+    const jetG = ctx.createGain();
+    jetG.gain.value = 0;
+    jetN.connect(jetBp).connect(jetG).connect(oppBus.g);
+    // スキール音: 高い帯域の雑音を、周波数をうねらせて「キュルルル」
+    const sqN = keep(loopNoise(1.3));
+    const sqBp = ctx.createBiquadFilter();
+    sqBp.type = "bandpass";
+    sqBp.frequency.value = 2600;
+    sqBp.Q.value = 9;
+    const sqLfo = keep(ctx.createOscillator());
+    sqLfo.frequency.value = 7;
+    const sqLfoG = ctx.createGain();
+    sqLfoG.gain.value = 450;
+    sqLfo.connect(sqLfoG).connect(sqBp.frequency);
+    const sqG = ctx.createGain(); // 相手のタイヤ
+    sqG.gain.value = 0;
+    const sqKiG = ctx.createGain(); // ぼぎカーのタイヤ
+    sqKiG.gain.value = 0;
+    sqN.connect(sqBp);
+    sqBp.connect(sqG).connect(oppBus.g);
+    sqBp.connect(sqKiG).connect(kiBus.g);
+    // ぼぎカーの風(動力がないので、エンジンの音はない D123)
+    const wN = keep(loopNoise(1.7));
+    const wLp = ctx.createBiquadFilter();
+    wLp.type = "lowpass";
+    const wG = ctx.createGain();
+    wG.gain.value = 0;
+    wN.connect(wLp).connect(wG).connect(kiBus.g);
+    nodes.forEach((n) => n.start());
+    out.gain.setTargetAtTime(1, ctx.currentTime, 0.05);
+    race = { kind, out, eng, o1, o2, lp, lfo, jetBp, jetG, sqG, sqKiG, wLp, wG, oppBus, kiBus, nodes, timer: 0 };
+  }
+  // p: { rpm 0〜1, eng 0〜1(エンジンの大きさ), squeal 0〜1(相手のタイヤ), squealKi 0〜1(ぼぎカーのタイヤ), wind 0〜1,
+  //      oppPan / kiPan -1(左)〜1(右), oppVol / kiVol 0〜1(カメラからの遠さ) }
+  function raceSet(p) {
+    if (!race) return;
+    const r = race;
+    const t = ctx.currentTime;
+    const rpm = Math.max(0, Math.min(1, p.rpm || 0));
+    const base = { v8: 34, v8big: 26, pon: 40, jet: 50, bike: 70 }[r.kind] || 34;
+    const f = base + rpm * base * 4;
+    const tc = 0.04;
+    r.o1.frequency.setTargetAtTime(f, t, tc);
+    r.o2.frequency.setTargetAtTime(f * 2.01, t, tc);
+    r.lp.frequency.setTargetAtTime(220 + rpm * 2600, t, tc);
+    r.lfo.frequency.setTargetAtTime(r.kind === "pon" ? 3 + rpm * 6 : r.kind === "bike" ? 16 + rpm * 14 : f / 4, t, tc);
+    const jet = r.kind === "jet";
+    r.eng.gain.setTargetAtTime((p.eng || 0) * (jet ? 0.12 : 0.5), t, 0.06);
+    r.jetBp.frequency.setTargetAtTime(700 + rpm * 3200, t, tc);
+    r.jetG.gain.setTargetAtTime(jet ? (p.eng || 0) * 0.5 : 0, t, 0.06);
+    r.sqG.gain.setTargetAtTime((p.squeal || 0) * 0.55, t, 0.05);
+    r.wLp.frequency.setTargetAtTime(300 + (p.wind || 0) * 2400, t, 0.08);
+    r.wG.gain.setTargetAtTime((p.wind || 0) * 0.35, t, 0.08);
+    r.sqKiG.gain.setTargetAtTime((p.squealKi || 0) * 0.45, t, 0.05);
+    r.oppBus.g.gain.setTargetAtTime(p.oppVol ?? 1, t, 0.06);
+    r.kiBus.g.gain.setTargetAtTime(p.kiVol ?? 1, t, 0.06);
+    if (r.oppBus.pan) r.oppBus.pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, p.oppPan || 0)), t, 0.06);
+    if (r.kiBus.pan) r.kiBus.pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, p.kiPan || 0)), t, 0.06);
+    clearTimeout(r.timer);
+    r.timer = setTimeout(raceStop, 400); // 画面を離れたら消える
+  }
+  function raceStop() {
+    if (!race) return;
+    const r = race;
+    race = null;
+    clearTimeout(r.timer);
+    r.out.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
+    setTimeout(() => r.nodes.forEach((n) => n.stop()), 500);
+  }
   function setVolume(kind, v) {
     vol[kind] = Math.max(0, Math.min(5, v));
     save();
@@ -294,5 +431,5 @@
       sfxGain.gain.value = level(vol.sfx) * 0.7;
     }
   }
-  window.bogiAudio = { bgm, bgmLevel, sfx, fromText, setVolume, volume: vol, unlock, state: () => ({ ctx: ctx && ctx.state, bgm: cur && cur.key, level: placeLv }) };
+  window.bogiAudio = { bgm, bgmLevel, sfx, fromText, setVolume, volume: vol, unlock, race: { start: raceStart, set: raceSet, stop: raceStop, kind: () => race && race.kind }, state: () => ({ ctx: ctx && ctx.state, bgm: cur && cur.key, level: placeLv }) };
 })();
