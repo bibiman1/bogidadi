@@ -154,10 +154,144 @@ const nCarX = (api) => {
   return N_CAR0 + 40 * e * e + 30 * e;
 };
 const nGone = (api) => api.flag("ponponGone") && nFuelT0 < 0;
+// きーが帰るときの抗議(D364、作者「きーが帰るとき、無慣性粘着駆動への抗議をマシン達が表明する演出を考えて」todo 94 の A)。
+// 札をもらったあと、マシン達は峠のトンネルの前へ先回りして並ぶ。はじめて帰るときは、いっせいに空ぶかしし、1 台ずつその車らしいしぐさで「いやだ」を示す
+// (赤べこは首を横に振る、ぽんぽんカーは目を点滅させて黒い煙、とりぼぎかーは子がもの噴流、こけしは前をはね上げる、車箪笥は引き出しをガタガタ、みとんは「……」)。
+// 言葉はなく、エンジンの音としぐさだけ。2 回目からは、並んで空ぶかしするだけ。トンネルに入ると、うしろでクラクション
+const N_SO = { rev: 0.4, tansu: 1.9, miton: 2.7, kok: 3.4, tori: 4.2, pon: 5.0, aka: 5.9, horn: 7.4, end: 8.6 }; // 東(きーの来たほう)から順に、最後にトンネルにいちばん近い赤べこ
+let nSoT0 = -1; // 抗議が始まった時刻
+let nSoShort = false; // 2 回目からの空ぶかし(この入場で鳴らしたか)
+const nSoOn = (api) => api.hasItem("クラブの札");
+const nSoAge = () => (nSoT0 >= 0 ? nNow() - nSoT0 : -1);
+const nSoWin = (k, len) => {
+  const u = nSoAge() - N_SO[k];
+  return u >= 0 && u < len ? u / len : -1;
+};
+const nSoRev = () => {
+  const u = nSoAge() - N_SO.rev;
+  return u >= 0 && u < 1.1;
+};
+// 並ぶ 1 台。draw(ctx, sx, sy, t, im, api) でしぐさを描く
+const nSoCar = (id, img, x, y, w, h, gesture, solid) =>
+  nSprite(id, img, x, y, w, h, {
+    hidden: (api) => !nSoOn(api),
+    solid,
+    range: 56,
+    interact: (api) => (N_VOICE[id.slice(3)] ? api.bubble(id, N_VOICE[id.slice(3)], 1600) : api.bubble(id, "……", 1200)),
+    draw(ctx, sx, sy, t, api) {
+      const im = api.image(img);
+      if (!im) return;
+      const j = nSoRev() ? Math.round(Math.sin(t * 47 + x) * 1.2) : 0; // 空ぶかしのふるえ
+      const x0 = Math.round(sx - im.width / 2) + j;
+      const y0 = Math.round(sy - im.height);
+      if (!gesture(ctx, x0, y0, t, im)) ctx.drawImage(im, x0, y0);
+    },
+  });
+const nSoCars = () => [
+  // 赤べこ: 張り子の首を横に振る(首振り人形の「いいえ」)。顔(x 9〜35、y 17〜41)だけを左右にずらして描く
+  nSoCar("so_akabeko", "akabeko_s", 7.4 * T, 4.9 * T, 44, 41, (ctx, x0, y0, t, im) => {
+    const u = nSoWin("aka", 1.4);
+    if (u < 0) return false;
+    const dx = Math.round(Math.sin(u * Math.PI * 8) * 3 * (1 - u * 0.4));
+    ctx.drawImage(im, 0, 0, im.width, 17, x0, y0, im.width, 17);
+    ctx.drawImage(im, 0, 17, 9, im.height - 17, x0, y0 + 17, 9, im.height - 17);
+    ctx.drawImage(im, 35, 17, im.width - 35, im.height - 17, x0 + 35, y0 + 17, im.width - 35, im.height - 17);
+    ctx.drawImage(im, 9, 17, 26, im.height - 17, x0 + 9 + dx, y0 + 17, 26, im.height - 17);
+    return true;
+  }, { w: 40, h: 22, dy: -10 }),
+  // ぽんぽんカー: 丸い目(ライト x 21・62、y 59)を点滅させる
+  nSoCar("so_ponpon", "ponpon_s", 13.4 * T, 4.8 * T, 84, 73, (ctx, x0, y0, t, im) => {
+    ctx.drawImage(im, x0, y0);
+    const u = nSoWin("pon", 1.1);
+    if (u >= 0 && Math.floor(u * 8) % 2 === 0) for (const ex of [21, 62]) nGlow(ctx, x0 + ex, y0 + 59, 9, "255, 240, 170", 0.85);
+    return true;
+  }, { w: 70, h: 22, dy: -10 }),
+  // とりぼぎかー: 子がもの噴流(白い筋を左右へ)
+  nSoCar("so_toribogi", "tori_s", 15.6 * T, 4.8 * T, 54, 72, (ctx, x0, y0, t, im) => {
+    const u = nSoWin("tori", 1.1);
+    const jx = u >= 0 ? Math.round(Math.sin(t * 60) * 1) : 0;
+    ctx.drawImage(im, x0 + jx, y0);
+    if (u >= 0) {
+      ctx.fillStyle = "rgba(250, 250, 255, 0.85)";
+      const L = 6 + Math.round(Math.random() * 8);
+      for (let i = 0; i < L; i++) {
+        ctx.fillRect(x0 + 16 - i, y0 + 9 + (Math.random() < 0.3 ? 1 : 0), 1, 1);
+        ctx.fillRect(x0 + 41 + i, y0 + 7 + (Math.random() < 0.3 ? 1 : 0), 1, 1);
+      }
+    }
+    return true;
+  }, { w: 46, h: 22, dy: -10 }),
+  // こけし: 前をはね上げて、ふかす
+  nSoCar("so_kokeshi", "kokeshi_s", 17.3 * T, 4.8 * T, 35, 72, (ctx, x0, y0, t, im) => {
+    const u = nSoWin("kok", 1.1);
+    if (u < 0) return false;
+    ctx.drawImage(im, x0, y0 - Math.round(Math.sin(u * Math.PI) * 5 + Math.abs(Math.sin(t * 30)) * 1));
+    return true;
+  }, { w: 22, h: 14, dy: -7 }),
+  // 車箪笥: 引き出しをガタガタ(上下左右に細かくゆれる)
+  nSoCar("so_tansu", "tansu_w", 22.8 * T, 4.9 * T, 113, 96, (ctx, x0, y0, t, im) => {
+    const u = nSoWin("tansu", 1.2);
+    if (u < 0) return false;
+    ctx.drawImage(im, x0 + Math.round(Math.sin(t * 70) * 2), y0 + Math.round(Math.sin(t * 53) * 1.5));
+    return true;
+  }, { w: 100, h: 24, dy: -12 }),
+  nSoCar("so_miton", "miton_s", 25.4 * T, 4.8 * T, 40, 75, () => false, { w: 24, h: 14, dy: -7 }),
+];
+// はじめて帰るときの抗議の流れ(カメラを引いて、並んだマシン達を見せる)
+const nSoStart = (api) => {
+  nSoT0 = nNow();
+  api.freeze(N_SO.end);
+  const p = api.player();
+  // 引いて全員の空ぶかしを見せ、そのあと 1 台ずつ寄る(しぐさが小さいので)
+  const Y = 4.1 * T, Z = 1.5;
+  api.camPath([
+    { t: 0, x: p.x, y: p.y - 20, z: 1 },
+    { t: 0.5, x: 15.5 * T, y: 4.6 * T, z: 0.55 },
+    { t: 1.5, x: 15.5 * T, y: 4.6 * T, z: 0.55 },
+    { t: N_SO.tansu, x: 23.6 * T, y: Y, z: Z },
+    { t: N_SO.miton + 0.4, x: 24.2 * T, y: Y, z: Z },
+    { t: N_SO.kok, x: 17.3 * T, y: Y, z: Z },
+    { t: N_SO.kok + 0.6, x: 17.3 * T, y: Y, z: Z },
+    { t: N_SO.tori, x: 15.6 * T, y: Y, z: Z },
+    { t: N_SO.tori + 0.6, x: 15.6 * T, y: Y, z: Z },
+    { t: N_SO.pon, x: 13.4 * T, y: Y, z: Z },
+    { t: N_SO.pon + 0.6, x: 13.4 * T, y: Y, z: Z },
+    { t: N_SO.aka, x: 7.4 * T, y: 4.4 * T, z: 1.8 },
+    { t: N_SO.horn - 0.2, x: 7.4 * T, y: 4.4 * T, z: 1.8 },
+    { t: N_SO.end - 0.6, x: 12 * T, y: 4.6 * T, z: 0.8 },
+  ]);
+  const say = (ms, id, text, dur) => api.later(ms, () => api.bubble(id, text, dur || 1300));
+  api.later(N_SO.rev * 1000, () => (api.sfx("rev"), api.shake(0.5, 1)));
+  api.later(N_SO.rev * 1000 + 350, () => api.sfx("rev"));
+  for (const id of ["akabeko", "ponpon", "toribogi", "kokeshi", "tansu"]) say(N_SO.rev * 1000 + 100, "so_" + id, N_VOICE[id], 1000);
+  say(N_SO.aka * 1000, "so_akabeko", N_VOICE.akabeko);
+  api.later(N_SO.pon * 1000, () => {
+    api.bubble("so_ponpon", N_VOICE.ponpon, 1300);
+    for (let k = 0; k < 6; k++) api.later(k * 140, () => nPuff(13.4 * T + (Math.random() - 0.5) * 20, 4.8 * T - 60, (Math.random() - 0.5) * 30, -20 - Math.random() * 10, 1.2, 9, "46, 42, 42"));
+  });
+  say(N_SO.tori * 1000, "so_toribogi", N_VOICE.toribogi);
+  api.later(N_SO.kok * 1000, () => (api.bubble("so_kokeshi", N_VOICE.kokeshi, 1300), api.sfx("rev")));
+  say(N_SO.tansu * 1000, "so_tansu", N_VOICE.tansu);
+  say(N_SO.miton * 1000, "so_miton", "……", 1200);
+  for (const k of [0, 380, 760]) api.later(N_SO.horn * 1000 + k, () => api.sfx("horn"));
+  api.later(N_SO.end * 1000, () => api.setFlag("seeOffDone"));
+};
+// 2 回目からは、近づくと並んで空ぶかしするだけ(止めない)
+const nSoShortRev = (api) => {
+  nSoShort = true;
+  nSoT0 = nNow() - N_SO.rev + 0.05;
+  api.sfx("rev");
+  for (const id of ["akabeko", "ponpon", "toribogi", "kokeshi", "tansu"]) api.bubble("so_" + id, N_VOICE[id], 1000);
+  api.later(1200, () => (nSoT0 = -1));
+};
 const N_PASS = nMap("pass", 28, 12, {
   spawns: {
     start: { x: 4.5 * T, y: 4.7 * T, facing: "south" },
     east: { x: 26.4 * T, y: 6.8 * T, facing: "west" },
+  },
+  onEnter() {
+    nSoShort = false;
+    nSoT0 = -1;
   },
   drawOverlay(ctx, ox, oy, t, api) {
     const e = nFuelAge(api);
@@ -165,13 +299,39 @@ const N_PASS = nMap("pass", 28, 12, {
     const up = e > N_FUEL.dump && e < N_FUEL.go + 1 ? 1.7 : 1;
     nGlow(ctx, ox + dx, oy + 4.7 * T - 46, 20 * up, "255, 150, 60", 0.32 + 0.1 * Math.sin(t * 11));
     // 線: ドラム缶から、ぽんぽんカーへ(走り去ったあとは、東の道の先へのびたまま)
-    const cx = nGone(api) ? 28 * T + 40 : nCarX(api);
-    nCable(ctx, ox + dx + 12, oy + 4.7 * T - 44, ox + cx - 30, oy + 4.7 * T - 30, nGone(api) ? 2 : 10);
+    // 札をもらったあとは、ぽんぽんカーが峠に戻って並んでいる(D364)ので、線はそのぽんぽんカーへ
+    const cx = nSoOn(api) ? 13.4 * T + 10 : nGone(api) ? 28 * T + 40 : nCarX(api);
+    nCable(ctx, ox + dx + 12, oy + 4.7 * T - 44, ox + cx - 30, oy + 4.7 * T - 30, nGone(api) && !nSoOn(api) ? 2 : 10);
     if (!nGone(api) && e > N_FUEL.fire && Math.random() < 0.35) nPuff(cx - 34, 4.7 * T - 30, -30, -18, 0.8, 7);
     nDrawPuffs(ctx, ox, oy);
   },
   triggers: [
-    { id: "leave", x: 3 * T, y: 1.8 * T, w: 3 * T, h: 1.2 * T, run: (api) => api.exit() },
+    {
+      id: "leave",
+      x: 3 * T,
+      y: 1.8 * T,
+      w: 3 * T,
+      h: 1.2 * T,
+      run(api) {
+        if (nSoOn(api)) {
+          api.sfx("horn"); // トンネルに入るきーのうしろで、まだクラクション
+          setTimeout(() => window.bogiAudio && window.bogiAudio.sfx("horn"), 420);
+        }
+        api.exit();
+      },
+    },
+    {
+      id: "seeoff",
+      x: 0,
+      y: 4 * T,
+      w: 21.5 * T,
+      h: 5 * T,
+      enabled: (api) => nSoOn(api) && nSoT0 < 0 && !(api.flag("seeOffDone") && nSoShort),
+      run(api) {
+        if (!api.flag("seeOffDone")) nSoStart(api);
+        else nSoShortRev(api);
+      },
+    },
     { id: "toDrivein", x: 27.6 * T, y: 4 * T, w: 1.4 * T, h: 5 * T, warp: { map: "drivein", spawn: "west" } },
     {
       id: "fuel",
@@ -207,6 +367,7 @@ const N_PASS = nMap("pass", 28, 12, {
       },
     }),
     nSprite("drum", "drum", N_CAR0 - N_DRUM, 4.7 * T, 46, 62, { solid: { w: 34, h: 16, dy: -8 } }),
+    ...nSoCars(), // きーが帰るときの抗議(D364)
     // 北の小道の口のパイロン(D343)。木の葉のぼぎは小道から来るが、きーは入れない
     ...[18.3, 18.95, 19.6, 20.25, 20.9].map((x, k) => nSprite("pylon" + k, "pylon", x * T, 4.05 * T, 12, 16, {})),
     nSprite("fueler", "fueler", 18.9 * T, 1.2 * T, 26, 40, {
