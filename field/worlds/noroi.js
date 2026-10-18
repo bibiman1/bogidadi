@@ -604,30 +604,35 @@ const nProtest = (st0) => {
 // 車箪笥は絵に排気管が見えない、とりぼぎかーはジェットなので、なし
 const N_FLAME = {
   rcs_aka: [[56, 64, -1, 0.15]],
-  rc_aka_back: [[31, 91, 0, 0], [61, 91, 0, 0]], // 胴の下、後輪の内がわの 3 つの口のまん中から手前へ(D355)
+  rc_aka_back: [[27, 90, 0, 0], [32, 92, 0, 0], [37, 94, 0, 0], [65, 90, 0, 0], [60, 92, 0, 0], [55, 94, 0, 0]], // 胴の下、後輪の内がわの口 6 つ全部から手前へ(D355、D356)
   rcs_pon: [[18, 33, -0.6, -1], [32, 34, -0.6, -1], [44, 34, -0.6, -1], [55, 35, -0.6, -1]],
   rc_pon_back: [[27, 31, -0.7, -1], [145, 31, 0.7, -1]],
   rcs_kokeshi: [[8, 62, -1, -0.35]],
   rc_kokeshi_back: [[5, 66, 0, 0], [29, 66, 0, 0]],
 };
-// 炎の強さ(0〜1): バーンナウト、ステージのあおり、走っている間ずっと(ギアの変わり目は最大)、抗議の空ぶかし。
+// 炎の強さ(0〜1) = アクセルの開き(D356、作者「排気炎、アイドリングではでないが小さい。アクセル開度に比例して炎が大きくなる。」)。
+// アイドリングは出さない。バーンナウトとステージのあおりは開いたぶんだけ、走っている間は全開(ギアの変わり目で一瞬もどる)、ゴールのあとは閉じていく。
 // 大げさに(D350、作者「排気管の炎は大げさなほうがいい。バリバリバリバリバリってかんじで、排気煙のフレアパターンが高速で切り替わるとかっけえな」)
-const nFlameI = (st0) => {
+const nThrottle = (st0) => {
   const { s, rd, opp, back, taut } = st0;
   const st = s - N_GREEN;
-  let I = 0;
-  if (s > 1 && s < 3.2) I = 0.8;
-  if (s >= 3.2 && st < 0) I = Math.max(0, Math.sin(s * 5)) > 0.6 ? 0.9 : 0.25; // ステージのあおり
+  let T = 0.04; // アイドリング
+  if (s > 1 && s < 3.2) T = 0.8 + 0.15 * Math.sin(s * 9); // バーンナウト
+  if (s >= 3.2 && st < 0) T = 0.05 + 0.75 * Math.max(0, Math.sin(s * 5)); // ステージのあおり
   if (st >= 0 && nr.foul < 0 && !back && !(taut > 0)) {
     if (opp < N_RACE_D) {
-      I = 0.85;
+      T = 1;
       const g = (Math.max(0, opp) / N_RACE_D) * 3.2;
-      if (g % 1 < 0.1 && g > 0.5) I = 1; // ギアが変わる瞬間に、ドカン
-    } else I = Math.max(0, 0.6 - (s - (N_GREEN + rd.et)) * 0.5); // ブレーキで、しだいにおさまる
+      if (g % 1 < 0.08 && g > 0.5) T = 0.45; // ギアを変える一瞬、アクセルを戻す
+    } else T = Math.max(0.04, 0.6 - (s - (N_GREEN + rd.et)) * 0.6); // ブレーキで、閉じていく
   }
   const pr = nProtest(st0);
-  if (pr) I = pr.rev ? (Math.max(0, Math.sin(s * 11)) > 0.3 ? 1 : 0.3) : 0.2;
-  return I;
+  if (pr) T = pr.rev ? 0.05 + 0.95 * Math.max(0, Math.sin(s * 11)) : 0.12;
+  return T;
+};
+const nFlameI = (st0) => {
+  const T = nThrottle(st0);
+  return T < 0.15 ? 0 : T; // アイドリングと、ほんの少し開いただけでは出ない
 };
 // とりぼぎかーの子がもターボジェット(D352、D354。設計図 docs/assets/noroi/settei/tori_jet/)。
 // くちばしから噴く反動で、子がもは尻から進み、回転台は上から見て反時計回り。子がもを消した桶の絵の上に、
@@ -638,7 +643,7 @@ const N_KOGAMO = {
   rc_tori_back: { tub: "rc_tori_tub", cx: 51.5, cy: 57, rx: 14, ry: 4.5, rear: true },
 };
 const nKg = { s: -1, th: 0.6, cv: {} };
-const nKogamoW = (st0) => 1 + 16 * nFlameI(st0); // 回る速さ(回/秒): 待つ間はゆっくり、バーンナウトと走りで速く
+const nKogamoW = (st0) => 1 + 16 * nThrottle(st0); // 回る速さ(回/秒): アクセルの開きに比例(D356)
 const nKogamo = (get, key, st0) => {
   const K = N_KOGAMO[key];
   const tub = K && get(K.tub);
@@ -700,18 +705,21 @@ const nFlame = (ctx, x, y, dx, dy, I, k) => {
   const ux0 = burst ? 0 : dx / d;
   const uy0 = burst ? -0.35 : dy / d;
   const pat = Math.floor(Math.random() * 4); // 0 長い噴射、1 扇、2 輝きの粒が並ぶ噴射、3 火の玉
-  // 光の輪(根もと)
-  ctx.fillStyle = `rgba(255, 190, 80, ${0.45 * I})`;
-  const g = Math.round((burst ? 10 : 8) * k * (0.6 + I * 0.7));
-  ctx.fillRect(Math.round(x - g), Math.round(y - g), g * 2, g * 2);
+  // 光の輪(根もと、丸く)。開くほど大きい
+  ctx.fillStyle = `rgba(255, 190, 80, ${0.4 * I})`;
+  const g = Math.max(2, Math.round((burst ? 10 : 8) * k * I));
+  for (let yy = -g; yy <= g; yy++) {
+    const hw = Math.floor(Math.sqrt(g * g - yy * yy));
+    ctx.fillRect(Math.round(x - hw), Math.round(y + yy), 2 * hw + 1, 1);
+  }
   const tongue = (a, lenK, wK, diamonds) => {
     const ux = burst ? Math.sin(a) * 0.7 : ux0 * Math.cos(a) - uy0 * Math.sin(a);
     const uy = burst ? uy0 - Math.abs(Math.cos(a)) * 0.3 : ux0 * Math.sin(a) + uy0 * Math.cos(a);
-    const len = (14 + 50 * I) * k * lenK * (0.7 + Math.random() * 0.6);
+    const len = 80 * I * k * lenK * (0.7 + Math.random() * 0.6); // 長さはアクセルの開きに比例(全開で 80 ドットほど)
     const n = Math.max(3, Math.round(len));
     for (let i = 0; i < n; i++) {
       const t = i / n;
-      let w = Math.max(1, Math.round(7 * k * wK * (1 - t * 0.75) * (0.7 + Math.random() * 0.6)));
+      let w = Math.max(1, Math.round((2 + 8 * I) * k * wK * (1 - t * 0.75) * (0.7 + Math.random() * 0.6)));
       if (diamonds && i % Math.max(3, Math.round(6 * k)) < 2) w += Math.round(3 * k); // 衝撃波の輝き
       const cx = Math.round(x + ux * i + (Math.random() - 0.5) * 2 * k);
       const cy = Math.round(y + uy * i + (Math.random() - 0.5) * 2 * k);
@@ -729,7 +737,7 @@ const nFlame = (ctx, x, y, dx, dy, I, k) => {
     tongue(0, 1.0, 0.8, true);
   } else {
     const [ex, ey] = tongue(0, 0.5, 0.9, false);
-    const R = Math.round((5 + 9 * I) * k * (0.8 + Math.random() * 0.4));
+    const R = Math.round(16 * I * k * (0.8 + Math.random() * 0.4));
     for (let yy = -R; yy <= R; yy++) {
       const w = Math.floor(Math.sqrt(R * R - yy * yy));
       const t = Math.abs(yy) / R;
