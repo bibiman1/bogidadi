@@ -643,6 +643,7 @@ const N_KOGAMO = {
   rc_tori_back: { tub: "rc_tori_tub", cx: 51.5, cy: 57, rx: 14, ry: 4.5, rear: true },
 };
 const nKg = { s: -1, th: 0.6, cv: {} };
+const N_KG_PAD = 12; // 子がもの絵の高さ 32 から、いちばん奥の足もと(横の画面で y 27.6)を引いた分より大きく
 const nKogamoW = (st0) => 1 + 16 * nThrottle(st0); // 回る速さ(回/秒): アクセルの開きに比例(D356)
 const nKogamo = (get, key, st0) => {
   const K = N_KOGAMO[key];
@@ -658,19 +659,19 @@ const nKogamo = (get, key, st0) => {
   if (!cv) {
     cv = nKg.cv[key] = document.createElement("canvas");
     cv.width = tub.width;
-    cv.height = tub.height;
+    cv.height = tub.height + N_KG_PAD; // 上に余白: 奥に回った子がもの頭が、桶の絵の上のはしで切れないように
   }
   const c = cv.getContext("2d");
   c.imageSmoothingEnabled = false;
   c.clearRect(0, 0, cv.width, cv.height);
-  c.drawImage(tub, 0, 0);
+  c.drawImage(tub, 0, N_KG_PAD);
   const ducks = [0, Math.PI].map((o) => {
     const th = nKg.th + o;
     const X = Math.cos(th), Y = Math.sin(th); // 上から見て X = 車の右、Y = 前
     const bx = Math.sin(th), by = -Math.cos(th); // くちばし = 時計回りの接線
     const right = K.rear ? bx : by;
     const toward = K.rear ? -by : bx;
-    return { sx: K.cx + (K.rear ? X : Y) * K.rx, sy: K.cy + (K.rear ? -Y : X) * K.ry, depth: K.rear ? -Y : X, right, toward };
+    return { sx: K.cx + (K.rear ? X : Y) * K.rx, sy: N_KG_PAD + K.cy + (K.rear ? -Y : X) * K.ry, depth: K.rear ? -Y : X, right, toward };
   });
   ducks.sort((a, b) => a.depth - b.depth);
   for (const d of ducks) {
