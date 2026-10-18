@@ -298,7 +298,10 @@ let nKinshi = false;
 // 戻すのは断片の中の進みだけ。ピンボールの最高点、覚えた能力、見届け、太宰の本、持ち帰った札はそのまま
 const N_REPLAY_FLAGS = ["custom", "ponponGone", "seeOffDone", "stripSeen", "won", "nrR1", "nrR2", "nrRound"];
 let nTakeT0 = -1; // お世話係が券を受け取った時刻
+let nReplaying = false; // 券をわたしている途中(A の押しなおしで二重にわたさない)
 function nReplay(api) {
+  if (nReplaying) return;
+  nReplaying = true;
   api.hold("ic_ticket", 1.4, () => {
     api.takeItem("リプレイ券");
     api.sfx("pop");
@@ -313,6 +316,7 @@ function nReplay(api) {
       nSoT0 = -1;
       nSoShort = false;
       nTakeT0 = -1;
+      nReplaying = false;
       api.warp("pass", "start");
     });
   });
@@ -715,8 +719,12 @@ N_DRIVEIN.bgmLevel = (p) => (nJukePlaying() ? Math.max(0.05, 0.3 * (1 - Math.hyp
 const nRace = (api) => api.warp("race", "view");
 // 対戦カード(D367): 左にぼぎカー、右に 5 台(勝ち抜きの順)。勝った相手は暗くして「かち」、次の相手は黄の枠が点滅
 let nCard = null; // { t0, round, sec }
+let nRaceGo = false; // カードのあと、競争の画面へ切りかわるまで(そのあいだの A で、もう一度話しかけないように)
 const N_CARD_SEC = 3.2;
 function nCardShow(api, round, then) {
+  // カードが出ているあいだも A は効くので、押すたびにカードと「競争へ」が積み重なり、競争が何度も始め直されていた
+  // (作者「ポンポンカーとの競争の際、後ろからの絵が2回出た。」)。カードが出ている間は、新しいカードを出さない
+  if (nCard) return;
   nCard = { t0: nNow(), round, sec: N_CARD_SEC };
   api.freeze(N_CARD_SEC);
   api.sfx("pop");
@@ -880,7 +888,11 @@ const N_STRIP = nMap("strip", 28, 12, {
       interact: (api) => {
         if (api.hasItem("リプレイ券")) return nReplay(api);
         if (api.flag("won")) return api.bubble("fuelerS", "……", 1200);
-        nCardShow(api, nRound(api), () => nRace(api));
+        if (nCard || nRaceGo) return;
+        nCardShow(api, nRound(api), () => {
+          nRaceGo = true;
+          nRace(api);
+        });
       },
       update() {
         this.y = 8.6 * T - (nTakeT0 >= 0 ? Math.abs(Math.sin((nNow() - nTakeT0) * 9)) * 4 : 0);
@@ -1435,6 +1447,7 @@ const N_RACE = {
   legend: K_LEGEND,
   spawns: { view: { x: 7 * T, y: 5 * T, facing: "east" } },
   onEnter(api) {
+    nRaceGo = false;
     nRaceReset(api);
   },
   debug: () => Object.assign({ s: nNow() - nr.t0, green: N_GREEN }, nr),
