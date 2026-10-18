@@ -60,7 +60,7 @@ function pbNewBall() {
   Object.assign(pb, { x: PB_LANE.x, y: PB_LANE.rest, vx: 0, vy: 0, live: true, charge: 0, drainT: -1, inPlay: false, shotC: 0, shotT: -9 });
 }
 function pbReset(api) {
-  Object.assign(pb, { balls: 3, score: 0, over: false, lanes: [false, false, false], flash: {}, flips: [pbFlipper(true), pbFlipper(false)], t: 0 });
+  Object.assign(pb, { balls: 3, score: 0, over: false, lanes: [false, false, false], flash: {}, flips: [pbFlipper(true), pbFlipper(false)], t: 0, replayed: false, replayT: -9 });
   pb.high = Number(api.flagValue("pinHigh")) || 0;
   pbNewBall();
 }
@@ -178,8 +178,17 @@ function pbStep(api, h) {
     pb.vy *= PB_TUNE.maxV / sp;
   }
 }
+// 1 ゲームで 10,000 点を超えると、ノッカーが鳴ってリプレイ券が出る(D366。作者「リプレイは１００００点にしておいて。」)。
+// 券は 1 枚ずつ(持っている間は出ない)。お世話係にわたすと、この断片を最初からやり直せる(noroi.js の nReplay)
+const PB_REPLAY = 10000;
 function pbScore(api, n, what) {
   pb.score += n;
+  if (!pb.replayed && pb.score >= PB_REPLAY && !api.hasItem("リプレイ券")) {
+    pb.replayed = true;
+    pb.replayT = pb.t;
+    api.sfx("knock");
+    api.later(350, () => api.giveItem("リプレイ券"));
+  }
   pb.flash[what] = pb.t;
 }
 function pbLeave(api) {
@@ -283,6 +292,11 @@ const N_PIN = {
     }
     pbText(ctx, ox + 344, oy + 64, "HIGH", "#e8c060", 2);
     pbDigits(ctx, ox + 344, oy + 80, pb.high, 7, "#9fe0ff");
+    // リプレイの点(D366)。超えたら 2 秒点滅して、そのあとは灯ったまま
+    pbPanel(ctx, ox + 334, oy + 172, 136, 58);
+    const lit = pb.replayed && (pb.t - pb.replayT > 2 || Math.floor(pb.t * 6) % 2 === 0);
+    pbText(ctx, ox + 344, oy + 180, "REPLAY", lit ? "#ffd84a" : "#e8c060", 2);
+    pbDigits(ctx, ox + 344, oy + 196, PB_REPLAY, 7, lit ? "#ffd84a" : "#7a6440");
     if (pb.over && Math.floor(pb.t * 2) % 2 === 0) {
       pbPanel(ctx, ox + 334, oy + 124, 136, 40);
       pbText(ctx, ox + 346, oy + 134, "GAME OVER", "#ff5a4a", 2);
@@ -559,7 +573,7 @@ function pbPanel(ctx, x, y, w, h) {
 const PB_FONT = {
   A: "010101111101101", B: "110101110101110", C: "011100100100011", E: "111100110100111", G: "011100101101011", H: "101101111101101",
   I: "111010010010111", L: "100100100100111", M: "101111111101101", O: "010101101101010", R: "110101110101101", S: "011100010001110",
-  V: "101101101101010", " ": "000000000000000",
+  V: "101101101101010", P: "110101110100100", Y: "101101010010010", " ": "000000000000000",
 };
 function pbText(ctx, x, y, s, col, k) {
   ctx.fillStyle = col;

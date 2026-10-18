@@ -147,7 +147,9 @@ const N_CAR0 = 13 * T; // 待避所のぽんぽんカーの x
 const N_DRUM = 2.2 * T; // ドラム缶(ぽんぽんカーの西どなり)
 let nFuelT0 = -1;
 const nFuelAge = (api) => (nFuelT0 >= 0 ? nNow() - nFuelT0 : api.flag("ponponGone") ? 99 : -1);
-const N_FUEL = { walk: 1.6, say: 1.6, dump: 5.2, fire: 5.8, go: 7.4, gone: 10.4 };
+const N_FUEL = { walk: 1.6, say: 1.6, dump: 5.2, fire: 5.8, step: 6.4, go: 7.4, gone: 10.4 };
+// 木の葉を入れたあと、お世話係はドラム缶の西どなりへ一歩出て、そこにいる(うしろにいると、ドラム缶に隠れて見えなかった)
+const N_FUEL_REST = { x: 9.6 * T, y: 4.5 * T };
 const nCarX = (api) => {
   const e = nFuelAge(api) - N_FUEL.go;
   if (e <= 0) return N_CAR0;
@@ -156,12 +158,14 @@ const nCarX = (api) => {
 const nGone = (api) => api.flag("ponponGone") && nFuelT0 < 0;
 // きーが帰るときの抗議(D364、作者「きーが帰るとき、無慣性粘着駆動への抗議をマシン達が表明する演出を考えて」todo 94 の A)。
 // 札をもらったあと、マシン達は峠のトンネルの前へ先回りして並ぶ。はじめて帰るときは、いっせいに空ぶかしし、1 台ずつその車らしいしぐさで「いやだ」を示す
-// (赤べこは首を横に振る、ぽんぽんカーは目を点滅させて黒い煙、とりぼぎかーは子がもの噴流、こけしは前をはね上げる、車箪笥は引き出しをガタガタ、みとんは「……」)。
-// 言葉はなく、エンジンの音としぐさだけ。2 回目からは、並んで空ぶかしするだけ。トンネルに入ると、うしろでクラクション
-const N_SO = { rev: 0.4, tansu: 1.9, miton: 2.7, kok: 3.4, tori: 4.2, pon: 5.0, aka: 5.9, horn: 7.4, end: 8.6 }; // 東(きーの来たほう)から順に、最後にトンネルにいちばん近い赤べこ
+// (みな体を左右にゆすって「いやいや」。赤べこは首を横に振る、ぽんぽんカーは目を点滅させて黒い煙、とりぼぎかーは子がもの噴流、こけしは前をはね上げる、車箪笥は引き出しをガタガタ、みとんは「……」)。
+// マシンのセリフ(オノマトペ)はなく、エンジンの音としぐさだけ。2 回目からは、並んで空ぶかしするだけ。トンネルに入ると、うしろでクラクション
+const N_SO = { rev: 0.4, tansu: 1.9, miton: 2.7, kok: 3.4, tori: 4.2, pon: 5.0, aka: 5.9, kin: 7.5, horn: 11.1, end: 12.4 }; // 東(きーの来たほう)から順に、最後にトンネルにいちばん近い赤べこ。そのあと、ぽんぽんカーのお世話係が来て、きーのおでこに禁止マークを貼る(D365)
 let nSoT0 = -1; // 抗議が始まった時刻
 let nSoShort = false; // 2 回目からの空ぶかし(この入場で鳴らしたか)
-const nSoOn = (api) => api.hasItem("クラブの札");
+// リプレイ券で最初からやり直したときは、札を持ったまま(D366)。もう一度勝つまでは、札をもらう前と同じにする
+const nFudaKept = (api) => api.flag("fudaKept");
+const nSoOn = (api) => api.hasItem("クラブの札") && !nFudaKept(api);
 const nSoAge = () => (nSoT0 >= 0 ? nNow() - nSoT0 : -1);
 const nSoWin = (k, len) => {
   const u = nSoAge() - N_SO[k];
@@ -171,6 +175,39 @@ const nSoRev = () => {
   const u = nSoAge() - N_SO.rev;
   return u >= 0 && u < 1.1;
 };
+// 赤べこの正面の絵(akabeko_s)を、頭と、頭を外した体に分ける(頭は前の顔を重ねた楕円 aka_map/face.py: 中心 (22, 28.5)、半径 12.6・13.2)。
+// 頭を外したあとは、首の穴(上半分)を暗い赤、下は前輪のあいだの空き(透明)にする。支点は首の付け根
+const N_AKA_HEAD = { cx: 22, cy: 28.5, rx: 12.8, ry: 13.4, px: 22, py: 17 };
+let nAkaParts = null;
+const nAkaHeadParts = (im) => {
+  if (nAkaParts && nAkaParts.src === im) return nAkaParts;
+  const mk = () => {
+    const c = document.createElement("canvas");
+    c.width = im.width;
+    c.height = im.height;
+    return c;
+  };
+  const body = mk(), head = mk();
+  const bg = body.getContext("2d"), hg = head.getContext("2d");
+  bg.drawImage(im, 0, 0);
+  hg.drawImage(im, 0, 0);
+  const bd = bg.getImageData(0, 0, im.width, im.height), hd = hg.getImageData(0, 0, im.width, im.height);
+  const H = N_AKA_HEAD;
+  for (let y = 0; y < im.height; y++)
+    for (let x = 0; x < im.width; x++) {
+      const i = (y * im.width + x) * 4;
+      const inside = ((x + 0.5 - H.cx) / H.rx) ** 2 + ((y + 0.5 - H.cy) / H.ry) ** 2 <= 1;
+      if (inside) {
+        if (y < H.cy - 2) bd.data.set([70, 18, 14, bd.data[i + 3]], i); // 首の穴
+        else bd.data[i + 3] = 0;
+      } else hd.data[i + 3] = 0;
+    }
+  bg.putImageData(bd, 0, 0);
+  hg.putImageData(hd, 0, 0);
+  nAkaParts = { src: im, body, head };
+  return nAkaParts;
+};
+const N_SO_KEY = { so_tansu: "tansu", so_miton: "miton", so_kokeshi: "kok", so_toribogi: "tori", so_ponpon: "pon", so_akabeko: "aka" };
 // 並ぶ 1 台。draw(ctx, sx, sy, t, im, api) でしぐさを描く
 const nSoCar = (id, img, x, y, w, h, gesture, solid) =>
   nSprite(id, img, x, y, w, h, {
@@ -184,19 +221,36 @@ const nSoCar = (id, img, x, y, w, h, gesture, solid) =>
       const j = nSoRev() ? Math.round(Math.sin(t * 47 + x) * 1.2) : 0; // 空ぶかしのふるえ
       const x0 = Math.round(sx - im.width / 2) + j;
       const y0 = Math.round(sy - im.height);
+      // いやいや: 自分の番に、足もとを支点に体を左右にゆする(だんだん小さく。作者「いやいやをするように他のマシンも動きをつけていい」)
+      const key = N_SO_KEY[id];
+      const u = key ? nSoWin(key, 1.3) : -1;
+      if (u >= 0) {
+        const tau = u * 1.3;
+        const ang = (key === "aka" ? 0.06 : 0.11) * Math.exp(-1.4 * tau) * Math.sin(2 * Math.PI * 2.6 * tau);
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.rotate(ang);
+        ctx.translate(-sx, -sy);
+      }
       if (!gesture(ctx, x0, y0, t, im)) ctx.drawImage(im, x0, y0);
+      if (u >= 0) ctx.restore();
     },
   });
 const nSoCars = () => [
-  // 赤べこ: 張り子の首を横に振る(首振り人形の「いいえ」)。顔(x 9〜35、y 17〜41)だけを左右にずらして描く
+  // 赤べこ: 張り子の首を横に振る(首振り人形の「いいえ」)。頭は首の付け根(頭のてっぺん)にぶら下がっているので、
+  // そこを支点に振り子のように回し、ばねのようにだんだん小さくなる(作者「あかべこの首振りが不自然。」で、平行にずらすのをやめた)
   nSoCar("so_akabeko", "akabeko_s", 7.4 * T, 4.9 * T, 44, 41, (ctx, x0, y0, t, im) => {
-    const u = nSoWin("aka", 1.4);
+    const u = nSoWin("aka", 1.6);
     if (u < 0) return false;
-    const dx = Math.round(Math.sin(u * Math.PI * 8) * 3 * (1 - u * 0.4));
-    ctx.drawImage(im, 0, 0, im.width, 17, x0, y0, im.width, 17);
-    ctx.drawImage(im, 0, 17, 9, im.height - 17, x0, y0 + 17, 9, im.height - 17);
-    ctx.drawImage(im, 35, 17, im.width - 35, im.height - 17, x0 + 35, y0 + 17, im.width - 35, im.height - 17);
-    ctx.drawImage(im, 9, 17, 26, im.height - 17, x0 + 9 + dx, y0 + 17, 26, im.height - 17);
+    const parts = nAkaHeadParts(im);
+    const tau = u * 1.6;
+    const ang = 0.3 * Math.exp(-1.5 * tau) * Math.sin(2 * Math.PI * 2.4 * tau);
+    ctx.drawImage(parts.body, x0, y0);
+    ctx.save();
+    ctx.translate(x0 + N_AKA_HEAD.px, y0 + N_AKA_HEAD.py);
+    ctx.rotate(ang);
+    ctx.drawImage(parts.head, -N_AKA_HEAD.px, -N_AKA_HEAD.py);
+    ctx.restore();
     return true;
   }, { w: 40, h: 22, dy: -10 }),
   // ぽんぽんカー: 丸い目(ライト x 21・62、y 59)を点滅させる
@@ -237,9 +291,64 @@ const nSoCars = () => [
   }, { w: 100, h: 24, dy: -12 }),
   nSoCar("so_miton", "miton_s", 25.4 * T, 4.8 * T, 40, 75, () => false, { w: 24, h: 14, dy: -7 }),
 ];
+// ぽんぽんカーのお世話係(木の葉のぼぎ)が、きーに禁止マークを貼る(D365、作者「ぽんぽんかーのお世話係がやってきて、きーに禁止マークをはりつけるのはどうか」「おすすめどおり」)。
+// 札は白地に赤い丸と斜線だけ(小さいので絵は入れない)。この断片を出るまで、きーのおでこに貼ったまま(トンネルに入ると消す)
+let nKinshi = false;
+// リプレイ券(D366): ピンボールで 10,000 点を超えるともらえる券を、お世話係にわたすと、この断片を最初からやり直せる。
+// 戻すのは断片の中の進みだけ。ピンボールの最高点、覚えた能力、見届け、太宰の本、持ち帰った札はそのまま
+const N_REPLAY_FLAGS = ["custom", "ponponGone", "seeOffDone", "stripSeen", "won", "nrR1", "nrR2"];
+let nTakeT0 = -1; // お世話係が券を受け取った時刻
+function nReplay(api) {
+  api.hold("ic_ticket", 1.4, () => {
+    api.takeItem("リプレイ券");
+    api.sfx("pop");
+    nTakeT0 = nNow();
+    api.freeze(1.3);
+    api.later(1000, () => {
+      const kept = api.hasItem("クラブの札");
+      N_REPLAY_FLAGS.forEach((f) => api.setFlag(f, false));
+      api.setFlag("fudaKept", kept);
+      nKinshi = false;
+      nFuelT0 = -1;
+      nSoT0 = -1;
+      nSoShort = false;
+      nTakeT0 = -1;
+      api.warp("pass", "start");
+    });
+  });
+}
+let nSoKi = null; // 抗議が始まったときのきーの足もと
+const N_KIN_WALK = 1.6, N_KIN_STAY = 0.7, N_KIN_BACK = 1.5;
+const nFuelerSo = () => {
+  const e = nSoAge() - N_SO.kin;
+  if (!nSoKi || e < 0 || e > N_KIN_WALK + N_KIN_STAY + N_KIN_BACK) return null;
+  const S = N_FUEL_REST, G = { x: nSoKi.x - 22, y: nSoKi.y - 2 };
+  const sm = (v) => (v <= 0 ? 0 : v >= 1 ? 1 : v * v * (3 - 2 * v));
+  const k = e < N_KIN_WALK ? sm(e / N_KIN_WALK) : e < N_KIN_WALK + N_KIN_STAY ? 1 : 1 - sm((e - N_KIN_WALK - N_KIN_STAY) / N_KIN_BACK);
+  const hop = Math.abs(Math.sin(e * 12)) * 2 * (e < N_KIN_WALK || e > N_KIN_WALK + N_KIN_STAY ? 1 : 0); // とことこ
+  const reach = e > N_KIN_WALK + 0.15 && e < N_KIN_WALK + 0.45 ? 3 : 0; // 背のび
+  return { x: S.x + (G.x - S.x) * k, y: S.y + (G.y - S.y) * k - hop - reach };
+};
+// きーのおでこの禁止マーク(7×7)
+const nKinshiDraw = (ctx, ox, oy, api) => {
+  if (!nKinshi) return;
+  const p = api.player();
+  if (p.facing === "north") return; // うしろ向きのときはおでこが見えない
+  const dx = p.facing === "west" ? -7 : p.facing === "east" ? 7 : 0;
+  const x = Math.round(ox + p.x + dx) - 3, y = Math.round(oy + p.y - 7) - 3; // 目の上(きーの絵を撮って合わせた)
+  const M = ["..rrr..", ".rwwwr.", "rrrwwwr", "rwrrrwr", "rwwwrrr", ".rwwwr.", "..rrr.."]; // 赤い丸と斜線
+  for (let j = 0; j < 7; j++)
+    for (let i = 0; i < 7; i++) {
+      const c = M[j][i];
+      if (c === ".") continue;
+      ctx.fillStyle = c === "r" ? "#d42a20" : "#f6f2ea";
+      ctx.fillRect(x + i, y + j, 1, 1);
+    }
+};
 // はじめて帰るときの抗議の流れ(カメラを引いて、並んだマシン達を見せる)
 const nSoStart = (api) => {
   nSoT0 = nNow();
+  nSoKi = { x: api.player().x, y: api.player().y };
   api.freeze(N_SO.end);
   const p = api.player();
   // 引いて全員の空ぶかしを見せ、そのあと 1 台ずつ寄る(しぐさが小さいので)
@@ -257,22 +366,23 @@ const nSoStart = (api) => {
     { t: N_SO.pon, x: 13.4 * T, y: Y, z: Z },
     { t: N_SO.pon + 0.6, x: 13.4 * T, y: Y, z: Z },
     { t: N_SO.aka, x: 7.4 * T, y: 4.4 * T, z: 1.8 },
-    { t: N_SO.horn - 0.2, x: 7.4 * T, y: 4.4 * T, z: 1.8 },
-    { t: N_SO.end - 0.6, x: 12 * T, y: 4.6 * T, z: 0.8 },
+    { t: N_SO.kin - 0.1, x: 7.4 * T, y: 4.4 * T, z: 1.8 },
+    { t: N_SO.kin + 0.8, x: (p.x + 11 * T) / 2, y: 5.4 * T, z: 1.1 },
+    { t: N_SO.kin + N_KIN_WALK, x: p.x - 10, y: p.y - 24, z: 1.7 },
+    { t: N_SO.kin + N_KIN_WALK + N_KIN_STAY + 0.4, x: p.x - 10, y: p.y - 24, z: 1.7 },
+    { t: N_SO.horn, x: 13 * T, y: 4.8 * T, z: 0.8 },
+    { t: N_SO.end - 0.6, x: 13 * T, y: 4.8 * T, z: 0.8 },
   ]);
   const say = (ms, id, text, dur) => api.later(ms, () => api.bubble(id, text, dur || 1300));
   api.later(N_SO.rev * 1000, () => (api.sfx("rev"), api.shake(0.5, 1)));
   api.later(N_SO.rev * 1000 + 350, () => api.sfx("rev"));
-  for (const id of ["akabeko", "ponpon", "toribogi", "kokeshi", "tansu"]) say(N_SO.rev * 1000 + 100, "so_" + id, N_VOICE[id], 1000);
-  say(N_SO.aka * 1000, "so_akabeko", N_VOICE.akabeko);
+  // この場面ではマシンにセリフ(オノマトペ)を言わせない。音としぐさだけ(作者「このシーンでマシンのセリフはいらない」)
   api.later(N_SO.pon * 1000, () => {
-    api.bubble("so_ponpon", N_VOICE.ponpon, 1300);
     for (let k = 0; k < 6; k++) api.later(k * 140, () => nPuff(13.4 * T + (Math.random() - 0.5) * 20, 4.8 * T - 60, (Math.random() - 0.5) * 30, -20 - Math.random() * 10, 1.2, 9, "46, 42, 42"));
   });
-  say(N_SO.tori * 1000, "so_toribogi", N_VOICE.toribogi);
-  api.later(N_SO.kok * 1000, () => (api.bubble("so_kokeshi", N_VOICE.kokeshi, 1300), api.sfx("rev")));
-  say(N_SO.tansu * 1000, "so_tansu", N_VOICE.tansu);
+  api.later(N_SO.kok * 1000, () => api.sfx("rev"));
   say(N_SO.miton * 1000, "so_miton", "……", 1200);
+  api.later((N_SO.kin + N_KIN_WALK + 0.35) * 1000, () => (nKinshi = true, api.sfx("pop"))); // ぺたっ
   for (const k of [0, 380, 760]) api.later(N_SO.horn * 1000 + k, () => api.sfx("horn"));
   api.later(N_SO.end * 1000, () => api.setFlag("seeOffDone"));
 };
@@ -281,7 +391,6 @@ const nSoShortRev = (api) => {
   nSoShort = true;
   nSoT0 = nNow() - N_SO.rev + 0.05;
   api.sfx("rev");
-  for (const id of ["akabeko", "ponpon", "toribogi", "kokeshi", "tansu"]) api.bubble("so_" + id, N_VOICE[id], 1000);
   api.later(1200, () => (nSoT0 = -1));
 };
 const N_PASS = nMap("pass", 28, 12, {
@@ -304,6 +413,7 @@ const N_PASS = nMap("pass", 28, 12, {
     nCable(ctx, ox + dx + 12, oy + 4.7 * T - 44, ox + cx - 30, oy + 4.7 * T - 30, nGone(api) && !nSoOn(api) ? 2 : 10);
     if (!nGone(api) && e > N_FUEL.fire && Math.random() < 0.35) nPuff(cx - 34, 4.7 * T - 30, -30, -18, 0.8, 7);
     nDrawPuffs(ctx, ox, oy);
+    nKinshiDraw(ctx, ox, oy, api);
   },
   triggers: [
     {
@@ -317,6 +427,7 @@ const N_PASS = nMap("pass", 28, 12, {
           api.sfx("horn"); // トンネルに入るきーのうしろで、まだクラクション
           setTimeout(() => window.bogiAudio && window.bogiAudio.sfx("horn"), 420);
         }
+        nKinshi = false; // 禁止マークは、この断片を出るまで
         api.exit();
       },
     },
@@ -372,13 +483,23 @@ const N_PASS = nMap("pass", 28, 12, {
     ...[18.3, 18.95, 19.6, 20.25, 20.9].map((x, k) => nSprite("pylon" + k, "pylon", x * T, 4.05 * T, 12, 16, {})),
     nSprite("fueler", "fueler", 18.9 * T, 1.2 * T, 26, 40, {
       range: 44,
-      interact: (api) => api.bubble("fueler", "……", 1200), // 仮
+      // リプレイ券を持っていれば、わたす(D366)
+      interact: (api) => (api.hasItem("リプレイ券") ? nReplay(api) : api.bubble("fueler", "……", 1200)),
       update(dt, t, api) {
         const e = nFuelAge(api);
         const u = e < 0 ? 0 : Math.min(1, e / N_FUEL.walk);
         const v = e < N_FUEL.say + N_FUEL.walk ? 0 : Math.min(1, (e - N_FUEL.walk - N_FUEL.say) / 1.4);
         this.x = 18.9 * T + (17.2 * T - 18.9 * T) * u - 6.2 * T * v;
         this.y = 1.2 * T + (4.2 * T - 1.2 * T) * u;
+        const w = Math.max(0, Math.min(1, (e - N_FUEL.step) / 0.7)); // ドラム缶の西どなりへ
+        this.x += (N_FUEL_REST.x - 11 * T) * w;
+        this.y += (N_FUEL_REST.y - 4.2 * T) * w;
+        if (nTakeT0 >= 0) this.y -= Math.abs(Math.sin((nNow() - nTakeT0) * 9)) * 4; // 券を受け取って、ぴょんぴょんはねる
+        const so = nFuelerSo(); // きーに禁止マークを貼りにいく(D365)
+        if (so) {
+          this.x = so.x;
+          this.y = so.y;
+        }
       },
     }),
   ],
@@ -398,6 +519,7 @@ const N_DRIVEIN = nMap("drivein", 28, 14, {
   },
   // ぽんぽんカーの線は、西の峠のドラム缶からのびてくる
   drawOverlay(ctx, ox, oy, t, api) {
+    nKinshiDraw(ctx, ox, oy, api); // 禁止マーク(D365)
     if (!nAtStrip(api)) nCable(ctx, ox - 10, oy + 9.6 * T, ox + 10.6 * T - 24, oy + 11.2 * T - 26, 30);
   },
   triggers: [
@@ -573,14 +695,16 @@ const N_STRIP = nMap("strip", 28, 12, {
   },
   onEnter(api) {
     if (api.flag("custom")) api.setFlag("stripSeen");
-    if (api.flag("won") && !api.hasItem("クラブの札")) {
+    if (api.flag("won") && (!api.hasItem("クラブの札") || nFudaKept(api))) {
       api.freeze(3.4);
       api.later(500, () => api.bubble("akabeko", N_VOICE.akabeko, 1600));
       api.later(900, () => api.bubble("kokeshi", N_VOICE.kokeshi, 1500));
       api.later(1300, () => api.bubble("ponpon", N_VOICE.ponpon, 1400));
       api.later(2000, () =>
         api.hold("ic_fuda", 1.8, () => {
-          api.giveItem("クラブの札");
+          if (api.hasItem("クラブの札")) api.sfx("item"); // やり直したとき(D366)は、もう持っている
+          else api.giveItem("クラブの札");
+          api.setFlag("fudaKept", false);
           api.clear();
           api.show("v_plaque", () => kLearn(api, "hashiru", "はしる")); // もらった札の大写し(カークラブの札だとわかるように)。競争に勝って、はしるを覚える(D201)
         })
@@ -601,6 +725,7 @@ const N_STRIP = nMap("strip", 28, 12, {
       if (k > 0.85 && Math.random() < 0.02) api.shake(0.2, 1);
     }
     nDrawPuffs(ctx, ox, oy);
+    nKinshiDraw(ctx, ox, oy, api);
   },
   triggers: [{ id: "toDrivein", x: -T, y: 3 * T, w: 1.45 * T, h: 7 * T, warp: { map: "drivein", spawn: "east" } }],
   objects: [
@@ -611,7 +736,7 @@ const N_STRIP = nMap("strip", 28, 12, {
       y: 4.6 * T,
       r: 3.4 * T,
       sec: 6, lure: "255, 240, 210",
-      when: (api) => api.flag("won") && api.hasItem("クラブの札"), // スタンドの砂(まわる)はやめた(D226)
+      when: (api) => api.flag("won") && api.hasItem("クラブの札") && !nFudaKept(api), // スタンドの砂(まわる)はやめた(D226)
       fx(ctx, sx, sy, p, t) {
         const a = (p < 0.3 ? p / 0.3 : (1 - p) / 0.7) * 0.5;
         ctx.fillStyle = `rgba(30, 26, 30, ${a})`;
