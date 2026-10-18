@@ -14,7 +14,7 @@ window.BOGI_WORLDS = {
     souvenirs: { lake: "氷のかけら", haihei: "おたかぽっぽ", kasumi: "蓮の花", banana: "マンゴー", suzuki: "納品書", takarabune: "白紙の海図", noroi: "クラブの札", padre: "水あめのわりばし", kinsei: "電池", bomber: "安全ピンのリボン" },
     souvenirIcons: { 氷のかけら: "ic_kori", おたかぽっぽ: "ic_poppo", 蓮の花: "ic_hasu", マンゴー: "ic_mango", 納品書: "ic_nouhin", 白紙の海図: "ic_kaizu", クラブの札: "ic_fuda", 水あめのわりばし: "ic_ame", 電池: "ic_denchi", 安全ピンのリボン: "ic_ribbon" },
     // 断片の中の謎解きに使う物。その断片にいる間だけ「どうぐ」に出る
-    puzzleItems: { 伝票: "suzuki", 荷札: "suzuki", スタンプ台紙: "haihei", ペレット: "takarabune", コンロッド: "takarabune" },
+    puzzleItems: { 伝票: "suzuki", 荷札: "suzuki", スタンプ台紙: "haihei", ペレット: "takarabune", コンロッド: "takarabune", リプレイ券: "noroi" }, // リプレイ券(D366)は呪いの野犬にいる間だけ
     assetBase: "./assets/worlds/void/",
     images: {
       wang_void: "wang_void.png",
