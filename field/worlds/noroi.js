@@ -253,15 +253,15 @@ const nSoCars = () => [
     ctx.restore();
     return true;
   }, { w: 40, h: 22, dy: -10 }),
-  // ぽんぽんカー: 丸い目(ライト x 21・62、y 59)を点滅させる
-  nSoCar("so_ponpon", "ponpon_s", 13.4 * T, 4.8 * T, 84, 73, (ctx, x0, y0, t, im) => {
+  // ぽんぽんカー: 丸い目(ライト x 22・68、y 65)を点滅させる
+  nSoCar("so_ponpon", "ponpon_s", 13.4 * T, 4.8 * T, 91, 77, (ctx, x0, y0, t, im) => {
     ctx.drawImage(im, x0, y0);
     const u = nSoWin("pon", 1.1);
-    if (u >= 0 && Math.floor(u * 8) % 2 === 0) for (const ex of [21, 62]) nGlow(ctx, x0 + ex, y0 + 59, 9, "255, 240, 170", 0.85);
+    if (u >= 0 && Math.floor(u * 8) % 2 === 0) for (const ex of [22, 68]) nGlow(ctx, x0 + ex, y0 + 65, 9, "255, 240, 170", 0.85);
     return true;
   }, { w: 70, h: 22, dy: -10 }),
   // とりぼぎかー: 子がもの噴流(白い筋を左右へ)
-  nSoCar("so_toribogi", "tori_s", 15.6 * T, 4.8 * T, 54, 72, (ctx, x0, y0, t, im) => {
+  nSoCar("so_toribogi", "tori_s", 15.6 * T, 4.8 * T, 42, 55, (ctx, x0, y0, t, im) => {
     const u = nSoWin("tori", 1.1);
     const jx = u >= 0 ? Math.round(Math.sin(t * 60) * 1) : 0;
     ctx.drawImage(im, x0 + jx, y0);
@@ -269,21 +269,21 @@ const nSoCars = () => [
       ctx.fillStyle = "rgba(250, 250, 255, 0.85)";
       const L = 6 + Math.round(Math.random() * 8);
       for (let i = 0; i < L; i++) {
-        ctx.fillRect(x0 + 16 - i, y0 + 9 + (Math.random() < 0.3 ? 1 : 0), 1, 1);
-        ctx.fillRect(x0 + 41 + i, y0 + 7 + (Math.random() < 0.3 ? 1 : 0), 1, 1);
+        ctx.fillRect(x0 + 12 - i, y0 + 6 + (Math.random() < 0.3 ? 1 : 0), 1, 1);
+        ctx.fillRect(x0 + 32 + i, y0 + 4 + (Math.random() < 0.3 ? 1 : 0), 1, 1);
       }
     }
     return true;
   }, { w: 46, h: 22, dy: -10 }),
   // こけし: 前をはね上げて、ふかす
-  nSoCar("so_kokeshi", "kokeshi_s", 17.3 * T, 4.8 * T, 35, 72, (ctx, x0, y0, t, im) => {
+  nSoCar("so_kokeshi", "kokeshi_s", 17.3 * T, 4.8 * T, 28, 54, (ctx, x0, y0, t, im) => {
     const u = nSoWin("kok", 1.1);
     if (u < 0) return false;
     ctx.drawImage(im, x0, y0 - Math.round(Math.sin(u * Math.PI) * 5 + Math.abs(Math.sin(t * 30)) * 1));
     return true;
   }, { w: 22, h: 14, dy: -7 }),
   // 車箪笥: 引き出しをガタガタ(上下左右に細かくゆれる)
-  nSoCar("so_tansu", "tansu_w", 22.8 * T, 4.9 * T, 113, 96, (ctx, x0, y0, t, im) => {
+  nSoCar("so_tansu", "tansu_w", 22.8 * T, 4.9 * T, 116, 100, (ctx, x0, y0, t, im) => {
     const u = nSoWin("tansu", 1.2);
     if (u < 0) return false;
     ctx.drawImage(im, x0 + Math.round(Math.sin(t * 70) * 2), y0 + Math.round(Math.sin(t * 53) * 1.5));
@@ -296,7 +296,7 @@ const nSoCars = () => [
 let nKinshi = false;
 // リプレイ券(D366): ピンボールで 10,000 点を超えるともらえる券を、お世話係にわたすと、この断片を最初からやり直せる。
 // 戻すのは断片の中の進みだけ。ピンボールの最高点、覚えた能力、見届け、太宰の本、持ち帰った札はそのまま
-const N_REPLAY_FLAGS = ["custom", "ponponGone", "seeOffDone", "stripSeen", "won", "nrR1", "nrR2"];
+const N_REPLAY_FLAGS = ["custom", "ponponGone", "seeOffDone", "stripSeen", "won", "nrR1", "nrR2", "nrRound"];
 let nTakeT0 = -1; // お世話係が券を受け取った時刻
 function nReplay(api) {
   api.hold("ic_ticket", 1.4, () => {
@@ -318,37 +318,70 @@ function nReplay(api) {
   });
 }
 let nSoKi = null; // 抗議が始まったときのきーの足もと
-const N_KIN_WALK = 1.6, N_KIN_STAY = 0.7, N_KIN_BACK = 1.5;
+// 通り道(D367、作者「おせわぼぎがいろいろなものをすり抜けて、きーに近寄って禁止マークをはるのがおかしい。」):
+// ドラム缶の西どなりから南の道へ出て、マシンの列の前を横に歩き、きーの横で止まる。帰りは同じ道を逆に。歩く時間は道のりで決める
+const N_KIN_STAY = 0.7, N_KIN_SPEED = 120, N_KIN_LANE = 5.6 * T; // 列の前の道(マシンの足もとは 4.9T)
+let nKinPts = null, nKinLen = [0], nKinWalk = 1.6;
+const nKinPlan = (ki) => {
+  const S = N_FUEL_REST, G = { x: ki.x - 32, y: ki.y - 2 };
+  nKinPts = [S, { x: S.x, y: N_KIN_LANE }, { x: G.x, y: N_KIN_LANE }, G];
+  nKinLen = [0];
+  for (let k = 1; k < nKinPts.length; k++) nKinLen.push(nKinLen[k - 1] + Math.hypot(nKinPts[k].x - nKinPts[k - 1].x, nKinPts[k].y - nKinPts[k - 1].y));
+  nKinWalk = Math.max(1.2, nKinLen[nKinLen.length - 1] / N_KIN_SPEED);
+};
+const nKinAt = (d) => {
+  let k = 1;
+  while (k < nKinPts.length - 1 && nKinLen[k] < d) k++;
+  const a = nKinPts[k - 1], b = nKinPts[k], seg = nKinLen[k] - nKinLen[k - 1] || 1;
+  const u = Math.max(0, Math.min(1, (d - nKinLen[k - 1]) / seg));
+  return { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u };
+};
 const nFuelerSo = () => {
   const e = nSoAge() - N_SO.kin;
-  if (!nSoKi || e < 0 || e > N_KIN_WALK + N_KIN_STAY + N_KIN_BACK) return null;
-  const S = N_FUEL_REST, G = { x: nSoKi.x - 22, y: nSoKi.y - 2 };
-  const sm = (v) => (v <= 0 ? 0 : v >= 1 ? 1 : v * v * (3 - 2 * v));
-  const k = e < N_KIN_WALK ? sm(e / N_KIN_WALK) : e < N_KIN_WALK + N_KIN_STAY ? 1 : 1 - sm((e - N_KIN_WALK - N_KIN_STAY) / N_KIN_BACK);
-  const hop = Math.abs(Math.sin(e * 12)) * 2 * (e < N_KIN_WALK || e > N_KIN_WALK + N_KIN_STAY ? 1 : 0); // とことこ
-  const reach = e > N_KIN_WALK + 0.15 && e < N_KIN_WALK + 0.45 ? 3 : 0; // 背のび
-  return { x: S.x + (G.x - S.x) * k, y: S.y + (G.y - S.y) * k - hop - reach };
+  if (!nSoKi || !nKinPts || e < 0 || e > nKinWalk * 2 + N_KIN_STAY) return null;
+  const L = nKinLen[nKinLen.length - 1];
+  const walking = e < nKinWalk || e > nKinWalk + N_KIN_STAY;
+  const d = e < nKinWalk ? (e / nKinWalk) * L : walking ? (1 - (e - nKinWalk - N_KIN_STAY) / nKinWalk) * L : L;
+  const q = nKinAt(d);
+  const hop = walking ? Math.abs(Math.sin(e * 12)) * 2 : 0; // とことこ
+  const reach = e > nKinWalk + 0.15 && e < nKinWalk + 0.45 ? 3 : 0; // 背のび
+  return { x: q.x, y: q.y - hop - reach };
 };
-// きーのおでこの禁止マーク(7×7)
+// きーの体の禁止マーク(13×13。作者「禁止マークはもっと大きくていい。」D367)。赤い輪と、左上から右下への斜線、白地。ふちに暗い線
+const N_KINSHI = (() => {
+  const N = 13, c = 6, M = [];
+  for (let j = 0; j < N; j++) {
+    let row = "";
+    for (let i = 0; i < N; i++) {
+      const r = Math.hypot(i - c, j - c);
+      const slash = Math.abs(i - j) <= 1 && r < 5.2;
+      row += r > 6.5 ? "." : r > 5.6 ? "k" : r > 4.4 || slash ? "r" : "w";
+    }
+    M.push(row);
+  }
+  return M;
+})();
 const nKinshiDraw = (ctx, ox, oy, api) => {
   if (!nKinshi) return;
   const p = api.player();
-  if (p.facing === "north") return; // うしろ向きのときはおでこが見えない
-  const dx = p.facing === "west" ? -7 : p.facing === "east" ? 7 : 0;
-  const x = Math.round(ox + p.x + dx) - 3, y = Math.round(oy + p.y - 7) - 3; // 目の上(きーの絵を撮って合わせた)
-  const M = ["..rrr..", ".rwwwr.", "rrrwwwr", "rwrrrwr", "rwwwrrr", ".rwwwr.", "..rrr.."]; // 赤い丸と斜線
-  for (let j = 0; j < 7; j++)
-    for (let i = 0; i < 7; i++) {
-      const c = M[j][i];
-      if (c === ".") continue;
-      ctx.fillStyle = c === "r" ? "#d42a20" : "#f6f2ea";
-      ctx.fillRect(x + i, y + j, 1, 1);
-    }
+  if (p.facing === "north") return; // うしろ向きのときは見えない
+  const dx = p.facing === "west" ? -6 : p.facing === "east" ? 6 : 0;
+  const x = Math.round(ox + p.x + dx) - 6, y = Math.round(oy + p.y - 9) - 6; // 体のまん中(きーの絵を撮って合わせた)
+  const col = { r: "#d42a20", w: "#f6f2ea", k: "#5a1a14" };
+  N_KINSHI.forEach((row, j) => [...row].forEach((ch, i) => {
+    if (ch === ".") return;
+    ctx.fillStyle = col[ch];
+    ctx.fillRect(x + i, y + j, 1, 1);
+  }));
 };
 // はじめて帰るときの抗議の流れ(カメラを引いて、並んだマシン達を見せる)
 const nSoStart = (api) => {
   nSoT0 = nNow();
   nSoKi = { x: api.player().x, y: api.player().y };
+  nKinPlan(nSoKi);
+  // お世話係が歩くぶん、クラクションと終わりをうしろへずらす
+  N_SO.horn = N_SO.kin + nKinWalk + N_KIN_STAY + 0.9;
+  N_SO.end = N_SO.horn + 1.3;
   api.freeze(N_SO.end);
   const p = api.player();
   // 引いて全員の空ぶかしを見せ、そのあと 1 台ずつ寄る(しぐさが小さいので)
@@ -367,9 +400,10 @@ const nSoStart = (api) => {
     { t: N_SO.pon + 0.6, x: 13.4 * T, y: Y, z: Z },
     { t: N_SO.aka, x: 7.4 * T, y: 4.4 * T, z: 1.8 },
     { t: N_SO.kin - 0.1, x: 7.4 * T, y: 4.4 * T, z: 1.8 },
-    { t: N_SO.kin + 0.8, x: (p.x + 11 * T) / 2, y: 5.4 * T, z: 1.1 },
-    { t: N_SO.kin + N_KIN_WALK, x: p.x - 10, y: p.y - 24, z: 1.7 },
-    { t: N_SO.kin + N_KIN_WALK + N_KIN_STAY + 0.4, x: p.x - 10, y: p.y - 24, z: 1.7 },
+    { t: N_SO.kin + 0.5, x: N_FUEL_REST.x, y: 5.2 * T, z: 1.3 },
+    { t: N_SO.kin + nKinWalk - 0.3, x: p.x - 10, y: p.y - 24, z: 1.3 },
+    { t: N_SO.kin + nKinWalk, x: p.x - 10, y: p.y - 24, z: 1.7 },
+    { t: N_SO.kin + nKinWalk + N_KIN_STAY + 0.4, x: p.x - 10, y: p.y - 24, z: 1.7 },
     { t: N_SO.horn, x: 13 * T, y: 4.8 * T, z: 0.8 },
     { t: N_SO.end - 0.6, x: 13 * T, y: 4.8 * T, z: 0.8 },
   ]);
@@ -382,7 +416,7 @@ const nSoStart = (api) => {
   });
   api.later(N_SO.kok * 1000, () => api.sfx("rev"));
   say(N_SO.miton * 1000, "so_miton", "……", 1200);
-  api.later((N_SO.kin + N_KIN_WALK + 0.35) * 1000, () => (nKinshi = true, api.sfx("pop"))); // ぺたっ
+  api.later((N_SO.kin + nKinWalk + 0.35) * 1000, () => (nKinshi = true, api.sfx("pop"))); // ぺたっ
   for (const k of [0, 380, 760]) api.later(N_SO.horn * 1000 + k, () => api.sfx("horn"));
   api.later(N_SO.end * 1000, () => api.setFlag("seeOffDone"));
 };
@@ -482,6 +516,7 @@ const N_PASS = nMap("pass", 28, 12, {
     // 北の小道の口のパイロン(D343)。木の葉のぼぎは小道から来るが、きーは入れない
     ...[18.3, 18.95, 19.6, 20.25, 20.9].map((x, k) => nSprite("pylon" + k, "pylon", x * T, 4.05 * T, 12, 16, {})),
     nSprite("fueler", "fueler", 18.9 * T, 1.2 * T, 26, 40, {
+      hidden: (api) => nFuelerAtStrip(api), // カスタムのあと札をもらうまでは、ストリップの入口にいる(D367)
       range: 44,
       // リプレイ券を持っていれば、わたす(D366)
       interact: (api) => (api.hasItem("リプレイ券") ? nReplay(api) : api.bubble("fueler", "……", 1200)),
@@ -529,11 +564,11 @@ const N_DRIVEIN = nMap("drivein", 28, 14, {
   ],
   objects: [
     kWall(22 * T, 0, 28 * T, 150), // 北東の砂地(サボテン、矢印の看板)は景色。背景の絵の物の奥に回りこまないように、ふさぐ
-    nSprite("ponpon", "ponpon_s", 10.6 * T, 11.2 * T, 65, 60, { hidden: nAtStrip, shake: true, solid: { w: 56, h: 22, dy: -10 }, range: 56, interact: nTalk("ponpon") }),
-    nSprite("toribogi", "tori_s", 5.2 * T, 11.3 * T, 64, 86, { hidden: nAtStrip, solid: { w: 52, h: 22, dy: -10 }, range: 56, interact: nTalk("toribogi") }),
+    nSprite("ponpon", "ponpon_s", 10.6 * T, 11.2 * T, 91, 77, { hidden: nAtStrip, shake: true, solid: { w: 56, h: 22, dy: -10 }, range: 56, interact: nTalk("ponpon") }),
+    nSprite("toribogi", "tori_s", 5.2 * T, 11.3 * T, 42, 55, { hidden: nAtStrip, solid: { w: 52, h: 22, dy: -10 }, range: 56, interact: nTalk("toribogi") }),
     nSprite("akabeko", "akabeko_s", 16.6 * T, 11.2 * T, 44, 41, { hidden: nAtStrip, shake: true, solid: { w: 40, h: 22, dy: -10 }, range: 56, interact: nTalk("akabeko") }),
-    nSprite("kokeshi", "kokeshi_s", 19.6 * T, 11.2 * T, 25, 56, { hidden: nAtStrip, solid: { w: 22, h: 14, dy: -7 }, range: 50, interact: nTalk("kokeshi") }),
-    nSprite("tansu", "tansu_w", 23.2 * T, 10.4 * T, 118, 89, { hidden: nMovedToStrip, shake: true, solid: { w: 108, h: 26, dy: -13 }, range: 70, interact: nTalk("tansu") }),
+    nSprite("kokeshi", "kokeshi_s", 19.6 * T, 11.2 * T, 28, 54, { hidden: nAtStrip, solid: { w: 22, h: 14, dy: -7 }, range: 50, interact: nTalk("kokeshi") }),
+    nSprite("tansu", "tansu_w", 23.2 * T, 10.4 * T, 116, 100, { hidden: nMovedToStrip, shake: true, solid: { w: 108, h: 26, dy: -13 }, range: 70, interact: nTalk("tansu") }),
     nSprite("miton", "miton_s", 26.2 * T, 10.2 * T, 36, 66, {
       hidden: nMovedToStrip, // カスタムのあと、きーがストリップへ行ったら、車箪笥といっしょにストリップだけにいる
       solid: { w: 24, h: 14, dy: -7 },
@@ -677,16 +712,91 @@ N_DRIVEIN.bgmLevel = (p) => (nJukePlaying() ? Math.max(0.05, 0.3 * (1 - Math.hyp
 
 // D 旧国道の直線(ドラッグストリップ)。競争の画面と同じ場所(D140): 北と南に空っぽの木のスタンド、スタートの白線と信号の柱、東にゴールの線と計時の小屋
 // 炎を塗ったあと、野犬たちが北の路肩に並び、スタートの白線の手前に三台(ぽんぽんカー、赤べこ、ぼぎカー)
-const nRace = (api, duel) => {
-  nDuelNext = duel || null;
-  api.warp("race", "view");
+const nRace = (api) => api.warp("race", "view");
+// 対戦カード(D367): 左にぼぎカー、右に 5 台(勝ち抜きの順)。勝った相手は暗くして「かち」、次の相手は黄の枠が点滅
+let nCard = null; // { t0, round, sec }
+const N_CARD_SEC = 3.2;
+function nCardShow(api, round, then) {
+  nCard = { t0: nNow(), round, sec: N_CARD_SEC };
+  api.freeze(N_CARD_SEC);
+  api.sfx("pop");
+  api.later(N_CARD_SEC * 1000, () => {
+    nCard = null;
+    then();
+  });
+}
+function nCardDraw(ctx, api) {
+  if (!nCard) return;
+  const e = nNow() - nCard.t0;
+  const pix = window.bogiPix;
+  const k = Math.min(1, e / 0.25); // 上から降りてくる
+  const X = 40, Y = Math.round(-280 + 296 * (1 - (1 - k) * (1 - k))), W = 400, H = 268;
+  ctx.save();
+  ctx.fillStyle = `rgba(0, 0, 0, ${0.55 * k})`;
+  ctx.fillRect(0, 0, 480, 300);
+  ctx.fillStyle = "#1c1410";
+  ctx.fillRect(X, Y, W, H);
+  ctx.fillStyle = "#e8c060";
+  ctx.fillRect(X + 3, Y + 3, W - 6, 2);
+  ctx.fillRect(X + 3, Y + H - 5, W - 6, 2);
+  ctx.fillRect(X + 3, Y + 3, 2, H - 6);
+  ctx.fillRect(X + W - 5, Y + 3, 2, H - 6);
+  for (let c = 0; c < 24; c++) for (let r = 0; r < 2; r++) if ((c + r) % 2 === 0) { ctx.fillStyle = "#f4f0dc"; ctx.fillRect(X + 8 + c * 16, Y + 10 + r * 6, 16, 6); } // チェッカーの帯
+  if (pix) pix.text(ctx, "かちぬきせん", X + W / 2 - 48, Y + 30, 1, "#ffd84a");
+  const im = (key) => (api.image ? api.image(key) : null);
+  // 左: ぼぎカー(炎を塗った横向き)
+  const bc = im("bogicar_e_flame");
+  if (bc) ctx.drawImage(bc, X + 14, Y + 132, 77 * 1.3, 37 * 1.3);
+  if (pix) pix.text(ctx, "きー", X + 48, Y + 192, 1, "#f4f0dc");
+  if (pix) pix.text(ctx, "VS", X + 118, Y + 140, 2, "#ff7a3c");
+  // 右: 5 台。相手は左(ぼぎカー)を向くように左右を反転
+  N_ROUNDS.forEach((rd, i) => {
+    const ry = Y + 52 + i * 42;
+    const a = im(rd.img);
+    const beaten = i < nCard.round;
+    const cur = i === nCard.round;
+    if (cur && Math.floor(e * 5) % 2 === 0) {
+      ctx.fillStyle = "#ffd84a";
+      ctx.fillRect(X + 156, ry - 2, 236, 40);
+      ctx.fillStyle = "#1c1410";
+      ctx.fillRect(X + 158, ry, 232, 36);
+    }
+    if (a) {
+      const sc = Math.min(34 / a.height, 76 / a.width);
+      const w = a.width * sc, h = a.height * sc;
+      ctx.globalAlpha = beaten ? 0.35 : 1;
+      ctx.save();
+      ctx.translate(X + 162 + 76, ry + 36 - h);
+      ctx.scale(-1, 1);
+      ctx.drawImage(a, 0, 0, w, h);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    }
+    if (pix) pix.text(ctx, rd.name, X + 248, ry + 12, 1, beaten ? "#7a6440" : "#f4f0dc");
+    if (beaten && pix) pix.text(ctx, "かち", X + 184, ry + 12, 1, "#ff4a3c");
+  });
+  ctx.restore();
+}
+// お世話係(木の葉のぼぎ)は、カスタムのあと札をもらうまで、ストリップの入口にいる(D367。峠からはいなくなる)
+const nFuelerAtStrip = (api) => nAtStrip(api) && !nSoOn(api);
+// ストリップでのマシンの場所(D367): 次の相手だけがスタートの白線(ぼぎカーのとなり)、ほかは北の路肩。ぽんぽんカーの路肩は線のつながる待避所
+const N_STRIP_HOME = { ponpon: [7.6, 5.25], toribogi: [12, 4.4], kokeshi: [15.4, 4.4], tansu: [19.4, 4.4], akabeko: [25.2, 4.4] };
+const N_STRIP_SLOT = [7.6, 6.9];
+const nStripPos = (api, id) => {
+  const cur = !api.flag("won") && N_ROUNDS[nRound(api)].id === id;
+  const [x, y] = cur ? N_STRIP_SLOT : N_STRIP_HOME[id];
+  return { x: x * T, y: y * T };
 };
-// 優勝のあとは、話しかけたマシンと一騎打ち(D341)。その前は、いつもの声だけ(または fallback)
-const nDuelOr = (id, fallback) => (api) => {
-  if (!api.flag("won")) return (fallback || nTalk(id))(api);
-  nTalk(id)(api);
-  api.later(900, () => nRace(api, id));
-};
+// 札をもらったマシン達は、峠のトンネルの前へ先回りしている(D367。作者「トンネル入り口にマシンがそろっていたら、レース場にはいないとおかしい。」)
+const nStripHidden = (api) => !nAtStrip(api) || nSoOn(api);
+const nStripCar = (id) => ({
+  hidden: nStripHidden,
+  update(dt, t, api) {
+    const q = nStripPos(api, id);
+    this.x = q.x;
+    this.y = q.y;
+  },
+});
 const N_STRIP = nMap("strip", 28, 12, {
   spawns: {
     west: { x: 1.2 * T, y: 6.6 * T, facing: "east" },
@@ -712,20 +822,25 @@ const N_STRIP = nMap("strip", 28, 12, {
     }
   },
   drawOverlay(ctx, ox, oy, t, api) {
-    if (nAtStrip(api)) nCable(ctx, ox - 10, oy + 4.2 * T, ox + 7.6 * T - 40, oy + 5.25 * T - 24, 18); // 線は西の峠のドラム缶から
+    if (nAtStrip(api) && !nSoOn(api)) {
+      const q = nStripPos(api, "ponpon");
+      nCable(ctx, ox - 10, oy + 4.2 * T, ox + q.x - 40, oy + q.y - 24, 18); // 線は西の峠のドラム缶から
+    }
     // バーンナウト(D146、D147): スタートの白線の手前で、ぽんぽんカーと赤べこがタイヤを空まわりさせ、白煙がうしろ(西 = 過去)へ流れる。
     // きーが近づくほど激しくなる
     if (nAtStrip(api) && !api.flag("won")) {
       const p = api.player();
+      const q = nStripPos(api, "ponpon");
       const d = Math.hypot(p.x - 7.6 * T, p.y - 7 * T);
       const k = Math.max(0.15, Math.min(1, 1 - (d - 2 * T) / (10 * T)));
-      for (const [wx, wy] of [[7.6 * T - 26, 5.25 * T - 5], [7.6 * T - 22, 6.9 * T - 5]]) {
+      for (const [wx, wy] of [[q.x - 26, q.y - 5], [7.6 * T - 22, 6.9 * T - 5]]) {
         if (Math.random() < 0.55 * k) nPuff(wx + Math.random() * 6, wy - Math.random() * 4, -40 - 60 * k * Math.random(), -8 - Math.random() * 14, 0.8 + 0.7 * k, 6 + 9 * k);
       }
       if (k > 0.85 && Math.random() < 0.02) api.shake(0.2, 1);
     }
     nDrawPuffs(ctx, ox, oy);
     nKinshiDraw(ctx, ox, oy, api);
+    nCardDraw(ctx, api);
   },
   triggers: [{ id: "toDrivein", x: -T, y: 3 * T, w: 1.45 * T, h: 7 * T, warp: { map: "drivein", spawn: "east" } }],
   objects: [
@@ -751,24 +866,25 @@ const N_STRIP = nMap("strip", 28, 12, {
       },
     }),
     nSprite("tree", "tree", 9 * T, 4.9 * T, 20, 65, { solid: { w: 12, h: 10, dy: -5 } }), // 信号の柱はスタートの白線(D140)
-    nSprite("toribogi", "tori_e", 12 * T, 4.4 * T, 93, 81, { hidden: (api) => !nAtStrip(api), range: 60, interact: nDuelOr("toribogi") }),
-    nSprite("kokeshi", "kokeshi_e", 15.4 * T, 4.4 * T, 72, 51, { hidden: (api) => !nAtStrip(api), range: 56, interact: nDuelOr("kokeshi") }),
-    nSprite("tansu", "tansu_e", 19.4 * T, 4.4 * T, 118, 89, { hidden: (api) => !nAtStrip(api), shake: true, range: 70, interact: nDuelOr("tansu") }),
-    nSprite("miton", "miton_s", 22.4 * T, 4.4 * T, 36, 66, { hidden: (api) => !nAtStrip(api), range: 50, interact: (api) => api.bubble("miton", "……", 1400) }),
-    nSprite("ponpon", "ponpon_e", 7.6 * T, 5.25 * T, 80, 59, { hidden: (api) => !nAtStrip(api), shake: true, range: 56, interact: nDuelOr("ponpon") }),
-    nSprite("akabeko", "akabeko_e", 7.6 * T, 6.9 * T, 83, 49, {
-      hidden: (api) => !nAtStrip(api),
-      shake: true,
-      solid: { w: 58, h: 16, dy: -8 },
-      range: 60,
-      interact: nDuelOr("akabeko", (api) => nRace(api)),
-    }),
-    nSprite("bogicar", "bogicar_e_flame", 7.4 * T, 8.7 * T, 77, 37, {
-      hidden: (api) => !nAtStrip(api),
-      solid: { w: 66, h: 12, dy: -6 },
-      range: 52,
-      interact: (api) => nRace(api),
-      canInteract: (api) => !api.flag("won"),
+    nSprite("toribogi", "tori_e", 12 * T, 4.4 * T, 93, 81, { ...nStripCar("toribogi"), range: 60, interact: nTalk("toribogi") }),
+    nSprite("kokeshi", "kokeshi_e", 15.4 * T, 4.4 * T, 72, 51, { ...nStripCar("kokeshi"), range: 56, interact: nTalk("kokeshi") }),
+    nSprite("tansu", "tansu_e", 19.4 * T, 4.4 * T, 118, 89, { ...nStripCar("tansu"), shake: true, range: 70, interact: nTalk("tansu") }),
+    nSprite("miton", "miton_s", 22.4 * T, 4.4 * T, 36, 66, { hidden: nStripHidden, range: 50, interact: (api) => api.bubble("miton", "……", 1400) }),
+    nSprite("ponpon", "ponpon_e", 7.6 * T, 5.25 * T, 80, 59, { ...nStripCar("ponpon"), shake: true, range: 56, interact: nTalk("ponpon") }),
+    nSprite("akabeko", "akabeko_e", 7.6 * T, 6.9 * T, 71, 45, { ...nStripCar("akabeko"), shake: true, solid: { w: 58, h: 16, dy: -8 }, range: 60, interact: nTalk("akabeko") }),
+    nSprite("bogicar", "bogicar_e_flame", 7.4 * T, 8.7 * T, 77, 37, { hidden: nStripHidden, solid: { w: 66, h: 12, dy: -6 } }),
+    // お世話係: 話しかけると対戦カードが映って、5 回のレースへ(D367)。リプレイ券を持っていれば、わたす(D366)
+    nSprite("fuelerS", "fueler", 2.8 * T, 8.6 * T, 26, 40, {
+      hidden: (api) => !nFuelerAtStrip(api),
+      range: 44,
+      interact: (api) => {
+        if (api.hasItem("リプレイ券")) return nReplay(api);
+        if (api.flag("won")) return api.bubble("fuelerS", "……", 1200);
+        nCardShow(api, nRound(api), () => nRace(api));
+      },
+      update() {
+        this.y = 8.6 * T - (nTakeT0 >= 0 ? Math.abs(Math.sin((nNow() - nTakeT0) * 9)) * 4 : 0);
+      },
     }),
   ],
 });
@@ -777,7 +893,8 @@ const N_STRIP = nMap("strip", 28, 12, {
 // 青の少し前から同じ出来事を真横から見せる。左がスタート(過去)、右がゴール(未来)。ウィリーはスタートのときだけ、うしろからも横からも。2 台ずつの勝ち抜き戦
 // 手前に信号の柱(ツリー)。手順は本物のドラッグレース(D125): バーンナウト(タイヤが空まわりして白煙)→ ステージ → 黄が 0.5 秒ごと → 青で A(青より前は赤で負け)→ 発進
 // 赤べこは前輪を上げて出る(ウィリー)。カメラは先を行く車を追って右へ流れ、ゴールは右のはし
-// 1 回戦 ぽんぽんカー(ゴールの手前で線がのびきり、左の峠(過去)のドラム缶へ引き戻される)→ 準決勝 とりぼぎかー → 決勝 赤べこ。負けたらその回からやり直し
+// 5 台の勝ち抜き戦(D367): 1 回戦 ぽんぽんカー(ゴールの手前で線がのびきり、左の峠(過去)のドラム缶へ引き戻される)→ 2 回戦 とりぼぎかー
+// → 3 回戦 車箪笥 → 準決勝 赤べこ → 決勝 こけし(遅い順)。負けたらその回からやり直し。回の合間に対戦カード
 // ゴール: 勝った側の灯り、空っぽのスタンドに、かつてのちゃんの見物人の影が満ちて消える(歓声 D126)
 // きーは歩きの絵の右向きを、同じ描き方で 2 倍に直接描いた絵(勝手に作らない D134、docs/assets/noroi/race/ki_side.py)。青で押すと、つぶれて背中に張り付く(粘着駆動 D123)
 // マシンの絵は三面図(docs/assets/noroi/sanmen/)の横の下絵から。空・スタンド・道は 1 ドット = ゲームの 1 ドット(D145)
@@ -787,20 +904,13 @@ const N_KI_ET = 2.4; // ぼぎカーは無慣性: 押した瞬間に全速、ゴ
 // 相手: ゴールまでの時間(青から)。ぼぎカーが勝つには、青から押すまでが (et - 2.4) 秒より短いこと
 const N_ROUNDS = [
   { id: "ponpon", img: "rcs_pon", name: "１かいせん", et: 3.0, snap: 0.86, lift: 0.07, snd: "pon" }, // バンジーで戻されるので、フライングしなければ勝てる
-  { id: "toribogi", img: "rcs_tori", name: "じゅんけっしょう", et: N_KI_ET + 1.4, lift: 0, snd: "jet" },
-  { id: "akabeko", img: "rcs_aka", name: "けっしょう", et: N_KI_ET + 0.9, lift: 0.2, snd: "v8" },
+  { id: "toribogi", img: "rcs_tori", name: "２かいせん", et: N_KI_ET + 1.4, lift: 0, snd: "jet" },
+  { id: "tansu", img: "rcs_tansu", name: "３かいせん", et: N_KI_ET + 1.2, lift: 0, rattle: 2, snd: "v8big" }, // ヘミ V8 の重い箱。出だしで引き出しがガタつく(みとんが中に乗る)
+  { id: "akabeko", img: "rcs_aka", name: "じゅんけっしょう", et: N_KI_ET + 0.9, lift: 0.2, snd: "v8" },
+  { id: "kokeshi", img: "rcs_kokeshi", name: "けっしょう", et: N_KI_ET + 0.6, lift: 0.1, snd: "bike" }, // いちばん速い。反応が遅いと負ける
 ];
-// 優勝のあとの一騎打ち(D341、作者「ドラッグレースは何回もチャレンジできるようにして。あと、車箪笥やこけしとも競争したい。」)
-// ドラッグストリップでマシンに話しかけると、そのマシンと何度でも。勝ち負けで進み具合は変わらない(タイムだけ)
-const N_DUEL = {
-  ponpon: N_ROUNDS[0],
-  toribogi: N_ROUNDS[1],
-  akabeko: N_ROUNDS[2],
-  tansu: { id: "tansu", img: "rcs_tansu", name: "くるまだんす", et: N_KI_ET + 1.2, lift: 0, rattle: 2, snd: "v8big" }, // ヘミ V8 の重い箱。出だしで引き出しがガタつく(みとんが中に乗る)
-  kokeshi: { id: "kokeshi", img: "rcs_kokeshi", name: "こけし", et: N_KI_ET + 0.6, lift: 0.1, snd: "bike" }, // いちばん速い。反応が遅いと負ける
-};
-let nDuelNext = null; // 次の競争の一騎打ちの相手(nRace で決める)
-const nCurRd = () => (nr.duel ? N_DUEL[nr.duel] : N_ROUNDS[nr.round]);
+// D341 の優勝のあとの一騎打ちはやめた(D367。作者「もう一度レースしたいなら、ピンボールでリプレイでいい。」)
+const nCurRd = () => N_ROUNDS[nr.round];
 const N_PX = 3; // 1 m = 3 ドット
 const N_SNAP_HOLD = 0.35; // ぽんぽんカーの線が張って止まっている秒(D338)
 const N_SNAP_FLY = 1.0; // そこから峠へ飛んでいく秒
@@ -810,7 +920,8 @@ const N_GY = { opp: 220, ki: 286 }; // 奥の車線と手前の車線の地面�
 const N_TREE = { x: 214, foot: 298, xs: [7, 23], ys: [8, 24, 40, 56, 72, 89, 105], r: 5 }; // 手前の信号の柱(左の列 = 相手、右の列 = ぼぎカー)
 const N_LAMP = { stage: "#f4f0dc", amber: "#ffbe3c", green: "#7cf08a", red: "#ff4a3c" };
 const nr = { t0: 0, foul: -1, go: -1, end: null, endT: 0, snapT: -1, round: 0, repT: -1, rep0: 0, flash: -1 };
-const nRound = (api) => (api.flag("nrR2") ? 2 : api.flag("nrR1") ? 1 : 0);
+// 今の回(0〜4)。前の 3 回戦のころの記録(nrR1、nrR2)も読む
+const nRound = (api) => Math.min(N_ROUNDS.length - 1, Number(api.flagValue("nrRound")) || (api.flag("nrR2") ? 2 : api.flag("nrR1") ? 1 : 0));
 const nRaceReset = (api) => {
   nr.t0 = nNow();
   nr.foul = -1;
@@ -821,7 +932,6 @@ const nRaceReset = (api) => {
   nr.repT = -1;
   nr.flash = -1;
   nr.round = nRound(api);
-  nr.duel = nDuelNext;
   nRcPuffs.length = 0;
   nRrPuffs.length = 0;
 };
@@ -1328,13 +1438,15 @@ const N_RACE = {
     nRaceReset(api);
   },
   debug: () => Object.assign({ s: nNow() - nr.t0, green: N_GREEN }, nr),
+  drawOverlay(ctx, ox, oy, t, api) {
+    nCardDraw(ctx, api);
+  },
   onA(api) {
     const { s } = nRaceState();
     if (nr.end || nr.foul >= 0 || nr.go >= 0 || s < 3.4) return true;
     if (s < N_GREEN) {
       nr.foul = s; // 青より前は赤(フライング)
-      if (nr.duel) api.later(2000, () => api.say(["フライング"], () => api.warp("strip", "start")));
-      else api.later(2000, () => nRaceReset(api));
+      api.later(2000, () => nRaceReset(api));
       return true;
     }
     nr.go = s;
@@ -1362,12 +1474,7 @@ const N_RACE = {
       if (kiIn || oppIn || timeout) {
         nr.end = kiIn && !oppIn ? "win" : "lose";
         nr.endT = s;
-        if (nr.duel) {
-          // 一騎打ち: 勝っても負けても、タイムを出してドラッグストリップへ戻る(また話しかければ、もう一度)
-          const lines = nr.end === "win" ? ["かち", ...nSlip(rd, (nr.go - N_GREEN).toFixed(3))] : [nr.foul >= 0 ? "フライング" : "まけ"];
-          if (nr.end !== "win" && nr.go >= 0) lines.push(`リアクション　${(nr.go - N_GREEN).toFixed(3)}`);
-          api.later(nr.end === "win" ? nSlipDelay(rd, s) : 2200, () => api.say(lines, () => api.warp("strip", "start")));
-        } else if (nr.end === "win") {
+        if (nr.end === "win") {
           const rt = (nr.go - N_GREEN).toFixed(3);
           const last = nr.round === N_ROUNDS.length - 1;
           api.later(nSlipDelay(rd, s), () => {
@@ -1379,12 +1486,12 @@ const N_RACE = {
                 }), { full: true });
             } else {
               api.say([`タイム　スリップ`, ...nSlip(rd, rt), `つぎは　${N_ROUNDS[nr.round + 1].name}`], () => {
-                api.setFlag(nr.round === 0 ? "nrR1" : "nrR2");
-                nRaceReset(api);
+                api.setFlag("nrRound", nr.round + 1);
+                nCardShow(api, nr.round + 1, () => nRaceReset(api)); // 対戦カード(D367)
               });
             }
           });
-        } else if (!nr.duel) api.later(2200, () => nRaceReset(api)); // 負けたら、その回からやり直し
+        } else api.later(2200, () => nRaceReset(api)); // 負けたら、その回からやり直し
       }
     }
     if (nr.repT < 0) {
