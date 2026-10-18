@@ -226,6 +226,9 @@ const N_PASS = nMap("pass", 28, 12, {
 // B ドライブイン跡(野犬のたまり場)。ダイナーの戸(北の建物の真ん中)から中へ入れる。みとんの車箪笥は駐車場の東(家なので)
 // みとんに話しかけると、車箪笥の引き出しからぼぎカーが出て、炎を塗ってくれる(一枚絵 v_custom、仮)。そのあと野犬たちは直線へ
 const nAtStrip = (api) => api.flag("custom");
+// 車箪笥とみとんは、カスタムの場面のあともドライブイン跡に残り、きーがストリップへ行ったらストリップだけにいる
+// (ドライブイン跡とストリップの両方にいて、別の個体に見えないように。作者「ダイナーの前のミトンと車箪笥はずっといると、コースにいる個体と別にみえないか」)
+const nMovedToStrip = (api) => api.flag("custom") && api.flag("stripSeen");
 const N_DRIVEIN = nMap("drivein", 28, 14, {
   spawns: {
     west: { x: 1.2 * T, y: 8.5 * T, facing: "east" },
@@ -247,8 +250,9 @@ const N_DRIVEIN = nMap("drivein", 28, 14, {
     nSprite("toribogi", "tori_s", 5.2 * T, 11.3 * T, 64, 86, { hidden: nAtStrip, solid: { w: 52, h: 22, dy: -10 }, range: 56, interact: nTalk("toribogi") }),
     nSprite("akabeko", "akabeko_s", 16.6 * T, 11.2 * T, 44, 41, { hidden: nAtStrip, shake: true, solid: { w: 40, h: 22, dy: -10 }, range: 56, interact: nTalk("akabeko") }),
     nSprite("kokeshi", "kokeshi_s", 19.6 * T, 11.2 * T, 25, 56, { hidden: nAtStrip, solid: { w: 22, h: 14, dy: -7 }, range: 50, interact: nTalk("kokeshi") }),
-    nSprite("tansu", "tansu_w", 23.2 * T, 10.4 * T, 118, 89, { shake: true, solid: { w: 108, h: 26, dy: -13 }, range: 70, interact: nTalk("tansu") }),
+    nSprite("tansu", "tansu_w", 23.2 * T, 10.4 * T, 118, 89, { hidden: nMovedToStrip, shake: true, solid: { w: 108, h: 26, dy: -13 }, range: 70, interact: nTalk("tansu") }),
     nSprite("miton", "miton_s", 26.2 * T, 10.2 * T, 36, 66, {
+      hidden: nMovedToStrip, // カスタムのあと、きーがストリップへ行ったら、車箪笥といっしょにストリップだけにいる
       solid: { w: 24, h: 14, dy: -7 },
       range: 50,
       interact(api) {
@@ -407,6 +411,7 @@ const N_STRIP = nMap("strip", 28, 12, {
     finish: { x: 10.2 * T, y: 7.8 * T, facing: "west" },
   },
   onEnter(api) {
+    if (api.flag("custom")) api.setFlag("stripSeen");
     if (api.flag("won") && !api.hasItem("クラブの札")) {
       api.freeze(3.4);
       api.later(500, () => api.bubble("akabeko", N_VOICE.akabeko, 1600));
@@ -606,7 +611,7 @@ const N_FLAME = {
   rcs_aka: [[56, 64, -1, 0.15]],
   rc_aka_back: [[20, 49, 0, 0], [21, 53, 0, 0], [22, 57, 0, 0], [73, 49, 0, 0], [72, 53, 0, 0], [71, 57, 0, 0]], // 胴の左右の横腹の外の口 6 つから手前へ(D357)
   rcs_pon: [[18, 33, -0.6, -1], [32, 34, -0.6, -1], [44, 34, -0.6, -1], [55, 35, -0.6, -1]],
-  rc_pon_back: [[25, 43, 0, 0], [23, 49, 0, 0], [21, 54, 0, 0], [18, 63, 0, 0], [149, 43, 0, 0], [151, 49, 0, 0], [153, 54, 0, 0], [156, 63, 0, 0]], // 左右 4 本ずつの口がこちらを向く(D361)
+  rc_pon_back: [[25, 43, -0.6, -1], [23, 49, -0.6, -1], [21, 54, -0.6, -1], [18, 63, -0.6, -1], [149, 43, 0.6, -1], [151, 49, 0.6, -1], [153, 54, 0.6, -1], [156, 63, 0.6, -1]], // 左右 4 本ずつ。炎は管の傾き(外へ 20、上へ 32)に合わせて V 字に(D361、作者「マフラーの角度に合うようにV字に」)
   rcs_kokeshi: [[8, 62, -1, -0.35]],
   rc_kokeshi_back: [[5, 66, 0, 0], [29, 66, 0, 0]],
 };
@@ -814,24 +819,67 @@ const nRaceSound = (st0, cam) => {
   A.set({ rpm, eng, squeal, squealKi, wind, oppPan, kiPan, oppVol, kiVol, crackle });
 };
 // 白煙(うしろへ流れて広がり、消える)
-const nRcPuffs = [];
-const nRcPuff = (x, y, vx) => nRcPuffs.push({ x, y, t0: nNow(), vx: vx - 10 - Math.random() * 30, life: 0.8 + Math.random() * 0.6 });
-const nDrawRcPuffs = (ctx, ox, oy, cam) => {
+// ---- バーンナウトの煙(D362、作者「バーンナウトの煙、自然な表現にできるか」todo 93 の A) ----
+// 1 つの煙 = ふちのくっきりした丸 3〜5 個のかたまり。明るい・ふつう・影の 3 色(左上が明るい)。
+// 出たときは速く、空気の抵抗で遅くなり、少し上がりながら流れて大きくなる。薄れるときはドットを間引く(4×4 の網目で 4 段)
+const N_SMOKE_TONES = ["248,246,240", "218,214,206", "172,168,162"];
+let nSmokePat = null;
+const nSmokePatterns = (ctx) => {
+  if (nSmokePat) return nSmokePat;
+  const B = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+  nSmokePat = N_SMOKE_TONES.map((c) =>
+    [1, 2, 3, 4].map((lv) => {
+      const cv = document.createElement("canvas");
+      cv.width = cv.height = 4;
+      const g = cv.getContext("2d");
+      g.fillStyle = `rgb(${c})`;
+      for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) if (B[y][x] < lv * 4) g.fillRect(x, y, 1, 1);
+      return ctx.createPattern(cv, "repeat");
+    })
+  );
+  return nSmokePat;
+};
+const nSmokeNew = (x, y, vx, vy, f, rm) => {
+  const n = 3 + Math.floor(Math.random() * 3);
+  const blobs = [];
+  for (let i = 0; i < n; i++) blobs.push({ a: Math.random() * Math.PI * 2, d: 0.2 + Math.random() * 0.45, s: 0.5 + Math.random() * 0.4 });
+  return { x, y, vx, vy, f, t0: nNow(), life: 1.6 + Math.random() * 0.9, r0: 3 + Math.random() * 2, rm: rm * (0.8 + Math.random() * 0.4), blobs, spin: (Math.random() - 0.5) * 1.6 };
+};
+// list の煙を描く。sx(p, x) で画面の x にする(横の画面はカメラを引く)
+const nSmokeDraw = (ctx, list, sx, oy) => {
   const now = nNow();
-  for (let k = nRcPuffs.length - 1; k >= 0; k--) {
-    const p = nRcPuffs[k];
-    const u = (now - p.t0) / p.life;
-    if (u >= 1) {
-      nRcPuffs.splice(k, 1);
-      continue;
+  const pats = nSmokePatterns(ctx);
+  const k = 2.4; // 空気の抵抗
+  for (let i = list.length - 1; i >= 0; i--) if (now - list[i].t0 >= list[i].life) list.splice(i, 1);
+  for (const p of list) {
+    const t = now - p.t0;
+    const u = t / p.life;
+    const e = (1 - Math.exp(-k * t)) / k;
+    const cx = sx(p, p.x + p.vx * e);
+    const cy = oy + p.y + p.vy * e - 10 * p.f * t;
+    const r = (p.r0 + (p.rm - p.r0) * (1 - Math.exp(-1.8 * t))) * p.f;
+    const lv = u < 0.45 ? 3 : u < 0.65 ? 2 : u < 0.82 ? 1 : 0;
+    for (let tone = 2; tone >= 0; tone--) {
+      ctx.fillStyle = pats[tone][lv];
+      for (const b of p.blobs) {
+        const a = b.a + p.spin * t;
+        const bx = cx + Math.cos(a) * b.d * r;
+        const by = cy + Math.sin(a) * b.d * r * 0.7;
+        const br = b.s * r;
+        if (tone === 2) nDisk(ctx, Math.round(bx + 1), Math.round(by + br * 0.25), Math.max(1, Math.round(br)));
+        else if (tone === 1) nDisk(ctx, Math.round(bx), Math.round(by), Math.max(1, Math.round(br * 0.9)));
+        else nDisk(ctx, Math.round(bx - br * 0.25), Math.round(by - br * 0.3), Math.max(1, Math.round(br * 0.5)));
+      }
     }
-    const r = 5 + u * 18;
-    ctx.fillStyle = `rgba(232, 228, 220, ${0.45 * (1 - u)})`;
-    ctx.beginPath();
-    ctx.arc(ox + p.x + p.vx * u - cam, oy + p.y - u * 16, r, 0, Math.PI * 2);
-    ctx.fill();
   }
 };
+// 横の画面の煙(x は道の上の位置。vx はうしろへ噴き出す速さ)
+const nRcPuffs = [];
+const nRcPuff = (x, y, vx) => {
+  if (nRcPuffs.length > 140) return;
+  nRcPuffs.push(nSmokeNew(x, y, vx - 30 - Math.random() * 70, -10 - Math.random() * 25, 1, 18));
+};
+const nDrawRcPuffs = (ctx, ox, oy, cam) => nSmokeDraw(ctx, nRcPuffs, (p, x) => ox + x - cam, oy);
 // 横向きの絵を、鼻先 fx(画面)、地面 gy に置く。lift = うしろのタイヤを軸に前を上げる角度(ウィリー)
 const nDrawSide = (ctx, im, fx, gy, shake, lift) => {
   if (!im) return null;
@@ -886,25 +934,13 @@ const nAt = (lane, d) => {
   const f = nScale(d);
   return { x: NR_VP.x + (lane - NR_VP.x) * f, y: NR_VP.y + (NR_CAR_Y - NR_VP.y) * f, f };
 };
-// 白煙(画面の上で広がって消える)
+// うしろからの画面の煙(f は遠さの倍率。タイヤから左右と上へ噴き出す)
 const nRrPuffs = [];
-const nRrPuff = (x, y, f) => nRrPuffs.push({ x, y, f, t0: nNow(), vx: (Math.random() - 0.5) * 40 * f, life: 0.9 + Math.random() * 0.5 });
-const nDrawRrPuffs = (ctx, ox, oy) => {
-  const now = nNow();
-  for (let k = nRrPuffs.length - 1; k >= 0; k--) {
-    const p = nRrPuffs[k];
-    const u = (now - p.t0) / p.life;
-    if (u >= 1) {
-      nRrPuffs.splice(k, 1);
-      continue;
-    }
-    const r = (6 + u * 16) * p.f;
-    ctx.fillStyle = `rgba(232, 228, 220, ${0.4 * (1 - u)})`;
-    ctx.beginPath();
-    ctx.arc(ox + p.x + p.vx * u, oy + p.y - u * 22 * p.f, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
+const nRrPuff = (x, y, f) => {
+  if (nRrPuffs.length > 140) return;
+  nRrPuffs.push(nSmokeNew(x, y, (Math.random() - 0.5) * 90 * f, (-15 - Math.random() * 30) * f, f, 20));
 };
+const nDrawRrPuffs = (ctx, ox, oy) => nSmokeDraw(ctx, nRrPuffs, (p, x) => ox + x, oy);
 const nDrawCar = (ctx, im, ox, oy, lane, d, shake, lift) => {
   if (!im) return null;
   const { x, y, f } = nAt(lane, d);
@@ -955,7 +991,7 @@ const nDrawRear = (ctx, ox, oy, get, api, st0) => {
       // 線: 画面の左下の外(峠のドラム缶)から、ぽんぽんカーのエンジンの右へ
       nCable(ctx, ox - 30, oy + 310, ox + r.x + r.w * 0.35, oy + r.y - r.h * 0.55, st0.taut > 0 ? 0 : back > 0 ? 6 : Math.max(4, 60 * (1 - opp / N_RACE_D)), { taut: st0.taut > 0 });
     }
-    if ((burn || (st > 0.2 && st < 1.0)) && Math.random() < 0.35 && r.f > 0.25) {
+    if ((burn || (st > 0.2 && st < 1.0)) && Math.random() < 0.6 && r.f > 0.25) {
       nRrPuff(r.x - r.w * 0.38, r.y - 4 * r.f, r.f);
       nRrPuff(r.x + r.w * 0.38, r.y - 4 * r.f, r.f);
     }
@@ -980,7 +1016,7 @@ const nDrawRear = (ctx, ox, oy, get, api, st0) => {
       const footY = y - bh + 12 * f;
       ctx.drawImage(stick, Math.round(ox + x - w / 2), Math.round(oy + footY - h + shake), Math.round(w), Math.round(h));
     }
-    if (burn && Math.random() < 0.3) {
+    if (burn && Math.random() < 0.55) {
       nRrPuff(r.x - r.w * 0.42, r.y - 4, r.f);
       nRrPuff(r.x + r.w * 0.42, r.y - 4, r.f);
     }
@@ -1149,7 +1185,7 @@ const N_RACE = {
       }
       if (back > 0 && back < 0.9 && Math.random() < 0.3) nRcPuff(r.x0 - ox + cam + 60, N_GY.opp - 10, 30);
     }
-    if (r && (burn || (st > 0.1 && st < 0.9)) && Math.random() < 0.45) nRcPuff(r.x0 - ox + cam + 22, N_GY.opp - 6, -40);
+    if (r && (burn || (st > 0.1 && st < 0.9)) && Math.random() < 0.7) nRcPuff(r.x0 - ox + cam + 22, N_GY.opp - 6, -40);
     // ぼぎカー(手前の車線)ときー
     const kim = get("rcs_bogi");
     const kfx = ox + N_SX + ki * N_PX - cam;
@@ -1164,7 +1200,7 @@ const N_RACE = {
         const ky = standing ? kr.y0 + 20 : kr.y0 + 22;
         ctx.drawImage(im, kx, ky - im.height);
       }
-      if (burn && Math.random() < 0.5) nRcPuff(kr.x0 - ox + cam + 26, N_GY.ki - 6, -60);
+      if (burn && Math.random() < 0.7) nRcPuff(kr.x0 - ox + cam + 26, N_GY.ki - 6, -60);
     }
     nDrawRcPuffs(ctx, ox, oy, cam);
     // 手前の信号の柱(スタートの線の少し先)
