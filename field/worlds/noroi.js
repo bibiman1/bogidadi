@@ -245,7 +245,7 @@ const N_DRIVEIN = nMap("drivein", 28, 14, {
     kWall(22 * T, 0, 28 * T, 150), // 北東の砂地(サボテン、矢印の看板)は景色。背景の絵の物の奥に回りこまないように、ふさぐ
     nSprite("ponpon", "ponpon_s", 10.6 * T, 11.2 * T, 65, 60, { hidden: nAtStrip, shake: true, solid: { w: 56, h: 22, dy: -10 }, range: 56, interact: nTalk("ponpon") }),
     nSprite("toribogi", "tori_s", 5.2 * T, 11.3 * T, 64, 86, { hidden: nAtStrip, solid: { w: 52, h: 22, dy: -10 }, range: 56, interact: nTalk("toribogi") }),
-    nSprite("akabeko", "akabeko_s", 16.6 * T, 11.2 * T, 46, 50, { hidden: nAtStrip, shake: true, solid: { w: 40, h: 22, dy: -10 }, range: 56, interact: nTalk("akabeko") }),
+    nSprite("akabeko", "akabeko_s", 16.6 * T, 11.2 * T, 44, 41, { hidden: nAtStrip, shake: true, solid: { w: 40, h: 22, dy: -10 }, range: 56, interact: nTalk("akabeko") }),
     nSprite("kokeshi", "kokeshi_s", 19.6 * T, 11.2 * T, 25, 56, { hidden: nAtStrip, solid: { w: 22, h: 14, dy: -7 }, range: 50, interact: nTalk("kokeshi") }),
     nSprite("tansu", "tansu_w", 23.2 * T, 10.4 * T, 118, 89, { shake: true, solid: { w: 108, h: 26, dy: -13 }, range: 70, interact: nTalk("tansu") }),
     nSprite("miton", "miton_s", 26.2 * T, 10.2 * T, 36, 66, {
@@ -465,7 +465,7 @@ const N_STRIP = nMap("strip", 28, 12, {
     nSprite("tansu", "tansu_e", 19.4 * T, 4.4 * T, 118, 89, { hidden: (api) => !nAtStrip(api), shake: true, range: 70, interact: nDuelOr("tansu") }),
     nSprite("miton", "miton_s", 22.4 * T, 4.4 * T, 36, 66, { hidden: (api) => !nAtStrip(api), range: 50, interact: (api) => api.bubble("miton", "……", 1400) }),
     nSprite("ponpon", "ponpon_e", 7.6 * T, 5.25 * T, 80, 59, { hidden: (api) => !nAtStrip(api), shake: true, range: 56, interact: nDuelOr("ponpon") }),
-    nSprite("akabeko", "akabeko_e", 7.6 * T, 6.9 * T, 67, 46, {
+    nSprite("akabeko", "akabeko_e", 7.6 * T, 6.9 * T, 83, 49, {
       hidden: (api) => !nAtStrip(api),
       shake: true,
       solid: { w: 58, h: 16, dy: -8 },
@@ -604,7 +604,7 @@ const nProtest = (st0) => {
 // 車箪笥は絵に排気管が見えない、とりぼぎかーはジェットなので、なし
 const N_FLAME = {
   rcs_aka: [[56, 64, -1, 0.15]],
-  rc_aka_back: [[27, 90, 0, 0], [32, 92, 0, 0], [37, 94, 0, 0], [65, 90, 0, 0], [60, 92, 0, 0], [55, 94, 0, 0]], // 胴の下、後輪の内がわの口 6 つ全部から手前へ(D355、D356)
+  rc_aka_back: [[20, 49, 0, 0], [21, 53, 0, 0], [22, 57, 0, 0], [73, 49, 0, 0], [72, 53, 0, 0], [71, 57, 0, 0]], // 胴の左右の横腹の外の口 6 つから手前へ(D357)
   rcs_pon: [[18, 33, -0.6, -1], [32, 34, -0.6, -1], [44, 34, -0.6, -1], [55, 35, -0.6, -1]],
   rc_pon_back: [[27, 31, -0.7, -1], [145, 31, 0.7, -1]],
   rcs_kokeshi: [[8, 62, -1, -0.35]],
