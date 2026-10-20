@@ -985,7 +985,7 @@ const KN_SANCHO = {
         const mx = ox + KN_WINDOW.x;
         const my = oy + KN_WINDOW.y;
         // 口の中の焼けたピザ(まだ取り出していないとき)と、細い煙
-        const inside = api.flag("gone") && !api.hasItem("焼けたピザ") && knPeelT0 < 0;
+        const inside = api.flag("gone") && !api.flag("pizza") && knPeelT0 < 0;
         if (inside) {
           knPizza(ctx, mx, my + 1, 6, "burnt");
           for (let k = 0; k < 2; k++) {
@@ -1017,7 +1017,8 @@ const KN_SANCHO = {
         knEll(ctx, ex, ey, 6, 3, "#c4965f");
         if (el >= P.in - 0.1) knPizza(ctx, ex, ey - 1, 6, "burnt");
       },
-      canInteract: (api) => api.flag("gone") && api.flag("peel") && !api.hasItem("焼けたピザ") && knPeelT0 < 0,
+      // 取り出したかは、持ち物ではなく旗で見る(前の版で持ち帰った電池が焼けたピザに替わっていると、持ち物で見ると、ピールもピザも出なかった)
+      canInteract: (api) => api.flag("gone") && api.flag("peel") && !api.flag("pizza") && knPeelT0 < 0,
       interact(api) {
         api.face("east");
         knPeelT0 = knNow();
@@ -1027,7 +1028,8 @@ const KN_SANCHO = {
         api.later(KN_PEEL.back * 1000, () => {
           knPeelT0 = -1;
           api.hold("ic_pizza", 1.8, () => {
-            api.giveItem("焼けたピザ");
+            api.setFlag("pizza");
+            if (!api.hasItem("焼けたピザ")) api.giveItem("焼けたピザ");
             api.clear();
           });
         });
