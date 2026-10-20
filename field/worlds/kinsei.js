@@ -11,7 +11,7 @@
 //       → 作業台に残ったピザピールを持って、さかいの手前から口へのばし、焼けたピザを取り出す(D383。電池はなくした D380)→ 帰る条件。西から帰る
 //       山頂の百葉箱を調べると、こわれた温度計の一枚絵(D382)
 // 向き(D148): きーは左(西)から登り、金星は右(東)のはし。図: docs/assets/kinsei/plan/(配置図 K2、絵コンテ K3)、三面図 K1(sanmen/venera7.py、第 3 版)
-const knS = { phase: "idle", t0: 0, walkT0: -1, cookT0: -1, kx: 0 };
+const knS = { phase: "idle", t0: 0, walkT0: -1, cookT0: -1, setupT0: -1, goneT0: -1, kx: 0 };
 const knNow = () => performance.now() / 1000;
 const KN_EDGE = 14.6 * T; // 金星のさかい(山頂)
 // ベネラ 7 号の絵(venera.png)の、足もとから口のまん中までのずれ(絵を替えたら測りなおす)
@@ -158,6 +158,8 @@ const knDraw = (ctx, im, x, y, o = {}) => {
   } else ctx.drawImage(src, dx, dy);
   ctx.restore();
 };
+// 撮影隊の向き(D389): 仮の絵の左右反転(kikikori_l、goron_l)を、向きで使い分ける。dir は 1 = 右(東)、-1 = 左(西)
+const knCrew = (api, key, dir) => api.image(dir < 0 ? `${key}_l` : key);
 const knLerp = (a, b, u) => a + (b - a) * Math.max(0, Math.min(1, u));
 // 道すじ(点の列)の上を u(0〜1)だけ進んだ所
 const knAlong = (pts, u) => {
@@ -289,7 +291,7 @@ const KN_SANDO = {
           y -= Math.abs(Math.sin(t * 9)) * 1.5;
           flip = false;
         }
-        knDraw(ctx, api.image("goron"), x, y, { flip });
+        knDraw(ctx, knCrew(api, "goron", flip ? -1 : 1), x, y);
       },
     }),
     knImg("kikikori", 5.6 * T, 6.0 * T, {
@@ -341,14 +343,31 @@ const KN_SANDO = {
 // 時刻(ロケが始まってからの秒)。カチンコ → こねる → 丸める → 押し広げる → 放り投げて回す ×3 → ソース → チーズ → バジル → 予報 → 撮影隊は外へ → きこりが飛び出す
 const KN_COOK = { clap: 1.0, knead: 3.0, ball: 5.0, press: 7.0, toss1: 9.0, toss3: 13.0, sauce: 16.0, cheese: 18.0, basil: 20.0, radio: 23.5, crew: 25.0, bolt: 26.0, end: 26.4 };
 const KN_TABLE = { x: 7 * T, y: 4.45 * T }; // 作業台の足もと
+const KN_TV = { x: 10.1 * T, y: 3.45 * T }; // テレビの足もと(北の壁ぎわ、戸棚の左)
+const KN_TV_SCREEN = { x: 6, y: 19, w: 29, h: 19 }; // テレビの絵の中の画面(左上と大きさ。絵を替えたら測りなおす)
 const KN_PZ = { x: 7 * T, y: 4.45 * T - 21 }; // 作業台の上のピザの中心
 const KN_KIKORI_IN = { x: 7 * T, y: 3.62 * T }; // 台の向こうのきこり
 const KN_DOOR_IN = { x: 6.5 * T, y: 9.2 * T };
 const knCookEl = () => (knS.cookT0 < 0 ? -1 : knNow() - knS.cookT0);
+// 木箱を置く → 暗転して設営(D389): 暗いあいだに、照明が立ち、きーはカメラのうしろへ(カメラに映らない)。明けるとカチンコ
+const KN_SETUP = { dark: 0.5, light: 1.3, end: 1.8 };
+const KN_KI_BEHIND = { x: 4.9 * T, y: 8.0 * T }; // カメラ(ききこり)の左うしろ
+const knSetupStart = (api) => {
+  knS.setupT0 = knNow();
+  api.freeze(KN_SETUP.end + KN_COOK.end + 0.3);
+  api.later(KN_SETUP.dark * 1000 + 100, () => {
+    api.place(KN_KI_BEHIND.x, KN_KI_BEHIND.y);
+    api.face("north");
+  });
+  api.later(KN_SETUP.end * 1000, () => {
+    knS.setupT0 = -1;
+    knCookStart(api);
+  });
+};
+const knSetupEl = () => (knS.setupT0 < 0 ? -1 : knNow() - knS.setupT0);
 const knCookStart = (api) => {
   knS.cookT0 = knNow();
   api.freeze(KN_COOK.end + 0.2);
-  api.face("north");
   api.later(300, () => api.sfx("knock")); // カチンコ
   const cx = KN_PZ.x;
   const cy = KN_PZ.y;
@@ -375,45 +394,43 @@ const KN_NAKA = {
   spawns: { door: { x: 6.5 * T, y: 8.3 * T, facing: "north" } },
   onEnter(api) {
     // 途中で出ていたら、木箱は台の上。ロケをはじめからやり直す
-    if (api.flag("placed") && !api.flag("dashed")) api.later(400, () => knCookStart(api));
+    if (api.flag("placed") && !api.flag("dashed")) api.later(400, () => knSetupStart(api));
   },
-  drawOverlay(ctx, ox, oy, t) {
+  drawOverlay(ctx, ox, oy, t, api) {
     // 窓の外の嵐: ときどき稲光が部屋を白く照らす
     const f = (t * 0.37) % 7;
     if (f < 0.12 || (f > 0.2 && f < 0.26)) {
       ctx.fillStyle = "rgba(236, 240, 255, 0.18)";
       ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     }
-    // カチンコ(番組名「ぼぎだぢクッキング」。ごろんが鳴らす)
+    // 暗転と設営(D389)
+    const se = knSetupEl();
+    if (se >= 0) {
+      const a = se < KN_SETUP.dark ? se / KN_SETUP.dark : se < KN_SETUP.light ? 1 : Math.max(0, 1 - (se - KN_SETUP.light) / (KN_SETUP.end - KN_SETUP.light));
+      ctx.fillStyle = `rgba(0, 0, 0, ${a})`;
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    }
+    // カチンコ(番組名「ぼぎだぢクッキング」。ごろんが鳴らす)。絵は PixelLab の板と拍子木、字は板に書いてある(D389)
     const el = knCookEl();
-    if (el >= 0 && el < KN_COOK.clap) {
-      const s = ctx.getTransform().a;
+    const board = api && api.image("k_clap_board");
+    const stick = api && api.image("k_clap_stick");
+    if (el >= 0 && el < KN_COOK.clap && board && stick) {
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.imageSmoothingEnabled = false;
       const W = ctx.canvas.width;
       const H = ctx.canvas.height;
-      const bw = Math.round(W * 0.42);
-      const bh = Math.round(bw * 0.62);
+      const k = Math.max(1, Math.floor((W * 0.45) / board.width)); // 画面の半分弱、整数倍で
+      const bw = board.width * k;
+      const bh = board.height * k;
       const bx = Math.round((W - bw) / 2);
-      const by = Math.round((H - bh) / 2) + 20;
-      ctx.fillStyle = "#1c1c1e";
-      ctx.fillRect(bx, by, bw, bh);
-      ctx.fillStyle = "#f2f0ea";
-      ctx.fillRect(bx + 8, by + bh * 0.42, bw - 16, 3);
-      // 上の拍子木: はじめ開いていて、0.3 秒で閉じる
+      const by = Math.round((H - bh) / 2) + 10 * k;
+      ctx.drawImage(board, bx, by, bw, bh);
+      // 拍子木: はじめ開いていて、0.3 秒で閉じる。左はしの留め金が軸
       const a = el < 0.3 ? -0.5 * (1 - el / 0.3) : 0;
-      ctx.translate(bx, by);
+      ctx.translate(bx + 6 * k, by);
       ctx.rotate(a);
-      for (let k = 0; k < 8; k++) {
-        ctx.fillStyle = k % 2 ? "#f2f0ea" : "#1c1c1e";
-        ctx.fillRect((k * bw) / 8, -28, bw / 8 + 1, 26);
-      }
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      if (window.bogiPix) {
-        const ts = 2; // 寄りのカメラでも板からはみ出さない大きさ
-        const tw = window.bogiPix.width("ぼぎだぢクッキング") * ts;
-        window.bogiPix.text(ctx, "ぼぎだぢクッキング", Math.round(W / 2 - tw / 2), Math.round(by + bh * 0.62), ts, "#f2f0ea");
-      }
+      ctx.drawImage(stick, -6 * k, -stick.height * k, stick.width * k, stick.height * k);
       ctx.restore();
     }
   },
@@ -471,7 +488,7 @@ const KN_NAKA = {
         }
         api.setFlag("placed");
         api.sfx("item");
-        knCookStart(api);
+        knSetupStart(api);
       },
       canInteract: (api) => (api.flag("boxed") && !api.flag("placed")) || (api.flag("dashed") && !api.flag("peel")),
     },
@@ -552,11 +569,66 @@ const KN_NAKA = {
           x = knLerp(sx, KN_DOOR_IN.x - this.x + sx, u);
           y = knLerp(sy, KN_DOOR_IN.y - this.y + sy, u) - Math.abs(Math.sin(el * 9)) * 1.5;
         }
-        knDraw(ctx, api.image("kikikori"), x, y);
+        knDraw(ctx, knCrew(api, "kikikori", el >= KN_COOK.radio ? -1 : 1), x, y); // 台の方(東)を向いて撮る。戸口へは西へ
+      },
+    },
+    {
+      // ブラウン管のテレビ(D389): 撮った映像、「ぼぎだぢクッキング」のタイトル画がちらつく。調べると一枚絵
+      id: "tv",
+      x: KN_TV.x,
+      y: KN_TV.y,
+      w: 1,
+      h: 1,
+      headY: 44,
+      range: 44,
+      solid: { w: 40, h: 8, dy: -4 },
+      hidden: (api) => !api.image("k_tv"), // 絵ができるまで出さない
+      draw(ctx, sx, sy, t, api) {
+        const im = api.image("k_tv");
+        if (!im) return;
+        knDraw(ctx, im, sx, sy);
+        // 画面のちらつき(走査線のような横すじと、明るさのゆれ)
+        const x0 = Math.round(sx - im.width / 2) + KN_TV_SCREEN.x;
+        const y0 = Math.round(sy - im.height) + KN_TV_SCREEN.y;
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.06 + 0.06 * Math.abs(Math.sin(t * 23))})`;
+        ctx.fillRect(x0, y0, KN_TV_SCREEN.w, KN_TV_SCREEN.h);
+        ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
+        const r = Math.floor(t * 30) % KN_TV_SCREEN.h;
+        ctx.fillRect(x0, y0 + r, KN_TV_SCREEN.w, 1);
+      },
+      interact: (api) => api.show("v_title"),
+    },
+    {
+      // 照明(D389、仮の絵): 暗転のあいだに立つ。作業台を照らす
+      id: "light",
+      x: 5.3 * T,
+      y: 4.1 * T,
+      w: 1,
+      h: 1,
+      hidden: (api) => !api.flag("placed") || (knSetupEl() >= 0 && knSetupEl() < KN_SETUP.dark),
+      draw(ctx, sx, sy, t, api) {
+        ctx.fillStyle = "#1e1e22";
+        ctx.fillRect(sx - 5, sy - 1, 11, 2); // 足
+        ctx.fillRect(sx - 1, sy - 30, 3, 30); // 柱
+        ctx.fillStyle = "#9a9aa2";
+        ctx.fillRect(sx - 5, sy - 37, 10, 8); // 灯具
+        ctx.fillStyle = "#1e1e22";
+        ctx.fillRect(sx - 5, sy - 37, 10, 1);
+        const on = knCookEl() >= 0 || knSetupEl() >= KN_SETUP.light;
+        ctx.fillStyle = on ? "#fff4cc" : "#8a8a8e";
+        ctx.fillRect(sx + 3, sy - 34, 2, 3); // 光る面(台の方 = 東)
+        if (on) {
+          const g = ctx.createRadialGradient(sx + 30, sy - 12, 2, sx + 30, sy - 12, 34);
+          g.addColorStop(0, "rgba(255, 244, 200, 0.22)");
+          g.addColorStop(1, "rgba(255, 244, 200, 0)");
+          ctx.fillStyle = g;
+          ctx.fillRect(sx - 6, sy - 48, 72, 72);
+        }
       },
     },
     {
       // ロケのあと(きこりが消えたあと)、撮影隊は中でピザを食べている(D388。「スタッフがおいしくいただきました」。言葉は出さない)
+      // D389: 撮った映像をテレビで見ながら。オロオロしてから中へ入るので、外にいるあいだは出さない
       // 作業台に何切れか欠けたピザ。ききこりとごろんが一切れずつ持って、もぐもぐ。話しかけると、もぐもぐが少し速くなるだけ
       id: "crewEat",
       x: KN_TABLE.x,
@@ -566,7 +638,7 @@ const KN_NAKA = {
       headY: 40,
       range: 70,
       fastUntil: 0,
-      hidden: (api) => !api.flag("gone"),
+      hidden: (api) => !api.flag("gone") || (knS.goneT0 >= 0 && knNow() - knS.goneT0 < KN_ORO.end),
       draw(ctx, sx, sy, t, api) {
         const fast = knNow() < this.fastUntil ? 2.2 : 1;
         // 台の上のピザ: 二切れ欠けている(欠けた所は台の色)
@@ -585,24 +657,24 @@ const KN_NAKA = {
           ctx.fill();
         }
         // ききこり(左)とごろん(右)。一切れずつ持って、もぐもぐ
-        const eat = (key, x, y, flip, ph, mouthY) => {
+        // テレビの前の撮影隊(D389): テレビの方を向いて、一切れずつ持って見ている(もぐもぐ)
+        const eat = (key, x, y, d, ph, mouthY) => {
           const chew = Math.floor((t * 6 * fast + ph) % 2); // 1 ドット上下
-          knDraw(ctx, api.image(key), x, y - chew, { flip });
-          // 口もとに一切れ(とがった方を口へ。耳が外がわ)
-          const hx = Math.round(x + (flip ? -8 : 8));
+          knDraw(ctx, knCrew(api, key, d), x, y - chew);
+          // 口の前に一切れ(耳が外がわ、とがった方が口へ)
+          const hx = Math.round(x + d * 9);
           const hy = Math.round(y - mouthY - chew);
-          const dir = flip ? 1 : -1; // 先の向き(口の方)
           for (let k = 0; k < 7; k++) {
             const w = 7 - k;
             ctx.fillStyle = k === 0 ? "#c99a5e" : "#c8402c";
-            ctx.fillRect(hx - dir * k - (dir > 0 ? 0 : 0), hy - Math.ceil(w / 2), 1, w);
+            ctx.fillRect(hx - d * k, hy - Math.ceil(w / 2), 1, w);
           }
           ctx.fillStyle = "#fbf6e6";
-          ctx.fillRect(hx - dir * 3, hy - 1, 1, 1);
-          ctx.fillRect(hx - dir * 2, hy + 1, 1, 1);
+          ctx.fillRect(hx - d * 3, hy - 1, 1, 1);
+          ctx.fillRect(hx - d * 2, hy + 1, 1, 1);
         };
-        eat("kikikori", sx - 2.1 * T, sy + 0.55 * T, false, 0, 26);
-        eat("goron", sx + 1.9 * T, sy + 0.5 * T, true, 1, 17);
+        eat("goron", sx + (KN_TV.x - 1.1 * T - this.x), sy + (KN_TV.y + 1.25 * T - this.y), 1, 1, 17);
+        eat("kikikori", sx + (KN_TV.x + 1.2 * T - this.x), sy + (KN_TV.y + 1.1 * T - this.y), -1, 0, 26);
       },
       interact() {
         this.fastUntil = knNow() + 1.5;
@@ -628,7 +700,7 @@ const KN_NAKA = {
           x = knLerp(sx, KN_DOOR_IN.x - this.x + sx, u);
           y = knLerp(sy, KN_DOOR_IN.y - this.y + sy, u) - Math.abs(Math.sin(el * 9)) * 1.5;
         }
-        knDraw(ctx, api.image("goron"), x, y, { flip: true });
+        knDraw(ctx, knCrew(api, "goron", -1), x, y); // 台の方(西)を向く。戸口へも西へ
       },
     },
   ],
@@ -642,6 +714,7 @@ const KN_PEEL = { reach: 0.8, in: 1.2, back: 2.0 }; // ピールをのばして�
 let knPeelT0 = -1;
 const KN_DOOR_OUT = { x: 5.35 * T, y: 3.75 * T };
 const knRunEl = () => (knS.phase === "run" ? knNow() - knS.t0 : -1);
+const KN_ORO = { oro: 4.0, end: 7.0 }; // きこりが消えてから: オロオロ / 戸口に着いて中へ
 const KN_SANCHO = {
   tile: T,
   bg: "#5e5a54",
@@ -667,6 +740,7 @@ const KN_SANCHO = {
       api.later(R.char * 1000 - 1500, () => api.sfx("whir"));
       api.later(R.melt * 1000, () => {
         knS.phase = "gone";
+        knS.goneT0 = knNow();
         api.setFlag("gone");
       });
       // 金星は、ほかの星と逆向きに、ゆっくり回っている。きーも、逆向きにくるっと回る(まわる D203。能力としてはやめ D226、回る姿だけが残る)
@@ -725,10 +799,31 @@ const KN_SANCHO = {
       y: 7.7 * T,
       w: 1,
       h: 1,
-      hidden: (api) => !api.flag("dashed") || api.flag("gone"), // きこりが消えたあとは、気象台の中でピザを食べている(D388)
+      // きこりが消えたあと(D389): 4 秒ほどオロオロ(左右に小走り、向きを変える)→ あきらめて戸口へ歩き、気象台の中へ
+      hidden: (api) => !api.flag("dashed") || (api.flag("gone") && (knS.goneT0 < 0 || knNow() - knS.goneT0 > KN_ORO.end)),
       draw(ctx, sx, sy, t, api) {
-        knDraw(ctx, api.image("kikikori"), sx, sy);
-        knDraw(ctx, api.image("goron"), sx + 1.2 * T, sy + 0.7 * T + 0 * Math.sin(t), { flip: false });
+        const el = api.flag("gone") ? knNow() - knS.goneT0 : -1;
+        const pts = [
+          ["kikikori", 0, 0, 0],
+          ["goron", 1.2 * T, 0.7 * T, 1.7],
+        ];
+        for (const [key, dx, dy, ph] of pts) {
+          let x = sx + dx;
+          let y = sy + dy;
+          let dir = 1; // 金星の方(東)を向いて準備
+          if (el >= 0 && el < KN_ORO.oro) {
+            const w = Math.sin(el * 3.1 + ph);
+            x += w * 0.7 * T;
+            y -= Math.abs(Math.sin(el * 11 + ph)) * 3;
+            dir = Math.cos(el * 3.1 + ph) >= 0 ? 1 : -1;
+          } else if (el >= KN_ORO.oro) {
+            const u = Math.min(1, (el - KN_ORO.oro) / (KN_ORO.end - KN_ORO.oro));
+            x = knLerp(x, sx - this.x + KN_DOOR_OUT.x, u);
+            y = knLerp(y, sy - this.y + KN_DOOR_OUT.y, u) - Math.abs(Math.sin(el * 8 + ph)) * 1.5;
+            dir = -1;
+          }
+          knDraw(ctx, knCrew(api, key, dir), x, y);
+        }
       },
     },
     // 見届け: きこりが消えたあと、ちりんの音が止むまでそばにいる(D189)

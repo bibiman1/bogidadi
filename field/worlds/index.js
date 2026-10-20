@@ -257,11 +257,11 @@ window.BOGI_WORLDS = {
     name: "きこりと金星",
     assetBase: "./assets/worlds/kinsei/",
     images: Object.fromEntries(
-      ["bg_sando", "bg_sancho", "bg_naka", "fg_sando", "fg_sancho", "kikori", "chirin", "t_sticker", "venera", "k_table", "k_crate", "k_peel", "k_peel_carry", "v_thermo"]
+      ["bg_sando", "bg_sancho", "bg_naka", "fg_sando", "fg_sancho", "kikori", "chirin", "t_sticker", "venera", "k_table", "k_crate", "k_peel", "k_peel_carry", "v_thermo", "k_tv", "v_title", "k_clap_board", "k_clap_stick", "kikikori_l", "goron_l"]
         .map((k) => [k, `${k}.png`])
         .concat([
           ["ki", "./assets/worlds/lake/ki_walk.png"],
-          ["kikikori", "./assets/worlds/banana/kikikori.png"], // 南極の撮影隊(D379)
+          ["kikikori", "./assets/worlds/banana/kikikori.png"], // 南極の撮影隊(D379)。左向きは kikikori_l、goron_l(仮の絵の反転 D389)
           ["goron", "./assets/worlds/banana/goron.png"],
         ])
     ),
@@ -283,6 +283,8 @@ window.BOGI_WORLDS = {
       knS.phase = api.flag("gone") ? "gone" : "idle";
       knS.walkT0 = -1;
       knS.cookT0 = -1;
+      knS.setupT0 = -1;
+      knS.goneT0 = -1;
     },
   },
   padre: {
