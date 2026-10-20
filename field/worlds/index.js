@@ -285,6 +285,10 @@ window.BOGI_WORLDS = {
       knS.cookT0 = -1;
       knS.setupT0 = -1;
       knS.goneT0 = -1;
+      knS.bakeT0 = -1;
+      knS.eatT0 = -1;
+      // 撮影隊がピザを焼く場面(D393)の前に出ていたら、そのあいだに焼き終えている(前の版の保存も同じ)
+      if (api.flag("gone") && !api.flag("baked")) api.setFlag("baked");
     },
   },
   padre: {
