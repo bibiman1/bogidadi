@@ -556,6 +556,60 @@ const KN_NAKA = {
       },
     },
     {
+      // ロケのあと(きこりが消えたあと)、撮影隊は中でピザを食べている(D388。「スタッフがおいしくいただきました」。言葉は出さない)
+      // 作業台に何切れか欠けたピザ。ききこりとごろんが一切れずつ持って、もぐもぐ。話しかけると、もぐもぐが少し速くなるだけ
+      id: "crewEat",
+      x: KN_TABLE.x,
+      y: KN_TABLE.y + 2,
+      w: 1,
+      h: 1,
+      headY: 40,
+      range: 70,
+      fastUntil: 0,
+      hidden: (api) => !api.flag("gone"),
+      draw(ctx, sx, sy, t, api) {
+        const fast = knNow() < this.fastUntil ? 2.2 : 1;
+        // 台の上のピザ: 二切れ欠けている(欠けた所は台の色)
+        const px = sx - 14;
+        const py = sy - 23;
+        knPizza(ctx, px, py, 14, "done");
+        ctx.fillStyle = "#96744f";
+        for (const [a0, a1] of [[-0.35, 0.45], [1.6, 2.4]]) {
+          ctx.beginPath();
+          ctx.moveTo(px, py - 0.5);
+          for (let k = 0; k <= 6; k++) {
+            const a = a0 + ((a1 - a0) * k) / 6;
+            ctx.lineTo(px + Math.cos(a) * 14, py - 0.5 + Math.sin(a) * 5.2);
+          }
+          ctx.closePath();
+          ctx.fill();
+        }
+        // ききこり(左)とごろん(右)。一切れずつ持って、もぐもぐ
+        const eat = (key, x, y, flip, ph, mouthY) => {
+          const chew = Math.floor((t * 6 * fast + ph) % 2); // 1 ドット上下
+          knDraw(ctx, api.image(key), x, y - chew, { flip });
+          // 口もとに一切れ(とがった方を口へ。耳が外がわ)
+          const hx = Math.round(x + (flip ? -8 : 8));
+          const hy = Math.round(y - mouthY - chew);
+          const dir = flip ? 1 : -1; // 先の向き(口の方)
+          for (let k = 0; k < 7; k++) {
+            const w = 7 - k;
+            ctx.fillStyle = k === 0 ? "#c99a5e" : "#c8402c";
+            ctx.fillRect(hx - dir * k - (dir > 0 ? 0 : 0), hy - Math.ceil(w / 2), 1, w);
+          }
+          ctx.fillStyle = "#fbf6e6";
+          ctx.fillRect(hx - dir * 3, hy - 1, 1, 1);
+          ctx.fillRect(hx - dir * 2, hy + 1, 1, 1);
+        };
+        eat("kikikori", sx - 2.1 * T, sy + 0.55 * T, false, 0, 26);
+        eat("goron", sx + 1.9 * T, sy + 0.5 * T, true, 1, 17);
+      },
+      interact() {
+        this.fastUntil = knNow() + 1.5;
+      },
+      canInteract: () => true,
+    },
+    {
       // ごろん(ディレクター): カチンコを鳴らす。できたら外へ
       id: "goron",
       x: 9.4 * T,
@@ -671,7 +725,7 @@ const KN_SANCHO = {
       y: 7.7 * T,
       w: 1,
       h: 1,
-      hidden: (api) => !api.flag("dashed"),
+      hidden: (api) => !api.flag("dashed") || api.flag("gone"), // きこりが消えたあとは、気象台の中でピザを食べている(D388)
       draw(ctx, sx, sy, t, api) {
         knDraw(ctx, api.image("kikikori"), sx, sy);
         knDraw(ctx, api.image("goron"), sx + 1.2 * T, sy + 0.7 * T + 0 * Math.sin(t), { flip: false });

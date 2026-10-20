@@ -32,7 +32,8 @@ const ST_CMDS = [
   { key: "sound", label: "おと" }, // BGM と効果音の大きさ(D195)
   { key: "save", label: "セーブ" }, // いる場所を記録する(D262、todo 55)。進み具合は前から自動で記録している
   // テストプレイ用: すべての条件を満たす(D294。灰色の字)。公開版では出さず、?debug のときだけ(D301)
-  ...(/[?&]debug\b/.test(location.search) ? [{ key: "grant", label: "テスト" }] : []),
+  // フラグ(D385): 断片の旗を一つずつ ON / OFF、断片をはじめから。これも ?debug のときだけ
+  ...(BOGI_DEBUG ? [{ key: "grant", label: "テスト" }, { key: "flags", label: "フラグ" }] : []),
   // はじめから(D94 のデバッグ用)は、タイトルで B を長押しする形に移した(D259)
 ];
 // きーの能力(とくぎ)。断片で習得する。新しい能力はここに 1 行足し、断片で api.learnAbility(id) を呼ぶ
@@ -43,7 +44,52 @@ const ABILITIES = [
   { id: "hashiru", text: "はしる", note: "おなじ　むきに　あるきつづける。" },
   { id: "funbaru", text: "ふんばる", note: "風の中で　つぶれて　はりつく。" },
 ];
+// フラグの画面(D385)で、はじめから並べる断片ごとの主な旗(名前: 説明)。保存に入っているほかの旗も並ぶ。
+// 名前だけのものは、コードの setFlag から拾った(説明はまだない)
+const ST_FLAGS = {
+  kinsei: { boxed: "木箱をもった", placed: "台に置いた(ロケ)", dashed: "きこりが飛び出した", peel: "ピールをもった", gone: "きこりが消えた", observed: "見届けた" },
+  lake: { ate: "", homeward: "", memory: "", saidHoutou: "", observed: "見届けた" },
+  haihei: { card: "", heard: "", prize: "", stand: "", observed: "見届けた" },
+  kasumi: { jump: "", observed: "見届けた" },
+  banana: { caught: "", chirinJoined: "", gotMango: "", observed: "見届けた" },
+  suzuki: { cartOff: "", charred: "", fallen: "", landing: "", launched: "", observed: "見届けた" },
+  takarabune: { airlock: "", cast: "", glowed: "", installed: "", running: "", sowing: "", observed: "見届けた" },
+  noroi: { custom: "", fudaKept: "", nrRound: "", ponponGone: "", seeOffDone: "", stripSeen: "", won: "", pinHigh: "", observed: "見届けた" },
+  padre: { ending_oneness: "", gone: "", taken: "", observed: "見届けた" },
+  bomber: { cap: "", loadSeen: "", ribbonBlown: "", observed: "見届けた" },
+};
+const stFlagWorld = () => (rpg.isHub ? stMenu.fw : rpg.worldId);
+function stFlagRows() {
+  const hub = window.BOGI_WORLDS[HUB];
+  // 懲罰空間では、先に断片を選ぶ
+  if (rpg.isHub && !stMenu.fw) return (hub.fragments || []).map((id) => ({ text: window.BOGI_WORLDS[id].name, pick: id }));
+  const w = stFlagWorld();
+  const names = Object.keys(ST_FLAGS[w] || {});
+  for (const k of Object.keys(gameState.flags)) if (k.startsWith(`${w}.`) && !names.includes(k.slice(w.length + 1))) names.push(k.slice(w.length + 1));
+  const rows = names.map((n) => {
+    const v = gameState.flags[`${w}.${n}`];
+    const on = !!v;
+    return { flag: n, text: n, mark: typeof v === "number" ? String(v) : on ? "ON" : "OFF", on, note: (ST_FLAGS[w] || {})[n] || null };
+  });
+  rows.push({ text: "この断片をはじめから", reset: true, note: "旗、終えたこと、持ち帰った物を消す" });
+  return rows;
+}
+// この断片をはじめから: その断片の旗、終えたこと、持ち帰った物(と謎解きの物)を消して、入りなおす
+function stFlagReset(w) {
+  const hub = window.BOGI_WORLDS[HUB];
+  for (const k of Object.keys(gameState.flags)) if (k.startsWith(`${w}.`)) delete gameState.flags[k];
+  gameState.cleared = gameState.cleared.filter((id) => id !== w);
+  const pz = hub.puzzleItems || {};
+  const sv = (hub.souvenirs || {})[w];
+  gameState.items = gameState.items.filter((t) => t !== sv && pz[t] !== w);
+  saveState();
+  if (!rpg.isHub && rpg.worldId === w) {
+    toggleStatus(false);
+    rpg.enter(window.BOGI_WORLDS[w]);
+  }
+}
 function stRows(key) {
+  if (key === "flags") return stFlagRows();
   const hub = window.BOGI_WORLDS[HUB];
   // どうぐ: いまいる断片の謎解きに使う物だけ(断片を出たら出さない。持ち帰った物は「おもいで」へ)
   if (key === "items") {
@@ -88,9 +134,12 @@ function renderStatus() {
   stCtx.fillRect(0, 0, 480, 300);
   // 左: コマンド
   stWindow(12, 12, 156, 118);
+  // デバッグのとき(コマンドが 6 つより多い)は、テストとフラグを右の列の下に置く(縦に 7 つは窓に入らない)
+  const cmdPos = (i) => (ST_CMDS.length > 6 && i >= 5 ? [118, 21 + (i - 2) * 17] : [42, 21 + i * 17]);
   ST_CMDS.forEach((c, i) => {
-    stText(c.label, 42, 21 + i * 17, c.key === "reset" || c.key === "grant" ? "#8a8a8a" : "#ffffff");
-    if (stMenu.cmd === i) stCursor(24, 24 + i * 17);
+    const [x, y] = cmdPos(i);
+    stText(c.label, x, y, c.key === "reset" || c.key === "grant" || c.key === "flags" ? "#8a8a8a" : "#ffffff");
+    if (stMenu.cmd === i) stCursor(x - 18, y + 3);
   });
   // 右: 要約(数だけ。いくつ増えてもあふれない)
   const frags = hub.fragments || [];
@@ -152,7 +201,7 @@ function renderStatus() {
     const pages = Math.max(1, Math.ceil(rows.length / ST_PAGE));
     const page = Math.floor(stMenu.cur / ST_PAGE);
     stWindow(12, 138, 456, 150);
-    stText(cmd.label, 28, 150);
+    stText(cmd.key === "flags" && stFlagWorld() ? `フラグ　${window.BOGI_WORLDS[stFlagWorld()].name}` : cmd.label, 28, 150, "#ffffff", 380);
     if (pages > 1) stText(`${page + 1}/${pages}`, 420, 150, "#8a8a8a");
     if (!rows.length) stText("なし", 50, 174, "#8a8a8a");
     rows.slice(page * ST_PAGE, page * ST_PAGE + ST_PAGE).forEach((r, i) => {
@@ -160,7 +209,7 @@ function renderStatus() {
       if (page * ST_PAGE + i === stMenu.cur) stCursor(28, ty + 2);
       if (r.done) stText("✓", 40, ty);
       stText(r.text, 58, ty, r.dim ? "#8a8a8a" : "#ffffff", 196);
-      if (r.mark) stText(r.mark, 258, ty, r.mark === "✦" ? "#ffe08a" : "#8a8a8a");
+      if (r.mark) stText(r.mark, 258, ty, r.mark === "✦" || r.mark === "ON" || /^\d/.test(r.mark) ? "#ffe08a" : "#8a8a8a");
       if (r.book) {
         const bim = stIcon("../props/bunko");
         if (bim && bim.complete) {
@@ -229,6 +278,7 @@ function statusInput(action) {
       if (k === "save") saveHere();
       stMenu.mode = k === "reset" || k === "sound" || k === "save" || k === "grant" ? k : "list";
       stMenu.cur = 0;
+      stMenu.fw = null;
     } else if (action === "b" || action === "c") return toggleStatus(false);
   } else if (stMenu.mode === "save") {
     stMenu.mode = "top"; // 「きろくしました」は、どのボタンでも閉じる
@@ -261,9 +311,28 @@ function statusInput(action) {
     else if (action === "down" && n) stMenu.cur = (stMenu.cur + 1) % n;
     else if (action === "left" && n) stMenu.cur = Math.max(0, stMenu.cur - ST_PAGE);
     else if (action === "right" && n) stMenu.cur = Math.min(n - 1, stMenu.cur + ST_PAGE);
-    else if (action === "b" || action === "c") stMenu.mode = "top"; // 一覧からは C でもひとつ戻る
+    else if (action === "a" && ST_CMDS[stMenu.cmd].key === "flags") {
+      // フラグ(D385): 断片を選ぶ / 旗を ON・OFF / この断片をはじめから
+      const r = stRows("flags")[stMenu.cur];
+      if (r && r.pick) {
+        stMenu.fw = r.pick;
+        stMenu.cur = 0;
+      } else if (r && r.reset) stFlagReset(stFlagWorld());
+      else if (r && r.flag) {
+        const k = `${stFlagWorld()}.${r.flag}`;
+        if (r.on) delete gameState.flags[k];
+        else gameState.flags[k] = true;
+        saveState();
+      }
+    } else if (action === "b" || action === "c") {
+      // 懲罰空間で断片を選んだあとは、断片えらびへ戻る
+      if (ST_CMDS[stMenu.cmd].key === "flags" && rpg.isHub && stMenu.fw) {
+        stMenu.cur = 0;
+        stMenu.fw = null;
+      } else stMenu.mode = "top"; // 一覧からは C でもひとつ戻る
+    }
   }
-  renderStatus();
+  if (statusOpen) renderStatus();
 }
 function toggleStatus(open = !statusOpen) {
   if (open && (story || transitioning || rpg.viewing)) return;

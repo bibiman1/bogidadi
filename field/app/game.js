@@ -2,6 +2,33 @@
 // field/app/ のファイルは index.html の順に読む(上のファイルで決めた名前を、下のファイルがそのまま使う)
 "use strict";
 
+// ---- デバッグ(D301、D385、D386) ----
+// URL の ?debug か、ゲームの中で 上上下下左右左右BA を入れたとき(この端末に覚える。もう一度入れると消える)
+const DEBUG_KEY = "bogidachi.debug";
+const BOGI_DEBUG = /[?&]debug\b/.test(location.search) || (() => {
+  try {
+    return localStorage.getItem(DEBUG_KEY) === "1";
+  } catch (e) {
+    return false;
+  }
+})();
+const CHEAT = ["up", "up", "down", "down", "left", "right", "left", "right", "b", "a"];
+let cheatPos = 0;
+// 上下左右と A・B を一つずつ受けとり、上上下下左右左右BA がそろったら、デバッグを入れる / 切って、読みこみなおす
+function cheatFeed(t) {
+  cheatPos = t === CHEAT[cheatPos] ? cheatPos + 1 : t === CHEAT[0] ? 1 : 0;
+  if (cheatPos < CHEAT.length) return;
+  cheatPos = 0;
+  try {
+    if (localStorage.getItem(DEBUG_KEY) === "1") localStorage.removeItem(DEBUG_KEY);
+    else localStorage.setItem(DEBUG_KEY, "1");
+  } catch (e) {
+    return;
+  }
+  if (window.bogiAudio) window.bogiAudio.sfx("chime");
+  setTimeout(() => location.reload(), 400);
+}
+
 // ---- 保存 ----
 const SAVE_KEY = "bogidachi.field.v1";
 const gameState = loadState();
@@ -119,7 +146,7 @@ const rpg = window.createBogiRPG({
   },
 });
 
-if (/[?&]debug\b/.test(location.search)) {
+if (BOGI_DEBUG) {
   window.bogiDebug = { rpg, gameState, enterWorld: (id) => rpg.enter(window.BOGI_WORLDS[id]) };
 }
 

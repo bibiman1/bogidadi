@@ -272,6 +272,12 @@ window.BOGI_WORLDS = {
     // 木箱(ピザの材料)を頭にのせて運ぶ: 押し付けられてから、作業台に置くまで(D380)
     carry: (api) => (api.flag("boxed") && !api.flag("placed") ? "k_crate" : api.flag("peel") && !api.hasItem("焼けたピザ") ? "k_peel_carry" : null),
     onEnterWorld(api) {
+      // 前の版(版 344 まで)の保存: きこりが山道から駆け出して消えた旗(dashed、gone)だけがあり、ロケの旗(boxed)がない。
+      // そのままだと、押し付けも、ロケも、ピールも起きない。ロケの流れ(D380)をはじめから遊べるように、旗を戻す(終えたことと見届けは残す)
+      if ((api.flag("dashed") || api.flag("gone")) && !api.flag("boxed")) {
+        api.setFlag("dashed", false);
+        api.setFlag("gone", false);
+      }
       // 途中で出ていたら、そのあいだに、きこりは金星の向こうへ消えている
       if (knS.phase === "run") api.setFlag("gone");
       knS.phase = api.flag("gone") ? "gone" : "idle";

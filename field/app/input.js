@@ -16,6 +16,11 @@ const KEY_MAP = {
 };
 
 window.addEventListener("keydown", (e) => {
+  // 上上下下左右左右BA(D386): どの画面でも数える
+  if (!e.repeat) {
+    const t = KEY_MAP[e.code] || (e.code === "KeyX" || e.code === "Escape" ? "b" : e.code === "Enter" || e.code === "Space" || e.code === "KeyZ" ? "a" : null);
+    if (t) cheatFeed(t);
+  }
   // 操作を止めているあいだ(B のスタッフロール D277)は、どのキーも受けつけない
   if (rpg.locked) {
     if (!e.code.startsWith("F")) e.preventDefault();
@@ -128,7 +133,12 @@ function setJoyFromPointer(e, rect) {
     // 押している所を丸で示す(8 方向のどれか。向きが変わったら小さく震える)
     updateJoyKnob(joyVec.x * R0 * 0.85, joyVec.y * R0 * 0.85);
     const d = Math.round(ang / (Math.PI / 4));
-    if (d !== joyDir) haptic();
+    if (d !== joyDir) {
+      haptic();
+      // 十字キーの上下左右も、上上下下左右左右BA に数える(ななめは数えない)
+      const t = { "-2": "up", 2: "down", 0: "right", 4: "left", "-4": "left" }[d];
+      if (t) cheatFeed(t);
+    }
     joyDir = d;
   } else if (isTouchDevice) joyDir = null;
 }
@@ -187,6 +197,7 @@ storyOverlay.addEventListener("click", () => {
 actionBtnA.addEventListener("pointerdown", (e) => {
   e.preventDefault();
   e.stopPropagation();
+  cheatFeed("a");
   if (rpg.locked) return rpg.lockedPress();
   haptic();
   if (watch.on) return toggleWatch(false);
@@ -208,6 +219,7 @@ actionBtnC.addEventListener("pointerdown", (e) => {
 actionBtnB.addEventListener("pointerdown", (e) => {
   e.preventDefault();
   e.stopPropagation();
+  cheatFeed("b");
   if (rpg.locked) return rpg.lockedPress();
   haptic();
   if (watch.on) return toggleWatch(false);

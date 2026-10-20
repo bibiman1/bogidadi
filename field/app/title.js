@@ -9,7 +9,7 @@
 const T32 = 32;
 const TITLE_CAM = { x: 22 * T32, y: 18.6 * T32, z: 0.27 }; // 扉からきーの部屋まで、10 の台座が一画面に入る引き
 const TITLE_ROW = 16.4; // 題を置く高さ(3 段と 2 段のあいだの、何もない帯)
-let skipTitle = /[?&]debug\b/.test(location.search);
+let skipTitle = BOGI_DEBUG;
 try {
   if (sessionStorage.getItem("bogidachi.skipTitle")) skipTitle = true;
   sessionStorage.removeItem("bogidachi.skipTitle");
