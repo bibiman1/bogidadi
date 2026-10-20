@@ -11,8 +11,8 @@ window.BOGI_WORLDS = {
     fragments: ["lake", "haihei", "kasumi", "banana", "suzuki", "takarabune", "noroi", "padre", "kinsei", "bomber"],
     fragmentTexts: Object.fromEntries(VOID_FRAGMENTS.map((f) => [f.id, f.text])),
     // おもいで(todo 32 の A): 断片を終えると持ち帰る物。ステータスの「おもいで」に、見届けたしるしと並べて出す
-    souvenirs: { lake: "氷のかけら", haihei: "おたかぽっぽ", kasumi: "蓮の花", banana: "マンゴー", suzuki: "納品書", takarabune: "白紙の海図", noroi: "クラブの札", padre: "水あめのわりばし", kinsei: "電池", bomber: "安全ピンのリボン" },
-    souvenirIcons: { 氷のかけら: "ic_kori", おたかぽっぽ: "ic_poppo", 蓮の花: "ic_hasu", マンゴー: "ic_mango", 納品書: "ic_nouhin", 白紙の海図: "ic_kaizu", クラブの札: "ic_fuda", 水あめのわりばし: "ic_ame", 電池: "ic_denchi", 安全ピンのリボン: "ic_ribbon" },
+    souvenirs: { lake: "氷のかけら", haihei: "おたかぽっぽ", kasumi: "蓮の花", banana: "マンゴー", suzuki: "納品書", takarabune: "白紙の海図", noroi: "クラブの札", padre: "水あめのわりばし", kinsei: "焼けたピザ", bomber: "安全ピンのリボン" },
+    souvenirIcons: { 氷のかけら: "ic_kori", おたかぽっぽ: "ic_poppo", 蓮の花: "ic_hasu", マンゴー: "ic_mango", 納品書: "ic_nouhin", 白紙の海図: "ic_kaizu", クラブの札: "ic_fuda", 水あめのわりばし: "ic_ame", 焼けたピザ: "ic_pizza", 安全ピンのリボン: "ic_ribbon" },
     // 断片の中の謎解きに使う物。その断片にいる間だけ「どうぐ」に出る
     puzzleItems: { 伝票: "suzuki", 荷札: "suzuki", スタンプ台紙: "haihei", ペレット: "takarabune", コンロッド: "takarabune", リプレイ券: "noroi" }, // リプレイ券(D366)は呪いの野犬にいる間だけ
     assetBase: "./assets/worlds/void/",
@@ -257,16 +257,26 @@ window.BOGI_WORLDS = {
     name: "きこりと金星",
     assetBase: "./assets/worlds/kinsei/",
     images: Object.fromEntries(
-      ["bg_sando", "bg_sancho", "fg_sando", "fg_sancho", "kikori", "chirin", "i_denchi", "t_sticker"].map((k) => [k, `${k}.png`]).concat([["ki", "./assets/worlds/lake/ki_walk.png"]])
+      ["bg_sando", "bg_sancho", "bg_naka", "fg_sando", "fg_sancho", "kikori", "chirin", "t_sticker", "venera", "k_table", "k_crate", "k_peel", "k_peel_carry", "v_thermo"]
+        .map((k) => [k, `${k}.png`])
+        .concat([
+          ["ki", "./assets/worlds/lake/ki_walk.png"],
+          ["kikikori", "./assets/worlds/banana/kikikori.png"], // 南極の撮影隊(D379)
+          ["goron", "./assets/worlds/banana/goron.png"],
+        ])
     ),
     playerSprite: { img: "ki", cell: 64, frames: 7, footY: 17 },
     start: "sando",
     startSpawn: "start",
-    maps: { sando: KN_SANDO, sancho: KN_SANCHO },
+    maps: { sando: KN_SANDO, naka: KN_NAKA, sancho: KN_SANCHO },
+    // 木箱(ピザの材料)を頭にのせて運ぶ: 押し付けられてから、作業台に置くまで(D380)
+    carry: (api) => (api.flag("boxed") && !api.flag("placed") ? "k_crate" : api.flag("peel") && !api.hasItem("焼けたピザ") ? "k_peel_carry" : null),
     onEnterWorld(api) {
       // 途中で出ていたら、そのあいだに、きこりは金星の向こうへ消えている
-      if (["run", "edge", "melt"].includes(knS.phase)) api.setFlag("gone");
-      knS.phase = api.flag("gone") ? "gone" : api.flag("dashed") ? "dashed" : "idle";
+      if (knS.phase === "run") api.setFlag("gone");
+      knS.phase = api.flag("gone") ? "gone" : "idle";
+      knS.walkT0 = -1;
+      knS.cookT0 = -1;
     },
   },
   padre: {
@@ -377,7 +387,7 @@ window.BOGI_DAZAI = DAZAI_BOOKS;
 // おもいでのアイコン(D200): どの世界でも、手に入れたときに掲げて見せられるように、全部の世界に読みこむ
 // 能力で開く所の小物(D201〜D203): 踏み台(ホテル)、倒れた荷車(鈴木商店)、砂の吹きだまり(呪いの野犬)、草むら(ぼぎボマー)
 const ABILITY_PROPS = ["fumidai", "niguruma", "kusa", "bunko", "shelf"];
-const OMOIDE_ICONS = ["ic_bunko", "ic_kori", "ic_poppo", "ic_hasu", "ic_mango", "ic_nouhin", "ic_kaizu", "ic_fuda", "ic_ame", "ic_denchi", "ic_ribbon"];
+const OMOIDE_ICONS = ["ic_bunko", "ic_kori", "ic_poppo", "ic_hasu", "ic_mango", "ic_nouhin", "ic_kaizu", "ic_fuda", "ic_ame", "ic_pizza", "ic_ribbon"];
 for (const w of Object.values(window.BOGI_WORLDS)) {
   w.images = w.images || {};
   for (const k of OMOIDE_ICONS) w.images[k] = `./assets/icons/${k}.png`;

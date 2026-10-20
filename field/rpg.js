@@ -637,10 +637,23 @@ const ASSET_V = (() => {
       if (!world || !player || cutscene || pan) return false;
       // 習得した能力なら、どのフィールドでも跳べる。習得前は、教わっている断片の中(フラグ「jump」)だけ
       if (!can("jump")) return false;
+      if (carrying()) return false; // 荷物を頭にのせている間は跳べない(きこりと金星の木箱 D380)
       if (jumpT0 >= 0 && clock - jumpT0 < JUMP_TIME) return false;
       jumpT0 = clock;
       if (map.onJump) map.onJump(world.api, { x: player.x, y: player.y, facing: player.facing });
       return true;
+    }
+
+    // 頭にのせて運んでいる物(world.carry(api) が絵の名前を返す。なければ null)
+    function carrying() {
+      return world && world.carry ? world.carry(world.api) : null;
+    }
+    function drawCarry(sx, sy, jz) {
+      const key = carrying();
+      const im = key && img(key);
+      if (!im) return;
+      const top = sy - 22 - jz; // きーの頭のてっぺん(絵の 64 ドットの升目で、足もとから 22 ドット上)
+      ctx.drawImage(im, Math.round(sx - im.width / 2), Math.round(top - im.height + 3 + (player.moving ? Math.floor(clock * 10) % 2 : 0)));
     }
 
     function busy() {
@@ -725,6 +738,7 @@ const ASSET_V = (() => {
       player.squash = !!(wind && can("funbaru"));
       let spd = SPEED * (running() ? 1.75 : 1);
       if (player.squash) spd = SPEED * 0.32;
+      if (carrying()) spd *= 0.7; // 荷物を頭にのせている間は少し遅い(D380)
       const tx = input.x * spd + (wind && !player.squash ? wind.x : 0);
       const ty = input.y * spd + (wind && !player.squash ? wind.y : 0);
       if (onIce) {
@@ -1124,6 +1138,7 @@ const ASSET_V = (() => {
       }
       if (!tint) {
         ctx.drawImage(im, frame * p.cell, row * p.cell, p.cell, p.cell, sx - p.cell / 2, sy - p.cell + p.footY - jz, p.cell, p.cell);
+        drawCarry(sx, sy, jz);
         return;
       }
       // 色を変えて描く(真っ黒にこげた、など): 形はそのまま、色だけを塗る
@@ -1139,6 +1154,7 @@ const ASSET_V = (() => {
       g.fillStyle = tint;
       g.fillRect(0, 0, p.cell, p.cell);
       ctx.drawImage(tintBuf, sx - p.cell / 2, sy - p.cell + p.footY - jz);
+      drawCarry(sx, sy, jz);
     }
     let tintBuf = null;
 

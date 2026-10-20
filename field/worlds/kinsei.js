@@ -2,35 +2,181 @@
 // field/worlds/ のファイルは index.html の順に読む。上のファイルで決めた名前(T、kWatch など)をそのまま使う
 "use strict";
 
-// ======== きこりと金星(D175〜D177) ========
+// ======== きこりと金星(D175〜D177、ロケ「ぼぎだぢクッキング」D378〜D381) ========
 // 嵐の山。惑星混交で、山頂の東のはしに金星のかけらが混ざり込んでいる(硫酸の黄色い雲、焼けた地面、陽炎)。山頂に無人の気象台
-// 条件: 山道で気象台のスピーカーが金星の天気予報を流す → きこりが衝動で東へ駆け出す → ちりんと一緒に追って山頂へ
-//       → きこりは金星の側へ突っ込み、陽炎の向こうでゆらいで見えなくなる(溶ける瞬間は見せない)→ ちりんはいつもと違う音で鳴る
-//       → 残った電池を拾う → 帰る条件。西から帰る
-// 向き(D148): きーは左(西)から登り、金星は右(東)のはし。下絵(docs/assets/kinsei/blockout.py)のまま(D156)。天気予報の文面、鳴き声、ちりんの音は仮
-const knS = { phase: "idle", t0: 0 };
+// 流れ(D380): 山道で南極の撮影隊(ききこり、ごろん)に、ピザの材料の木箱を押し付けられる → 頭にのせて山頂の気象台へ運ぶ
+//       → 気象台の中で木箱を作業台に置くと、ロケが始まり、きこりがマルゲリータを作る(言葉なし)
+//       → できると無線で金星の天気予報。撮影隊は外へ撮影の準備に。待ちきれないきこりがピザを持って飛び出す
+//       → 外で、ベネラ 7 号(D382)のふたの飛んだ口(ピザ窯に見える)へ飛びこみ、真っ黒にこげて煙、陽炎の向こうで見えなくなる(溶ける瞬間は見せない)
+//       → 作業台に残ったピザピールを持って、さかいの手前から口へのばし、焼けたピザを取り出す(D383。電池はなくした D380)→ 帰る条件。西から帰る
+//       山頂の百葉箱を調べると、こわれた温度計の一枚絵(D382)
+// 向き(D148): きーは左(西)から登り、金星は右(東)のはし。図: docs/assets/kinsei/plan/(配置図 K2、絵コンテ K3)、三面図 K1(sanmen/venera7.py、第 3 版)
+const knS = { phase: "idle", t0: 0, walkT0: -1, cookT0: -1, kx: 0 };
 const knNow = () => performance.now() / 1000;
-// 嵐: 暗い空、斜めに降る雨、ときどき稲光
-const knStorm = (ctx, t, dark) => {
+const KN_EDGE = 14.6 * T; // 金星のさかい(山頂)
+// ベネラ 7 号の絵(venera.png)の、足もとから口のまん中までのずれ(絵を替えたら測りなおす)
+const KN_MOUTH_DX = -25;
+const KN_MOUTH_DY = -45;
+const KN_FORECAST = "……きょうの金星は、無風、92気圧、456℃、雲……"; // 予報の文(D178)の頭に「きょうの金星は」(D381)
+
+// 嵐: 暗い空、斜めに降る雨、ときどき稲光。rainTo(画面の x)より右には雨を降らせない(金星は無風 D381)
+const knStorm = (ctx, t, dark, rainTo) => {
   const W = ctx.canvas.width;
   const H = ctx.canvas.height;
   ctx.fillStyle = `rgba(28, 34, 48, ${dark})`;
   ctx.fillRect(0, 0, W, H);
+  ctx.save();
+  if (rainTo !== undefined) {
+    ctx.beginPath();
+    ctx.rect(0, 0, rainTo, H);
+    ctx.clip();
+  }
   ctx.strokeStyle = "rgba(200, 210, 224, 0.35)";
   ctx.lineWidth = 1;
   ctx.beginPath();
   for (let k = 0; k < 70; k++) {
-    const x = (k * 137 + t * 520) % (W + 60) - 30;
-    const y = (k * 89 + t * 760) % (H + 40) - 20;
+    const x = ((k * 137 + t * 520) % (W + 60)) - 30;
+    const y = ((k * 89 + t * 760) % (H + 40)) - 20;
     ctx.moveTo(x, y);
     ctx.lineTo(x - 7, y + 16);
   }
   ctx.stroke();
+  ctx.restore();
   const f = (t * 0.37) % 7;
   if (f < 0.12 || (f > 0.2 && f < 0.26)) {
     ctx.fillStyle = "rgba(236, 240, 255, 0.35)";
     ctx.fillRect(0, 0, W, H);
   }
+};
+// 陽炎(D381、強さ 2 ドット): 描き終えた画面の、さかいより右を、細い横の帯ごとに左右へずらす。下ほど強く、下から上へ流れる
+const knHazeBuf = document.createElement("canvas");
+const knHaze = (ctx, edgeX, t, amp = 2) => {
+  const s = ctx.getTransform().a; // 1 ドット = s 画素
+  const c = ctx.canvas;
+  const x0 = Math.max(0, Math.round((edgeX - 8) * s));
+  const w = c.width - x0;
+  if (w <= 0) return;
+  knHazeBuf.width = w;
+  knHazeBuf.height = c.height;
+  knHazeBuf.getContext("2d").drawImage(c, x0, 0, w, c.height, 0, 0, w, c.height);
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  const rows = Math.ceil(c.height / s);
+  for (let r = 0; r < rows; r++) {
+    const a = amp * (0.35 + 0.65 * (r / rows));
+    const off = Math.round(Math.sin(r * 0.45 + t * 7) * a + Math.sin(r * 0.13 - t * 2.3) * a * 0.4) * s;
+    if (off) ctx.drawImage(knHazeBuf, 0, r * s, w, s, x0 + off, r * s, w, s);
+  }
+  ctx.restore();
+};
+// ドットのだ円(行ごとの四角で塗る。ふちがぼやけない)
+const knEll = (ctx, cx, cy, rx, ry, color) => {
+  if (rx < 0.5 || ry < 0.5) return;
+  ctx.fillStyle = color;
+  const r0 = Math.ceil(ry);
+  for (let dy = -r0; dy <= r0; dy++) {
+    const k = 1 - (dy * dy) / (ry * ry);
+    if (k <= 0) continue;
+    const hw = Math.round(rx * Math.sqrt(k));
+    ctx.fillRect(Math.round(cx - hw), Math.round(cy + dy), hw * 2 + 1, 1);
+  }
+};
+// ピザ(マルゲリータ)。stage: ball / flat / sauce / cheese / basil / done / burnt。p はその段の進み(0〜1)
+const KN_DOUGH = "#efdcae";
+const KN_CRUST = "#c99a5e";
+const knPizza = (ctx, x, y, rx, stage, p = 1) => {
+  const ry = Math.max(1.5, rx * 0.36);
+  if (stage === "ball") {
+    knEll(ctx, x, y, rx, rx * 0.75, KN_CRUST);
+    knEll(ctx, x, y - 0.5, rx - 1, rx * 0.75 - 1, KN_DOUGH);
+    return;
+  }
+  knEll(ctx, x, y, rx, ry, stage === "burnt" ? "#3a2014" : KN_CRUST);
+  knEll(ctx, x, y - 0.5, rx - 1, ry - 0.7, stage === "burnt" ? "#5a2e1a" : KN_DOUGH);
+  if (stage === "flat") return;
+  // トマトソース: 渦巻きに広がる
+  const sr = stage === "sauce" ? (rx - 2.5) * p : rx - 2.5;
+  knEll(ctx, x, y - 0.5, sr, Math.max(0.8, sr * 0.36), stage === "burnt" ? "#8e3420" : "#c8402c");
+  if (stage === "sauce") return;
+  const dots = [
+    [-0.45, -0.2],
+    [0.1, 0.3],
+    [0.5, -0.1],
+    [-0.15, -0.45],
+    [0.3, 0.55],
+  ];
+  const nC = stage === "cheese" ? Math.ceil(dots.length * p) : dots.length;
+  for (let i = 0; i < nC; i++) knEll(ctx, x + dots[i][0] * (rx - 3), y - 0.5 + dots[i][1] * (ry - 1), 2.2, 1.2, stage === "burnt" ? "#f0c070" : "#fbf6e6");
+  if (stage === "cheese" || stage === "burnt") return;
+  const leaves = [
+    [-0.25, 0.1],
+    [0.35, 0.25],
+    [0.05, -0.35],
+  ];
+  const nB = stage === "basil" ? Math.ceil(leaves.length * p) : leaves.length;
+  ctx.fillStyle = "#3f9a3c";
+  for (let i = 0; i < nB; i++) ctx.fillRect(Math.round(x + leaves[i][0] * (rx - 3)), Math.round(y - 0.5 + leaves[i][1] * (ry - 1)), 2, 1);
+};
+// 絵を描く(足もとが x, y)。flip で左右反転、alpha、tint(色をのせる: こげる)
+const knTintBuf = document.createElement("canvas");
+const knDraw = (ctx, im, x, y, o = {}) => {
+  if (!im) return;
+  ctx.save();
+  if (o.alpha !== undefined) ctx.globalAlpha = Math.max(0, o.alpha);
+  let src = im;
+  if (o.tint) {
+    knTintBuf.width = im.width;
+    knTintBuf.height = im.height;
+    const g = knTintBuf.getContext("2d");
+    g.clearRect(0, 0, im.width, im.height);
+    g.globalCompositeOperation = "source-over";
+    g.drawImage(im, 0, 0);
+    g.globalCompositeOperation = "source-atop";
+    g.fillStyle = o.tint;
+    g.fillRect(0, 0, im.width, im.height);
+    src = knTintBuf;
+  }
+  const dx = Math.round(x - im.width / 2);
+  const dy = Math.round(y - im.height);
+  if (o.wob) {
+    // 陽炎の向こうでゆらぐ: 2 行ずつ左右へずらす
+    for (let row = 0; row < im.height; row += 2) {
+      const off = Math.round(Math.sin(row * 0.6 + o.t * 14) * o.wob * 0.5);
+      if (o.flip) {
+        ctx.save();
+        ctx.translate(dx + im.width + off, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(src, 0, row, im.width, 2, 0, dy + row, im.width, 2);
+        ctx.restore();
+      } else ctx.drawImage(src, 0, row, im.width, 2, dx + off, dy + row, im.width, 2);
+    }
+  } else if (o.flip) {
+    ctx.translate(dx + im.width, dy);
+    ctx.scale(-1, 1);
+    ctx.drawImage(src, 0, 0);
+  } else ctx.drawImage(src, dx, dy);
+  ctx.restore();
+};
+const knLerp = (a, b, u) => a + (b - a) * Math.max(0, Math.min(1, u));
+// 道すじ(点の列)の上を u(0〜1)だけ進んだ所
+const knAlong = (pts, u) => {
+  const seg = [];
+  let L = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    seg.push(d);
+    L += d;
+  }
+  let s = Math.max(0, Math.min(1, u)) * L;
+  for (let i = 0; i < seg.length; i++) {
+    if (s <= seg[i] || i === seg.length - 1) {
+      const k = seg[i] ? Math.min(1, s / seg[i]) : 1;
+      return [knLerp(pts[i][0], pts[i + 1][0], k), knLerp(pts[i][1], pts[i + 1][1], k)];
+    }
+    s -= seg[i];
+  }
+  return pts[pts.length - 1];
 };
 const knImg = (key, x, y, extra) =>
   Object.assign(
@@ -42,12 +188,15 @@ const knImg = (key, x, y, extra) =>
       h: 1,
       headY: 40,
       draw(ctx, sx, sy, t, api) {
-        const im = api.image(key);
-        if (im) ctx.drawImage(im, Math.round(sx - im.width / 2), Math.round(sy - im.height));
+        knDraw(ctx, api.image(key), sx, sy);
       },
     },
     extra
   );
+
+// ---- 山道: 撮影隊が機材を持って登る。きーは木箱を押し付けられる(D380) ----
+const KN_CREW_V = 120; // 撮影隊の登る速さ(px/秒)。木箱を運ぶきー(105)より少し速く、先に山頂へ
+const knCrewX = (x0) => (knS.walkT0 < 0 ? x0 : x0 + (knNow() - knS.walkT0) * KN_CREW_V);
 const KN_SANDO = {
   tile: T,
   bg: "#46504a",
@@ -65,53 +214,121 @@ const KN_SANDO = {
     { id: "leave", x: -T, y: 4 * T, w: 1.6 * T, h: 4 * T, run: (api) => api.exit() },
     { id: "toSancho", x: 29.4 * T, y: 4 * T, w: 1.6 * T, h: 4 * T, warp: { map: "sancho", spawn: "west" } },
     {
-      // 気象台のスピーカー(絵の柱、x 5.8 マス)の下まで来ると、金星の天気予報が流れ、きこりが駆け出す
-      id: "forecast",
-      x: 5.3 * T,
+      // 押し付け: ごろん(ディレクター)の前まで来ると、ごろんが跳ねて、木箱がきーの頭にのる。ごろんは山頂を指す。言葉はない
+      id: "oshitsuke",
+      x: 2.3 * T,
       y: 4 * T,
       w: T,
       h: 4 * T,
-      enabled: (api) => !api.flag("dashed"),
+      enabled: (api) => !api.flag("boxed"),
       run(api) {
         if (knS.phase !== "idle") return;
-        knS.phase = "forecast";
-        api.bubble("speaker", "無風、92気圧、456℃、雲", 3400); // 金星の天気予報(作者 D178)
-        api.later(3500, () => {
-          api.bubble("kikori", "ブヒッ", 900); // 鳴き声(仮)。スピーカーの吹き出しが消えてから
-          knS.phase = "dash";
-          knS.t0 = knNow();
-          api.setFlag("dashed");
+        knS.phase = "oshitsuke";
+        knS.t0 = knNow();
+        api.freeze(2.2);
+        api.face("east");
+        api.later(700, () => api.sfx("pop"));
+        api.later(1200, () => {
+          api.setFlag("boxed");
+          api.sfx("item");
+        });
+        api.later(2200, () => {
+          knS.phase = "climb";
+          knS.walkT0 = knNow();
         });
       },
     },
   ],
   objects: [
-    // 拡声器の柱は、背景から切り抜いた絵(fg_sando)を根元の y で前後させる(作者「背景の前後」)
+    // 拡声器の柱は、背景から切り抜いた絵(fg_sando)を根元の y で前後させる(作者「背景の前後」)。鳴らさない(予報は気象台の中の無線 D380)
     kFg("fg_sando", 161, 70, 45, 91, 158),
     kWall(180, 152, 193, 160),
-    { id: "speaker", x: 5.8 * T, y: 4.3 * T, w: 1, h: 1, headY: 96, draw() {} },
-    knImg("kikori", 7.4 * T, 6.4 * T, {
-      hidden: (api) => api.flag("dashed") && knS.phase !== "dash",
+    {
+      // 木箱(ピザの材料)。押し付けられる前は地面に。押し付けのあいだ、地面からきーの頭へ跳ぶ
+      id: "crate",
+      x: 2.6 * T,
+      y: 6.3 * T,
+      w: 1,
+      h: 1,
+      hidden: (api) => api.flag("boxed"),
       draw(ctx, sx, sy, t, api) {
-        const im = api.image("kikori");
+        const im = api.image("k_crate");
         if (!im) return;
         let x = sx;
-        let y = sy - Math.abs(Math.sin(t * 9)) * 3; // 落ち着きなく跳ねる
-        if (knS.phase === "dash") x = sx + (knNow() - knS.t0) * 330; // 一直線に東へ
-        ctx.drawImage(im, Math.round(x - im.width / 2), Math.round(y - im.height));
+        let y = sy;
+        if (knS.phase === "oshitsuke") {
+          const u = Math.max(0, Math.min(1, (knNow() - knS.t0 - 0.7) / 0.5));
+          const pl = api.player();
+          x = knLerp(sx, pl.x + (sx - this.x), u);
+          y = knLerp(sy, pl.y + (sy - this.y) - 22, u) - Math.sin(u * Math.PI) * 18;
+        }
+        knDraw(ctx, im, x, y);
+      },
+    },
+    knImg("goron", 3.3 * T, 6.6 * T, {
+      // ごろん(ディレクター)。押し付けのあと、山頂を指し(右向き)、撮影隊の先頭で登っていく
+      hidden: (api) => api.flag("boxed") && (knS.phase !== "oshitsuke" && knS.phase !== "climb" || knCrewX(this.x) > 30 * T),
+      draw(ctx, sx, sy, t, api) {
+        let x = sx;
+        let y = sy;
+        let flip = true; // 左(きーの方)を向く
+        if (knS.phase === "oshitsuke") {
+          const el = knNow() - knS.t0;
+          y -= el > 0.3 && el < 0.9 ? Math.abs(Math.sin((el - 0.3) * 10)) * 5 : 0; // 跳ねる
+          if (el > 1.3) flip = false; // 山頂の方を向いて指す
+          if (el > 1.3) {
+            // 指す手の先に、小さな三角(言葉の代わり)
+            ctx.fillStyle = "#ffe6a0";
+            const ax = Math.round(x + 22 + Math.sin(t * 8) * 2);
+            const ay = Math.round(y - 22);
+            for (let k = 0; k < 4; k++) ctx.fillRect(ax + k, ay - 3 + k, 1, 7 - k * 2);
+          }
+        }
+        if (knS.phase === "climb") {
+          x = sx + (knCrewX(this.x) - this.x);
+          y -= Math.abs(Math.sin(t * 9)) * 1.5;
+          flip = false;
+        }
+        knDraw(ctx, api.image("goron"), x, y, { flip });
+      },
+    }),
+    knImg("kikikori", 5.6 * T, 6.0 * T, {
+      // ききこり(カメラ係)。機材を持って登る
+      hidden: (api) => api.flag("boxed") && (knS.phase !== "oshitsuke" && knS.phase !== "climb" || knCrewX(this.x) > 30 * T),
+      draw(ctx, sx, sy, t, api) {
+        const x = sx + (knS.phase === "climb" ? knCrewX(this.x) - this.x : 0);
+        knDraw(ctx, api.image("kikikori"), x, sy - (knS.phase === "climb" ? Math.abs(Math.sin(t * 8 + 1)) * 1.5 : 0));
+      },
+    }),
+    knImg("kikori", 9 * T, 6.3 * T, {
+      // きこり: 落ち着きなく跳ねる。登るときは、きーより先へ走っては戻る
+      hidden: (api) => api.flag("boxed") && (knS.phase !== "oshitsuke" && knS.phase !== "climb"),
+      update(dt, t, api) {
+        if (knS.phase !== "climb") {
+          knS.kx = this.x;
+          return;
+        }
+        const target = Math.min(29.5 * T, api.player().x + 2.6 * T + Math.sin(t * 1.4) * 2.2 * T);
+        knS.kx += Math.max(-1, Math.min(1, target - knS.kx)) * Math.min(Math.abs(target - knS.kx), 260 * dt);
+        this.dir = target > knS.kx + 2 ? 1 : target < knS.kx - 2 ? -1 : this.dir || 1;
+      },
+      draw(ctx, sx, sy, t, api) {
+        const x = sx + (knS.kx || this.x) - this.x;
+        knDraw(ctx, api.image("kikori"), x, sy - Math.abs(Math.sin(t * 9)) * 3, { flip: this.dir < 0 });
       },
       range: 40,
-      interact: (api) => api.bubble("kikori", "ブヒッ", 900),
-      canInteract: () => knS.phase === "idle",
+      interact: (api) => {
+        api.sfx("oink");
+        api.bubble("kikori", "ブヒッ", 900);
+      },
+      canInteract: (api) => !api.flag("boxed") && knS.phase === "idle",
     }),
-    knImg("chirin", 6.7 * T, 6.2 * T, {
-      hidden: (api) => api.flag("dashed") && knS.phase !== "dash",
+    knImg("chirin", 8.2 * T, 6.0 * T, {
+      // ちりん: きこりのそばでゆれる(きこりに執着)
+      hidden: (api) => api.flag("boxed") && knS.phase !== "oshitsuke" && knS.phase !== "climb",
       draw(ctx, sx, sy, t, api) {
-        const im = api.image("chirin");
-        if (!im) return;
-        let x = sx + Math.sin(t * 3) * 1.5; // 風にゆれる
-        if (knS.phase === "dash") x += Math.max(0, knNow() - knS.t0 - 0.8) * 70; // 少し遅れて、きこりを追う
-        ctx.drawImage(im, Math.round(x - im.width / 2), Math.round(sy - im.height - 6));
+        const x = sx + Math.sin(t * 3) * 1.5 + ((knS.kx || 9 * T) - 9 * T) * 0.92;
+        knDraw(ctx, api.image("chirin"), x, sy - 6);
       },
       range: 40,
       interact: (api) => api.bubble("chirin", "チリーン", 1200), // 仮
@@ -119,21 +336,290 @@ const KN_SANDO = {
     }),
   ],
 };
-const KN_EDGE = 14.6 * T; // 金星のさかい
+
+// ---- 気象台の中: ロケ「ぼぎだぢクッキング」(D378〜D380、絵コンテ K3) ----
+// 時刻(ロケが始まってからの秒)。カチンコ → こねる → 丸める → 押し広げる → 放り投げて回す ×3 → ソース → チーズ → バジル → 予報 → 撮影隊は外へ → きこりが飛び出す
+const KN_COOK = { clap: 1.0, knead: 3.0, ball: 5.0, press: 7.0, toss1: 9.0, toss3: 13.0, sauce: 16.0, cheese: 18.0, basil: 20.0, radio: 23.5, crew: 25.0, bolt: 26.0, end: 26.4 };
+const KN_TABLE = { x: 7 * T, y: 4.45 * T }; // 作業台の足もと
+const KN_PZ = { x: 7 * T, y: 4.45 * T - 21 }; // 作業台の上のピザの中心
+const KN_KIKORI_IN = { x: 7 * T, y: 3.62 * T }; // 台の向こうのきこり
+const KN_DOOR_IN = { x: 6.5 * T, y: 9.2 * T };
+const knCookEl = () => (knS.cookT0 < 0 ? -1 : knNow() - knS.cookT0);
+const knCookStart = (api) => {
+  knS.cookT0 = knNow();
+  api.freeze(KN_COOK.end + 0.2);
+  api.face("north");
+  api.later(300, () => api.sfx("knock")); // カチンコ
+  const cx = KN_PZ.x;
+  const cy = KN_PZ.y;
+  api.camPath([
+    { t: 0, x: 7 * T, y: 4.5 * T, z: 1 },
+    { t: 1.6, x: cx, y: cy - 6, z: 1.5 },
+    { t: KN_COOK.basil, x: cx, y: cy - 10, z: 1.5 },
+    { t: KN_COOK.radio - 0.8, x: 5.6 * T, y: 4.6 * T, z: 1.15 },
+    { t: KN_COOK.end, x: 7 * T, y: 4.6 * T, z: 1 },
+  ]);
+  api.later(KN_COOK.basil * 1000, () => api.bubble("radio", KN_FORECAST, 3400));
+  api.later(KN_COOK.crew * 1000, () => api.sfx("oink"));
+  api.later(KN_COOK.bolt * 1000, () => {
+    api.setFlag("dashed"); // 撮影隊は外へ、きこりはピザを持って飛び出した
+    knS.cookT0 = -1;
+  });
+};
+const KN_NAKA = {
+  tile: T,
+  bg: "#1e1c1a",
+  map: kGrid(14, 9, (c, r) => r < 2 || c >= 13),
+  legend: K_LEGEND,
+  drawGround: kImage("bg_naka", 14 * T, 9 * T),
+  spawns: { door: { x: 6.5 * T, y: 8.3 * T, facing: "north" } },
+  onEnter(api) {
+    // 途中で出ていたら、木箱は台の上。ロケをはじめからやり直す
+    if (api.flag("placed") && !api.flag("dashed")) api.later(400, () => knCookStart(api));
+  },
+  drawOverlay(ctx, ox, oy, t) {
+    // 窓の外の嵐: ときどき稲光が部屋を白く照らす
+    const f = (t * 0.37) % 7;
+    if (f < 0.12 || (f > 0.2 && f < 0.26)) {
+      ctx.fillStyle = "rgba(236, 240, 255, 0.18)";
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    }
+    // カチンコ(番組名「ぼぎだぢクッキング」。ごろんが鳴らす)
+    const el = knCookEl();
+    if (el >= 0 && el < KN_COOK.clap) {
+      const s = ctx.getTransform().a;
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      const W = ctx.canvas.width;
+      const H = ctx.canvas.height;
+      const bw = Math.round(W * 0.42);
+      const bh = Math.round(bw * 0.62);
+      const bx = Math.round((W - bw) / 2);
+      const by = Math.round((H - bh) / 2) + 20;
+      ctx.fillStyle = "#1c1c1e";
+      ctx.fillRect(bx, by, bw, bh);
+      ctx.fillStyle = "#f2f0ea";
+      ctx.fillRect(bx + 8, by + bh * 0.42, bw - 16, 3);
+      // 上の拍子木: はじめ開いていて、0.3 秒で閉じる
+      const a = el < 0.3 ? -0.5 * (1 - el / 0.3) : 0;
+      ctx.translate(bx, by);
+      ctx.rotate(a);
+      for (let k = 0; k < 8; k++) {
+        ctx.fillStyle = k % 2 ? "#f2f0ea" : "#1c1c1e";
+        ctx.fillRect((k * bw) / 8, -28, bw / 8 + 1, 26);
+      }
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      if (window.bogiPix) {
+        const ts = 2; // 寄りのカメラでも板からはみ出さない大きさ
+        const tw = window.bogiPix.width("ぼぎだぢクッキング") * ts;
+        window.bogiPix.text(ctx, "ぼぎだぢクッキング", Math.round(W / 2 - tw / 2), Math.round(by + bh * 0.62), ts, "#f2f0ea");
+      }
+      ctx.restore();
+    }
+  },
+  triggers: [{ id: "toSancho", x: 5.55 * T, y: 8.75 * T, w: 1.9 * T, h: T, enabled: () => knS.cookT0 < 0, warp: { map: "sancho", spawn: "door" } }],
+  objects: [
+    // 絵(bg_naka)に合わせた壁: 北の壁のすそ、西の壁、東の壁、無線の机
+    kWall(0, 64, 448, 92),
+    kWall(0, 64, 28, 288),
+    kWall(384, 64, 416, 288),
+    kWall(33, 118, 119, 158),
+    { id: "radio", x: 2 * T, y: 3.4 * T, w: 1, h: 1, headY: 30, draw() {} },
+    {
+      // 作業台(気象台の机を外に出した物)。木箱をのせると、ロケが始まる
+      id: "table",
+      x: KN_TABLE.x,
+      y: KN_TABLE.y,
+      w: 1,
+      h: 1,
+      headY: 40,
+      solid: { w: 58, h: 14, dy: -6 },
+      range: 44,
+      draw(ctx, sx, sy, t, api) {
+        knDraw(ctx, api.image("k_table"), sx, sy);
+        if (api.flag("placed")) knDraw(ctx, api.image("k_crate"), sx + 40, sy + 2); // 置いた木箱(台のよこ)
+        // 台の上のピザ(ロケの段に合わせて)
+        const el = knCookEl();
+        // ピザピール(D383): できたピザはピールにのる。きこりがピザだけつかんで飛び出したあと、ピールが台に残る
+        const peelOnTable = (el >= KN_COOK.basil) || (api.flag("dashed") && !api.flag("peel"));
+        if (peelOnTable) knDraw(ctx, api.image("k_peel"), sx + 4, sy - 17);
+        if (el < 0) return;
+        const C = KN_COOK;
+        const px = sx;
+        const py = sy - 21;
+        const u = (a, b) => Math.max(0, Math.min(1, (el - a) / (b - a)));
+        if (el < C.clap) return;
+        if (el < C.knead) {
+          // こねる: 丸い生地がつぶれては戻る
+          const sq = Math.sin(el * 12);
+          knEll(ctx, px, py, 5 + sq, 3.2 - sq * 0.8, KN_CRUST);
+          knEll(ctx, px, py - 0.5, 4 + sq, 2.4 - sq * 0.8, KN_DOUGH);
+        } else if (el < C.ball) knPizza(ctx, px + Math.sin(el * 7) * 1.5, py, 5, "ball");
+        else if (el < C.press) knPizza(ctx, px, py, knLerp(5, 11, u(C.ball, C.press)), "flat");
+        else if (el < C.toss3) return; // 宙にある(きこりの方で描く)
+        else if (el < C.sauce) knPizza(ctx, px, py, 19, "sauce", u(C.toss3, C.sauce));
+        else if (el < C.cheese) knPizza(ctx, px, py, 19, "cheese", u(C.sauce, C.cheese));
+        else if (el < C.basil) knPizza(ctx, px, py, 19, "basil", u(C.cheese, C.basil));
+        else if (el < C.basil + 0.6) knPizza(ctx, knLerp(px, px + 13, u(C.basil, C.basil + 0.6)), py - 1, 19 - 6 * u(C.basil, C.basil + 0.6), "done"); // ピールへすべらせる
+        else if (el < C.crew + 0.35 * (C.bolt - C.crew)) knPizza(ctx, px + 13, py - 1, 13, "done"); // ピールの上
+      },
+      interact(api) {
+        if (api.flag("dashed")) {
+          api.setFlag("peel"); // ピールを持つ(D383)
+          api.sfx("item");
+          return;
+        }
+        api.setFlag("placed");
+        api.sfx("item");
+        knCookStart(api);
+      },
+      canInteract: (api) => (api.flag("boxed") && !api.flag("placed")) || (api.flag("dashed") && !api.flag("peel")),
+    },
+    {
+      // きこり: 台の向こうでピザを作る。できたら掲げ、予報のあと、待ちきれずに飛び出す
+      id: "kikori",
+      x: KN_KIKORI_IN.x,
+      y: KN_KIKORI_IN.y,
+      w: 1,
+      h: 1,
+      headY: 40,
+      hidden: (api) => api.flag("dashed"),
+      draw(ctx, sx, sy, t, api) {
+        const im = api.image("kikori");
+        if (!im) return;
+        const el = knCookEl();
+        const C = KN_COOK;
+        let x = sx;
+        let y = sy;
+        let flip = false;
+        if (el < 0) y -= Math.abs(Math.sin(t * 9)) * 3; // 待っている: 落ち着きなく跳ねる
+        else if (el < C.knead) y -= Math.abs(Math.sin(el * 12)) * 2; // こねる
+        else if (el < C.press) y -= Math.abs(Math.sin(el * 7)) * 1.5;
+        else if (el < C.toss3) {
+          // 放り投げて回し、伸ばす(1 回 2 秒 × 3、だんだん大きく)
+          const k = Math.floor((el - C.press) / 2);
+          const v = ((el - C.press) % 2) / 2;
+          y -= v < 0.15 || v > 0.85 ? 3 : 0;
+          const rx = knLerp(11, 19, (k + v) / 3);
+          const h = Math.sin(v * Math.PI) * (20 + k * 5);
+          const spin = Math.abs(Math.cos(el * 16)); // 回っていて、横幅がふくらんだり縮んだり
+          const dx = x;
+          const dy = sy - 36 - h;
+          knEll(ctx, dx, dy, rx * (0.55 + 0.45 * spin), 3, KN_CRUST);
+          knEll(ctx, dx, dy - 0.5, rx * (0.55 + 0.45 * spin) - 1, 2, KN_DOUGH);
+          // 生地が落ちるまで、手(体)は上を向いて待つ
+        } else if (el < C.basil) y -= Math.abs(Math.sin(el * 5)) * 1;
+        else if (el < C.crew) {
+          // できあがり。ピールの上のピザを見つめて、予報を聞く
+          y -= Math.abs(Math.sin(el * 4)) * 1;
+        } else if (el < C.bolt) {
+          // 待ちきれない: 身ぶるいして、戸口へ駆け出す
+          const v = (el - C.crew) / (C.bolt - C.crew);
+          if (v < 0.35) x += Math.round(Math.sin(el * 60) * 1.5);
+          else {
+            const [ax, ay] = knAlong([[KN_KIKORI_IN.x, KN_KIKORI_IN.y], [5.0 * T, 6.0 * T], [KN_DOOR_IN.x, KN_DOOR_IN.y]], (v - 0.35) / 0.65);
+            x = sx + ax - this.x;
+            y = sy + ay - this.y - Math.abs(Math.sin(el * 18)) * 3;
+            flip = true;
+          }
+        } else return;
+        knDraw(ctx, im, x, y, { flip });
+        if (el >= C.crew + 0.35 * (C.bolt - C.crew)) knPizza(ctx, x, y - im.height - 3, 13, "done"); // ピールからピザだけつかんで掲げる
+      },
+      range: 40,
+      interact: (api) => {
+        api.sfx("oink");
+        api.bubble("kikori", "ブヒッ", 900);
+      },
+      canInteract: () => knCookEl() < 0,
+    },
+    {
+      // ききこり(カメラ係): 台の方を向いて撮る。できたら外へ
+      id: "kikikori",
+      x: 6.0 * T,
+      y: 7.1 * T,
+      w: 1,
+      h: 1,
+      headY: 46,
+      hidden: (api) => api.flag("dashed"),
+      draw(ctx, sx, sy, t, api) {
+        const el = knCookEl();
+        let x = sx;
+        let y = sy;
+        if (el >= KN_COOK.radio) {
+          const u = (el - KN_COOK.radio) / 1.4;
+          if (u >= 1) return;
+          x = knLerp(sx, KN_DOOR_IN.x - this.x + sx, u);
+          y = knLerp(sy, KN_DOOR_IN.y - this.y + sy, u) - Math.abs(Math.sin(el * 9)) * 1.5;
+        }
+        knDraw(ctx, api.image("kikikori"), x, y);
+      },
+    },
+    {
+      // ごろん(ディレクター): カチンコを鳴らす。できたら外へ
+      id: "goron",
+      x: 9.4 * T,
+      y: 6.3 * T,
+      w: 1,
+      h: 1,
+      headY: 36,
+      hidden: (api) => api.flag("dashed"),
+      draw(ctx, sx, sy, t, api) {
+        const el = knCookEl();
+        let x = sx;
+        let y = sy;
+        if (el >= KN_COOK.radio + 0.5) {
+          const u = (el - KN_COOK.radio - 0.5) / 1.6;
+          if (u >= 1) return;
+          x = knLerp(sx, KN_DOOR_IN.x - this.x + sx, u);
+          y = knLerp(sy, KN_DOOR_IN.y - this.y + sy, u) - Math.abs(Math.sin(el * 9)) * 1.5;
+        }
+        knDraw(ctx, api.image("goron"), x, y, { flip: true });
+      },
+    },
+  ],
+};
+
+// ---- 山頂: 撮影隊は外で準備、きこりはベネラへ(D379〜D381) ----
+const KN_VENERA = { x: 17.2 * T, y: 8.0 * T }; // ベネラ 7 号の足もと(さかいの向こう、焼けた地面。D382)
+const KN_WINDOW = { x: KN_VENERA.x + KN_MOUTH_DX, y: KN_VENERA.y + KN_MOUTH_DY }; // ふたの飛んだ口(ピザ窯の口に見える)
+const KN_RUN = { run: 1.8, leap: 2.6, char: 4.6, melt: 7.0, pop: 7.4, end: 7.6 };
+const KN_PEEL = { reach: 0.8, in: 1.2, back: 2.0 }; // ピールをのばして、口から焼けたピザを取り出す(秒)
+let knPeelT0 = -1;
+const KN_DOOR_OUT = { x: 5.35 * T, y: 3.75 * T };
+const knRunEl = () => (knS.phase === "run" ? knNow() - knS.t0 : -1);
 const KN_SANCHO = {
   tile: T,
   bg: "#5e5a54",
   map: kGrid(20, 12, (c, r) => r < 3 || r > 10 || c >= 15 || (c === 0 && (r < 5 || r > 8))),
   legend: K_LEGEND,
   drawGround: kImage("bg_sancho", 20 * T, 12 * T),
-  spawns: { west: { x: 1 * T, y: 6.5 * T, facing: "east" } },
+  spawns: {
+    west: { x: 1 * T, y: 6.5 * T, facing: "east" },
+    door: { x: 5.35 * T, y: 4.0 * T, facing: "south" },
+  },
   onEnter(api) {
-    if (api.flag("dashed") && !api.flag("gone")) {
+    if (api.flag("dashed") && !api.flag("gone") && knS.phase !== "run") {
       knS.phase = "run";
       knS.t0 = knNow();
+      const R = KN_RUN;
+      api.camPath([
+        { t: 0, x: 6.5 * T, y: 4.8 * T, z: 1 },
+        { t: R.run, x: 12.8 * T, y: 6.8 * T, z: 1 },
+        { t: R.leap, x: 15.6 * T, y: 6.6 * T, z: 1.3 },
+        { t: R.end + 0.4, x: 15.2 * T, y: 6.9 * T, z: 1.3 },
+      ]);
+      api.later(R.leap * 1000 - 200, () => api.sfx("pop"));
+      api.later(R.char * 1000 - 1500, () => api.sfx("whir"));
+      api.later(R.melt * 1000, () => {
+        knS.phase = "gone";
+        api.setFlag("gone");
+      });
+      // 金星は、ほかの星と逆向きに、ゆっくり回っている。きーも、逆向きにくるっと回る(まわる D203。能力としてはやめ D226、回る姿だけが残る)
+      api.later((R.end + 1.4) * 1000, () => api.spin());
     }
   },
-  debug: () => Object.assign({ now: knNow() }, knS),
+  debug: () => Object.assign({ now: knNow(), runEl: knRunEl(), cookEl: knCookEl() }, knS),
   // きこりが消えたあと、金星のさかいから熱い風が吹きつける(D201)。ふんばる(ぱーでれで覚える)なら、つぶれて張りつき、じりじり進める
   wind(api, x) {
     return api.flag("gone") && x > 10.4 * T ? { x: -300, y: 0 } : null;
@@ -145,17 +631,52 @@ const KN_SANCHO = {
     g.addColorStop(1, "rgba(255, 200, 90, 0.4)");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    knStorm(ctx, t, 0.22);
+    knStorm(ctx, t, 0.22, ox + KN_EDGE); // 雨はさかいの左だけ(D381)
+    knHaze(ctx, ox + KN_EDGE, t, 2); // 陽炎(D381)
   },
-  triggers: [{ id: "toSando", x: -T, y: 5 * T, w: 1.6 * T, h: 4 * T, enabled: () => knS.phase !== "melt", warp: { map: "sando", spawn: "east" } }],
+  triggers: [
+    { id: "toSando", x: -T, y: 5 * T, w: 1.6 * T, h: 4 * T, enabled: () => knS.phase !== "run", warp: { map: "sando", spawn: "east" } },
+    // 気象台の戸口(建物の下のふちの、まん中の黒い戸)
+    { id: "toNaka", x: 4.95 * T, y: 3.2 * T, w: 0.85 * T, h: 0.55 * T, enabled: () => knS.phase !== "run", warp: { map: "naka", spawn: "door" } },
+  ],
   objects: [
     // 背景の前後(作者「背景の前後」): 百葉箱と風の塔は、背景から切り抜いた絵(fg_sancho。docs/assets/kinsei/fg_kinsei.py)を根元の y で前後させる
     kFg("fg_sancho", 298, 104, 45, 74, 176),
     kFg("fg_sancho", 364, 18, 36, 95, 111),
     kWall(300, 166, 343, 177), // 百葉箱の脚
     kWall(374, 104, 389, 112), // 風の塔の根元
-    kWall(86, 96, 256, 106), // 気象台の建物の下のふち(壁の上を歩かないように)
+    kWall(86, 96, 158, 106), // 気象台の建物の下のふち(戸口の左)
+    kWall(184, 96, 256, 106), // 戸口の右
     kTrace("t_sticker", "t_sticker", 6.7 * T, 3.4 * T, -12), // 気象台の白い壁に、色あせた太陽のシール
+    knImg("venera", KN_VENERA.x, KN_VENERA.y, {
+      // ベネラの着陸機(三面図 K1)。窓の中が赤く光り、ピザ窯の口に見える(言葉では言わない)
+      draw(ctx, sx, sy, t, api) {
+        knDraw(ctx, api.image("venera"), sx, sy);
+        const el = knRunEl();
+        const flare = el > KN_RUN.leap && el < KN_RUN.melt ? 1 - (el - KN_RUN.leap) / (KN_RUN.melt - KN_RUN.leap) : 0;
+        const a = 0.18 + Math.sin(t * 3) * 0.08 + flare * 0.5;
+        const cx = sx;
+        const cy = sy - 30;
+        const gg = ctx.createRadialGradient(cx, cy, 1, cx, cy, 14 + flare * 10);
+        gg.addColorStop(0, `rgba(255, 140, 60, ${a})`);
+        gg.addColorStop(1, "rgba(255, 120, 40, 0)");
+        ctx.fillStyle = gg;
+        ctx.fillRect(cx - 26, cy - 26, 52, 52);
+      },
+    }),
+    {
+      // 撮影隊: ロケのあと、さかいの手前で三脚を立てて準備している
+      id: "crewOut",
+      x: 11.4 * T,
+      y: 7.7 * T,
+      w: 1,
+      h: 1,
+      hidden: (api) => !api.flag("dashed"),
+      draw(ctx, sx, sy, t, api) {
+        knDraw(ctx, api.image("kikikori"), sx, sy);
+        knDraw(ctx, api.image("goron"), sx + 1.2 * T, sy + 0.7 * T + 0 * Math.sin(t), { flip: false });
+      },
+    },
     // 見届け: きこりが消えたあと、ちりんの音が止むまでそばにいる(D189)
     kWatch({ id: "w_chirin", x: 13.2 * T, y: 7 * T, r: 2.2 * T, sec: 6, lure: "200, 230, 255", when: (api) => api.flag("gone") }),
     {
@@ -167,20 +688,6 @@ const KN_SANCHO = {
       draw() {},
       last: 0,
       update(dt, t, api) {
-        const now = knNow();
-        if (knS.phase === "run" && now - knS.t0 > 1.6) knS.phase = "edge";
-        // さかいで足ぶみして待つ。見える所まで来たら、陽炎の向こうへ
-        if (knS.phase === "edge" && api.player().x > 8.5 * T) {
-          knS.phase = "melt";
-          knS.t0 = now;
-        }
-        if (knS.phase === "melt" && now - knS.t0 > 3.2) {
-          knS.phase = "gone";
-          api.setFlag("gone");
-          // 金星は、ほかの星と逆向きに、ゆっくり回っている。きーも、逆向きにくるっと回る(まわる D203)
-          // まわるは能力としてはやめた(D226)。回る姿だけが残る
-          api.later(900, () => api.spin());
-        }
         // ちりんは、きこりが消えたあと、いつもと違う音で鳴り続ける(仮)
         if (api.flag("gone") && !api.flag("observed") && t - this.last > 3.5) {
           this.last = t;
@@ -188,58 +695,164 @@ const KN_SANCHO = {
         }
       },
     },
-    knImg("kikori", 1.5 * T, 7 * T, {
-      hidden: (api) => !["run", "edge", "melt"].includes(knS.phase),
-      draw(ctx, sx, sy, t, api) {
+    {
+      // きこり: 戸口から飛び出し、ピザを持ってさかいへ走り、ベネラの窓へ飛びこむ → こげて煙 → 陽炎の向こうで見えなくなる
+      id: "kikoriOut",
+      x: KN_DOOR_OUT.x,
+      y: KN_DOOR_OUT.y,
+      w: 1,
+      h: 1,
+      headY: 40,
+      hidden: () => knS.phase !== "run",
+      draw() {},
+      // ベネラより手前に描く(足もとの y で前後を決めると、窓に飛びこんだところがベネラの裏に隠れる)
+      drawOver(ctx, sx, sy, t, api) {
         const im = api.image("kikori");
         if (!im) return;
-        const now = knNow();
-        let x = sx;
-        let a = 1;
-        let wob = 0;
-        if (knS.phase === "run") x = sx + Math.min(1, (now - knS.t0) / 1.6) * (KN_EDGE - this.x);
-        if (knS.phase === "edge") {
-          x = sx + (KN_EDGE - this.x);
-          wob = 1.5; // 陽炎がかかりはじめる
-        }
-        if (knS.phase === "melt") {
+        const el = knRunEl();
+        const R = KN_RUN;
+        const ox = sx - this.x;
+        const oy = sy - this.y;
+        let x;
+        let y;
+        let o = { t };
+        let pizza = true;
+        if (el < R.run) {
+          [x, y] = knAlong([[KN_DOOR_OUT.x, KN_DOOR_OUT.y], [8 * T, 5.6 * T], [12 * T, 6.4 * T], [14.4 * T, 7.0 * T]], el / R.run);
+          y -= Math.abs(Math.sin(el * 18)) * 3;
+        } else if (el < R.leap) {
+          // 窓へ、跳ねるように飛びこむ
+          const u = (el - R.run) / (R.leap - R.run);
+          x = knLerp(14.4 * T, KN_WINDOW.x - 2, u);
+          y = knLerp(7.0 * T, KN_WINDOW.y + 16, u) - Math.sin(u * Math.PI) * 30;
+        } else if (el < R.char) {
+          // 窓に頭から突っこんだまま、黒くこげていく。煙
+          const u = (el - R.leap) / (R.char - R.leap);
+          x = KN_WINDOW.x - 2 + Math.round(Math.sin(el * 40) * (1 - u));
+          y = KN_WINDOW.y + 16;
+          o = { t, tint: `rgba(24, 16, 12, ${0.25 + u * 0.7})` };
+          pizza = u < 0.3;
+          for (let k = 0; k < 5; k++) {
+            const v = (el * 0.8 + k * 0.2) % 1;
+            const r = 2 + v * 5;
+            ctx.fillStyle = `rgba(70, 66, 62, ${0.6 * (1 - v)})`;
+            ctx.fillRect(Math.round(ox + x - 4 + Math.sin(k * 2 + el * 3) * 4 - r / 2), Math.round(oy + y - im.height - v * 26 - r / 2), Math.round(r), Math.round(r));
+          }
+        } else if (el < R.melt) {
           // 陽炎の向こうで、ゆらいで見えなくなる(溶ける瞬間は見せない)
-          const u = Math.min(1, (now - knS.t0) / 3.2);
-          x = sx + (KN_EDGE - this.x) + u * 2.4 * T;
-          a = 1 - u;
-          wob = Math.sin(t * 22) * (2 + u * 5);
+          const u = (el - R.char) / (R.melt - R.char);
+          x = KN_WINDOW.x - 2 + u * 0.4 * T;
+          y = KN_WINDOW.y + 16;
+          o = { t, tint: "rgba(24, 16, 12, 0.95)", alpha: 1 - u, wob: 2 + u * 5 };
+          pizza = false;
+        } else {
+          x = null;
         }
-        ctx.globalAlpha = Math.max(0, a);
-        for (let row = 0; row < im.height; row += 2) {
-          const off = Math.round(Math.sin(row * 0.6 + t * 14) * wob * 0.5);
-          ctx.drawImage(im, 0, row, im.width, 2, Math.round(x - im.width / 2 + off), Math.round(sy - im.height + row), im.width, 2);
+        if (x !== null) {
+          knDraw(ctx, im, ox + x, oy + y, o);
+          if (pizza) knPizza(ctx, ox + x, oy + y - im.height - 3, 13, "done");
         }
-        ctx.globalAlpha = 1;
       },
-    }),
-    knImg("chirin", 13.4 * T, 6.8 * T, {
+    },
+    knImg("chirin", 3.4 * T, 4.9 * T, {
+      // ちりん: 外で待つ。きこりが飛び出すと、さかいの手前まで追う
       draw(ctx, sx, sy, t, api) {
         const im = api.image("chirin");
         if (!im) return;
-        let x = sx + Math.sin(t * (api.flag("gone") ? 9 : 3)) * (api.flag("gone") ? 3 : 1.5);
-        if (knS.phase === "run") {
-          const el = knNow() - knS.t0;
-          x = sx - Math.max(0, 1 - el / 1.6) * (13.4 - 1.5) * T; // 追いかけて、さかいの手前まで
+        const gone = api.flag("gone");
+        let x = sx;
+        let y = sy;
+        const el = knRunEl();
+        if (gone || el >= 0) {
+          const u = gone ? 1 : Math.max(0, Math.min(1, (el - 0.5) / 2.2));
+          x = knLerp(sx, 13.4 * T - this.x + sx, u);
+          y = knLerp(sy, 6.8 * T - this.y + sy, u);
         }
-        ctx.drawImage(im, Math.round(x - im.width / 2), Math.round(sy - im.height - 6));
+        x += Math.sin(t * (gone ? 9 : 3)) * (gone ? 3 : 1.5);
+        knDraw(ctx, im, x, y - 6);
+      },
+      update(dt, t, api) {
+        // 吹き出しの位置(headY)を、追いかけた先に合わせる
+        if (api.flag("gone")) Object.assign(this, { x: 13.4 * T, y: 6.8 * T });
       },
       range: 40,
       interact: (api) => api.bubble("chirin", api.flag("gone") ? "チリ　リ……" : "チリーン", 1400),
     }),
-    knImg("i_denchi", 14.1 * T, 7.6 * T, {
-      range: 36,
-      hidden: (api) => !api.flag("gone") || api.hasItem("電池"),
+    {
+      // 焼けたピザはベネラの口の中(D383)。さかいの手前でベネラの方を向いて調べると、ピールがのびて取り出す
+      id: "oven",
+      x: 14.25 * T,
+      y: 7.3 * T,
+      w: 1,
+      h: 1,
+      headY: 30,
+      range: 52,
+      draw() {},
+      drawOver(ctx, sx, sy, t, api) {
+        const ox = sx - this.x;
+        const oy = sy - this.y;
+        const mx = ox + KN_WINDOW.x;
+        const my = oy + KN_WINDOW.y;
+        // 口の中の焼けたピザ(まだ取り出していないとき)と、細い煙
+        const inside = api.flag("gone") && !api.hasItem("焼けたピザ") && knPeelT0 < 0;
+        if (inside) {
+          knPizza(ctx, mx, my + 1, 6, "burnt");
+          for (let k = 0; k < 2; k++) {
+            const v = (t * 0.6 + k * 0.5) % 1;
+            ctx.fillStyle = `rgba(90, 84, 78, ${0.5 * (1 - v)})`;
+            ctx.fillRect(Math.round(mx - 2 + k * 4 + Math.sin(t * 3 + k) * 2), Math.round(my - 6 - v * 16), 2, 3);
+          }
+        }
+        if (knPeelT0 < 0) return;
+        // ピールがのびる → 口に入る → 焼けたピザをのせて戻る
+        const el = knNow() - knPeelT0;
+        const P = KN_PEEL;
+        const pl = api.player();
+        const hx = ox + pl.x + 6;
+        const hy = oy + pl.y - 12;
+        const u = el < P.reach ? el / P.reach : el < P.in ? 1 : Math.max(0, 1 - (el - P.in) / (P.back - P.in));
+        const ex = knLerp(hx + 14, mx, u);
+        const ey = knLerp(hy, my, u);
+        ctx.strokeStyle = "#6e4c28";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(hx, hy);
+        ctx.lineTo(ex, ey);
+        ctx.stroke();
+        ctx.strokeStyle = "#c4965f";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        knEll(ctx, ex, ey, 7, 4, "#6e4c28");
+        knEll(ctx, ex, ey, 6, 3, "#c4965f");
+        if (el >= P.in - 0.1) knPizza(ctx, ex, ey - 1, 6, "burnt");
+      },
+      canInteract: (api) => api.flag("gone") && api.flag("peel") && !api.hasItem("焼けたピザ") && knPeelT0 < 0,
       interact(api) {
-        api.hold("ic_denchi", 1.8, () => {
-          api.giveItem("電池");
-          api.clear();
+        api.face("east");
+        knPeelT0 = knNow();
+        api.freeze(KN_PEEL.back + 0.1);
+        api.sfx("whir");
+        api.later(KN_PEEL.in * 1000, () => api.sfx("pop"));
+        api.later(KN_PEEL.back * 1000, () => {
+          knPeelT0 = -1;
+          api.hold("ic_pizza", 1.8, () => {
+            api.giveItem("焼けたピザ");
+            api.clear();
+          });
         });
       },
-    }),
+    },
+    {
+      // 百葉箱(D382、D383): 調べると、こわれた温度計の一枚絵。言葉なし。いつでも
+      id: "hyakuyo",
+      x: 10.0 * T,
+      y: 5.6 * T,
+      w: 1,
+      h: 1,
+      headY: 70,
+      range: 44,
+      draw() {},
+      interact: (api) => api.show("v_thermo"),
+    },
   ],
 };
