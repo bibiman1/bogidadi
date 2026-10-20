@@ -355,7 +355,7 @@ const DAZAI_BOOKS = [
   { w: "takarabune", map: "engineroom", x: 13.5 * T, y: 4.5 * T, title: "魚服記" },
   { w: "noroi", map: "diner", x: 3 * T, y: 5.5 * T, title: "走れメロス" },
   { w: "padre", map: "akichi", x: 18.6 * T, y: 5.3 * T, title: "お伽草紙" },
-  { w: "kinsei", map: "sancho", x: 14.2 * T, y: 6.2 * T, title: "斜陽" },
+  { w: "kinsei", map: "sancho", x: 6.95 * T, y: 3.75 * T, title: "斜陽" }, // 気象台の色あせた太陽のシールの下(D392)
   { w: "bomber", map: "kichi", x: 3.6 * T, y: 6.5 * T, title: "トカトントン" },
 ];
 const kBook = (b) => ({
