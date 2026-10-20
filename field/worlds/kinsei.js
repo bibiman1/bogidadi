@@ -14,6 +14,7 @@
 const knS = { phase: "idle", t0: 0, walkT0: -1, cookT0: -1, setupT0: -1, goneT0: -1, kx: 0 };
 const knNow = () => performance.now() / 1000;
 const KN_EDGE = 14.6 * T; // 金星のさかい(山頂)
+const KN_HEAT_X = KN_EDGE - 0.9 * T; // ここより東へは、熱くて行けない(D391)
 // ベネラ 7 号の絵(venera.png)の、足もとから口のまん中までのずれ(絵を替えたら測りなおす)
 const KN_MOUTH_DX = -25;
 const KN_MOUTH_DY = -45;
@@ -679,7 +680,8 @@ const KN_NAKA = {
       interact() {
         this.fastUntil = knNow() + 1.5;
       },
-      canInteract: () => true,
+      // 台のピールを取るまでは反応しない(同じ場所の作業台が先。ここが先に反応して、ピールが持てなかった)
+      canInteract: (api) => api.flag("peel"),
     },
     {
       // ごろん(ディレクター): カチンコを鳴らす。できたら外へ
@@ -748,10 +750,7 @@ const KN_SANCHO = {
     }
   },
   debug: () => Object.assign({ now: knNow(), runEl: knRunEl(), cookEl: knCookEl() }, knS),
-  // きこりが消えたあと、金星のさかいから熱い風が吹きつける(D201)。ふんばる(ぱーでれで覚える)なら、つぶれて張りつき、じりじり進める
-  wind(api, x) {
-    return api.flag("gone") && x > 10.4 * T ? { x: -300, y: 0 } : null;
-  },
+  // 熱い風(D201)はやめた(D391)。さかいの手前で、熱くてはじき返される(heat)
   drawOverlay(ctx, ox, oy, t) {
     // 金星の熱: 東から黄色い光
     const g = ctx.createLinearGradient(ox + 12 * T, 0, ox + 20 * T, 0);
@@ -823,6 +822,46 @@ const KN_SANCHO = {
             dir = -1;
           }
           knDraw(ctx, knCrew(api, key, dir), x, y);
+        }
+      },
+    },
+    {
+      // 金星の熱(D391): さかいの手前まで来ると、熱くて、ぴょんとはじき返される。いつでも(荷物を持っていても)。言葉なし
+      // 熱の中へ突っこめるのは、きこりだけ。焼けたピザは、ここからピールをのばして取り出す(D383)
+      id: "heat",
+      x: KN_HEAT_X,
+      y: 7 * T,
+      w: 1,
+      h: 1,
+      hitT: -9,
+      draw() {},
+      update(dt, t, api) {
+        if (knS.phase === "run") return;
+        const p = api.player();
+        if (p.x < KN_HEAT_X) return;
+        api.knock(-240, 0);
+        if (t - this.hitT > 0.6) {
+          this.hitT = t;
+          api.sfx("pop");
+        }
+      },
+      drawOver(ctx, sx, sy, t, api) {
+        const e = t - this.hitT;
+        if (e < 0 || e > 1.1) return;
+        const p = api.player();
+        const px = Math.round(sx - this.x + p.x);
+        const py = Math.round(sy - this.y + p.y);
+        const a = Math.max(0, 1 - e / 1.1);
+        // きーが赤くほてる
+        ctx.fillStyle = `rgba(255, 70, 40, ${0.45 * a})`;
+        ctx.beginPath();
+        ctx.ellipse(px, py - 9, 11, 9, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // 湯気が三すじ、のぼって消える
+        for (let k = 0; k < 3; k++) {
+          const v = Math.min(1, e / 1.1 + k * 0.12);
+          ctx.fillStyle = `rgba(240, 240, 236, ${0.8 * a})`;
+          ctx.fillRect(px - 6 + k * 5 + Math.round(Math.sin(t * 9 + k) * 1.5), py - 20 - Math.round(v * 14), 2, 3);
         }
       },
     },
@@ -935,7 +974,10 @@ const KN_SANCHO = {
       w: 1,
       h: 1,
       headY: 30,
-      range: 52,
+      // 調べる点は、熱ではじかれる線の手前、ちりんより南(D391。ちりんと同じ所だと、ちりんが先に答えた)
+      ix: KN_HEAT_X - 0.3 * T - 14.25 * T,
+      iy: 0.9 * T,
+      range: 34,
       draw() {},
       drawOver(ctx, sx, sy, t, api) {
         const ox = sx - this.x;
