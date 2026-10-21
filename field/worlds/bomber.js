@@ -553,6 +553,16 @@ const B_KICHI = {
         }
         // 後ろ向きのプロペラ 4 基。エンジンが回っているあいだは、止まった羽根のない絵にして、回る円盤を描く。帰りは 1 基もげている
         const running = bS.phase === "taxi" || bS.phase === "landing" || (bS.phase === "morning" && bS.chocks);
+        // 車輪止め(はめている間)は機体より先に描き、翼が上からかぶさるようにする(todo 125)。
+        // 手前の主脚の 2 つの車輪を、前とうしろからはさむ(todo 124)。くさびの斜めの面を車輪にあて、ロープは車輪の下を通す
+        const ck = api.image("chock");
+        if (ck && (bS.phase === "morning" || bS.phase === "back") && !bS.chocks) {
+          const lx = Math.round(sx + B_CHOCK.l), rx = Math.round(sx + B_CHOCK.r) - 11, ty = Math.round(sy + B_CHOCK.y);
+          ctx.drawImage(ck, 0, 0, 11, 14, lx, ty, 11, 14);
+          ctx.drawImage(ck, 11, 0, 11, 14, rx, ty, 11, 14);
+          ctx.fillStyle = "rgb(150, 120, 80)";
+          ctx.fillRect(lx + 4, ty + 14, rx + 7 - (lx + 4), 1);
+        }
         ctx.drawImage((running && api.image("bomber_spin")) || im, x0, ly);
         if (dmg && hurt > 0) {
           ctx.save();
@@ -626,20 +636,10 @@ const B_KICHI = {
           // 安全ピンのリボンと、車輪止め(朝の手順)
           const rb = api.image("i_ribbon");
           if (rb && !bS.pin) ctx.drawImage(rb, Math.round(sx + B_GEAR.main - rb.width / 2), Math.round(sy + 5.6 * T - rb.height / 2)); // 主脚にさがっている
-          const ck = api.image("chock");
-          if (ck) {
-            if (bS.chocks) {
-              // 外した後は、脚のわきの地面に置く
-              const cx = sx + B_GEAR.nose + 1 * T;
-              ctx.drawImage(ck, Math.round(cx - ck.width / 2), Math.round(sy + 6.7 * T - ck.height / 2));
-            } else {
-              // 手前の主脚の 2 つの車輪を、前とうしろからはさむ(todo 124)。くさびの斜めの面を車輪にあて、ロープは車輪の下を通す
-              const lx = Math.round(sx + B_CHOCK.l), rx = Math.round(sx + B_CHOCK.r) - 11, ty = Math.round(sy + B_CHOCK.y);
-              ctx.drawImage(ck, 0, 0, 11, 14, lx, ty, 11, 14);
-              ctx.drawImage(ck, 11, 0, 11, 14, rx, ty, 11, 14);
-              ctx.fillStyle = "rgb(150, 120, 80)";
-              ctx.fillRect(lx + 4, ty + 14, rx + 7 - (lx + 4), 1);
-            }
+          if (ck && bS.chocks) {
+            // 外した後は、脚のわきの地面に置く
+            const cx = sx + B_GEAR.nose + 1 * T;
+            ctx.drawImage(ck, Math.round(cx - ck.width / 2), Math.round(sy + 6.7 * T - ck.height / 2));
           }
         }
       },
