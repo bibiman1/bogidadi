@@ -738,9 +738,18 @@ const KN_NAKA = {
         const im = api.image("k_tv");
         if (!im) return;
         knDraw(ctx, im, sx, sy);
-        // 画面のちらつき(走査線のような横すじと、明るさのゆれ)
         const x0 = Math.round(sx - im.width / 2) + KN_TV_SCREEN.x;
         const y0 = Math.round(sy - im.height) + KN_TV_SCREEN.y;
+        // D400: タイトル画が映るのは、ピザを切ったあと。それまでは消えている(暗いガラス)
+        if (!api.flag("cut")) {
+          ctx.fillStyle = "#26292c";
+          ctx.fillRect(x0, y0, KN_TV_SCREEN.w, KN_TV_SCREEN.h);
+          ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
+          ctx.fillRect(x0 + 3, y0 + 2, 4, 1);
+          ctx.fillRect(x0 + 2, y0 + 3, 1, 3);
+          return;
+        }
+        // 画面のちらつき(走査線のような横すじと、明るさのゆれ)
         ctx.fillStyle = `rgba(255, 255, 255, ${0.06 + 0.06 * Math.abs(Math.sin(t * 23))})`;
         ctx.fillRect(x0, y0, KN_TV_SCREEN.w, KN_TV_SCREEN.h);
         ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
@@ -748,6 +757,7 @@ const KN_NAKA = {
         ctx.fillRect(x0, y0 + r, KN_TV_SCREEN.w, 1);
       },
       interact: (api) => api.show("v_title"),
+      canInteract: (api) => api.flag("cut"), // 消えているあいだは調べられない(D400)
     },
     {
       // 照明(D389、仮の絵): 暗転のあいだに立つ。作業台を照らす
