@@ -239,7 +239,7 @@ window.BOGI_WORLDS = {
     name: "ぼぎボマーと地上ぼぎクルー",
     assetBase: "./assets/worlds/bomber/",
     images: Object.fromEntries(
-      ["bg_kichi", "bomber", "bomber_shadow", "bomber_shadow_props", "i_ribbon", "cap", "chock", "flag", "bomb_s", "bomb_m", "bomb_w", "bomb_l", "missile", "t_plane", "bomber_dmg", "bomber_spin", "bomber_dmg_spin", "v_fly1", "v_fly2", "v_fly3", "v_fly4", "v_fly5", "v_boom1", "v_rain01", "v_rain02", "v_rain03", "v_rain04", "v_rain05", "v_rain06", "v_rain07", "v_rain08", "v_rain09", "v_rain10", "v_rain11", "v_rain12", "v_rain13", "v_rain14", "v_rain15", "v_rain16", "v_laser1", "v_laser2", "v_laser3", "salute_hawk", "salute_wagtail", "salute_rooster", "daikon", "kabocha"]
+      ["bg_kichi", "bomber", "bomber_shadow", "bomber_shadow_props", "i_ribbon", "cap", "chock", "flag", "bomb_s", "bomb_m", "bomb_w", "bomb_l", "missile", "t_plane", "bomber_dmg", "bomber_spin", "bomber_dmg_spin", "v_fly1", "v_fly2", "v_fly3", "v_fly4", "v_fly5", "v_boom1", "v_rain01", "v_rain02", "v_rain03", "v_rain04", "v_rain05", "v_rain06", "v_rain07", "v_rain08", "v_rain09", "v_rain10", "v_rain11", "v_rain12", "v_rain13", "v_rain14", "v_rain15", "v_rain16", "v_laser1", "v_laser2", "v_laser3", "salute_hawk", "salute_wagtail", "salute_rooster", "daikon", "kabocha", "bg_hatake", "plant_s", "plant_m", "plant_w", "plant_l", "plant_daikon", "plant_kabocha"]
         .map((k) => [k, `${k}.png`])
         .concat([["ki", "./assets/worlds/lake/ki_walk.png"]])
         .concat(["crew_hawk", "crew_wagtail", "crew_rooster"].map((k) => [k, `./assets/worlds/kasumi/${k}.png`]))
@@ -247,7 +247,7 @@ window.BOGI_WORLDS = {
     playerSprite: { img: "ki", cell: 64, frames: 7, footY: 17 },
     start: "kichi",
     startSpawn: "start",
-    maps: { kichi: B_KICHI },
+    maps: { kichi: B_KICHI, farm: BF_MAP },
     onEnterWorld() {
       bMorning(); // 入るたびに、朝の手順から
     },

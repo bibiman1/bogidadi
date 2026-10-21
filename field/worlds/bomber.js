@@ -278,6 +278,7 @@ const B_KICHI = {
   spawns: {
     start: { x: 1.2 * T, y: 13.5 * T, facing: "east" },
     morning: { x: 12 * T, y: 17.6 * T, facing: "east" },
+    farm: { x: B_HANGAR.x, y: 7.6 * T, facing: "south" }, // ハンガーの畑から出てきたところ
   },
   // D401: 谷の向こうの投下のたびに、東から爆風が飛行場へ吹きつける(地ひびきと同じとき)。見届けの間ずっと。
   // ふんばる(ぱーでれで覚える)なら、つぶれて張りつき、旗の台で空を見ていられる。覚えていなければ、西へ押し戻されて見届けられない
@@ -329,6 +330,8 @@ const B_KICHI = {
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   },
   triggers: [
+    // ハンガー(掩体壕)の口から、中の畑へ(D408)
+    { id: "toFarm", x: B_HANGAR.x - 0.7 * T, y: 6.85 * T, w: 1.4 * T, h: 0.45 * T, warp: { map: "farm", spawn: "door" } },
     {
       id: "leave",
       x: -T,
@@ -939,5 +942,226 @@ const B_KICHI = {
         if (cap) ctx.drawImage(cap, Math.round(sx - cap.width / 2), Math.round(sy - 34));
       },
     },
+  ],
+};
+
+// ---- ハンガーの中の畑(D408、D409)。飛行場の北の掩体壕の口から入る。13 × 16 マス(絵は 416 × 496)。下絵は docs/assets/bomber/plan/farm.py ----
+// 背景は PixelLab の絵をそのまま(作者「２でいい。」。奥ほど少しせまく描かれているので、うねの位置は絵に合わせて斜めにとる)
+// 爆弾を野菜のように育てている。うね 5 本に、爆弾が頭を下にして植わり、尾翼が土から出ている。ところどころに大根とかぼちゃ。
+// きーは植わっているものを引きぬける(掲げる)。世話は運び手のぼぎだぢ。ぬいたあとは、近くのぼぎがすぐ植えなおす(畑はへらない)
+const BF_RY = [210, 410]; // うねの上はしと下はしの y(絵の上)
+const BF_RX = [
+  [78, 55],
+  [147, 130],
+  [212, 212],
+  [281, 290],
+  [350, 365],
+]; // うねのまん中の x(上はし、下はし)
+const bfRidgeX = (k, y) => BF_RX[k][0] + ((BF_RX[k][1] - BF_RX[k][0]) * (y - BF_RY[0])) / (BF_RY[1] - BF_RY[0]);
+const bfWallX = (y) => {
+  const u = Math.max(0, Math.min(1, (y - 200) / 245));
+  return [32 - 28 * u, 388 + 24 * u]; // 左右の壁の内がわ
+};
+// 通り道のまん中の x(0 = 左の壁と 1 本目のあいだ … 5 = 5 本目と右の壁のあいだ)
+const bfPathX = (q, y) => (q === 0 ? (bfWallX(y)[0] + bfRidgeX(0, y)) / 2 : q === 5 ? (bfRidgeX(4, y) + bfWallX(y)[1]) / 2 : (bfRidgeX(q - 1, y) + bfRidgeX(q, y)) / 2);
+const BF_KINDS = { s: "bomb_s", m: "bomb_m", w: "bomb_w", l: "bomb_l", daikon: "daikon", kabocha: "kabocha" };
+const bfS = { pulled: [] }; // ぬかれて、まだ植えなおされていないもの(植わっているものの番号)
+const BF_PLANTS = [];
+BF_RX.forEach((_, i) => {
+  for (let k = 0; k < 8; k++) {
+    const kind = (i * 7 + k * 3) % 11 === 2 ? "daikon" : (i * 5 + k * 2) % 13 === 4 ? "kabocha" : ["s", "m", "w", "l"][(i + k) % 4];
+    const y = 230 + k * 24;
+    BF_PLANTS.push({ x: bfRidgeX(i, y), y, kind });
+  }
+});
+// いちばん近い通り道の上の、植わっているものの横
+const bfBeside = (p) => {
+  let best = 0;
+  for (let q = 1; q < 6; q++) if (Math.abs(bfPathX(q, p.y) - p.x) < Math.abs(bfPathX(best, p.y) - p.x)) best = q;
+  return [bfPathX(best, p.y), p.y + 12]; // きーと重ならないよう、少し手前に立つ
+};
+const BF_CARE = [
+  ["crew_hawk", 1, 260],
+  ["crew_wagtail", 3, 330],
+  ["crew_rooster", 4, 250],
+  ["crew_wagtail", 2, 390],
+].map(([img, q, y], j) => ({
+  id: `care${j}`,
+  x: bfPathX(q, y),
+  y,
+  w: 1,
+  h: 1,
+  img,
+  q,
+  home: [bfPathX(q, y), y],
+  job: null, // 植えなおしに行く先(植わっているものの番号)
+  t0: 0,
+  update(dt, t) {
+    // ぬかれたものがあれば、手のあいている者が、いちばん近いものへ植えなおしに行く
+    if (this.job === null) {
+      const busy = BF_CARE.map((o) => o.job);
+      let best = null;
+      for (const n of bfS.pulled) {
+        if (busy.includes(n)) continue;
+        const d = Math.hypot(BF_PLANTS[n].x - this.x, BF_PLANTS[n].y - this.y);
+        if (!best || d < best.d) best = { n, d };
+      }
+      if (best) {
+        this.job = best.n;
+        this.t0 = 0;
+      }
+    }
+    if (this.job !== null) {
+      const to = bfBeside(BF_PLANTS[this.job]);
+      this.moving = Math.hypot(to[0] - this.x, to[1] - this.y) > 2;
+      if (this.moving) {
+        this.west = to[0] < this.x;
+        const dx = to[0] - this.x, dy = to[1] - this.y, d = Math.hypot(dx, dy);
+        this.x += (dx / d) * Math.min(d, 110 * dt);
+        this.y += (dy / d) * Math.min(d, 110 * dt);
+      } else {
+        this.west = BF_PLANTS[this.job].x < this.x;
+        this.t0 += dt;
+        if (this.t0 > 1.0) {
+          // 植えなおした
+          bfS.pulled = bfS.pulled.filter((n) => n !== this.job);
+          this.job = null;
+        }
+      }
+      return;
+    }
+    // ふだんは、持ち場の通り道を、ゆっくり行ったり来たりして世話をする(水やり、草ぬき)
+    const u = (t * 0.12 + this.home[1] * 0.01) % 2;
+    const ty = this.home[1] + Math.sin(u * Math.PI) * 1.2 * T;
+    this.moving = Math.abs(ty - this.y) > 0.5;
+    this.x += (bfPathX(this.q, this.y) - this.x) * Math.min(1, dt * 3);
+    this.y += (ty - this.y) * Math.min(1, dt * 3);
+  },
+  draw(ctx, sx, sy, t, api) {
+    const im = api.image(this.img);
+    if (!im) return;
+    const working = this.job !== null ? !this.moving : !this.moving || Math.floor(t * 0.5 + j) % 3 === 0;
+    const hop = this.moving && this.job !== null ? (Math.floor(t * 9 + j) % 2 ? 2 : 0) : working ? [0, 1, 2, 1][Math.floor(t * 14 + j * 1.7) % 4] : 0; // 修理と同じ、ぴょこぴょこ
+    ctx.save();
+    ctx.translate(Math.round(sx), Math.round(sy - hop));
+    if (this.west) ctx.scale(-1, 1);
+    ctx.drawImage(im, -Math.round(im.width / 2), -im.height);
+    ctx.restore();
+    // 水やり: 手もとから、しずくが 3 つ
+    if (working && this.job === null && j % 2 === 0) {
+      ctx.fillStyle = "rgba(150, 200, 255, 0.85)";
+      for (let k = 0; k < 3; k++) {
+        const f = (t * 1.6 + k / 3) % 1;
+        ctx.fillRect(Math.round(sx + (this.west ? -12 : 12) + (k - 1) * 2), Math.round(sy - 14 + f * 12), 1, 2);
+      }
+    }
+  },
+}));
+const BF_MAP = {
+  tile: T,
+  bg: "#2e2a26",
+  map: kGrid(13, 16, (c, r) => r < 6 || c < 1 || c > 11 || (r > 14 && (c < 5 || c > 7))),
+  legend: K_LEGEND,
+  drawGround: kImage("bg_hatake", 416, 496),
+  spawns: {
+    door: { x: 208, y: 14.3 * T, facing: "north" },
+  },
+  drawOverlay(ctx, ox, oy, t) {
+    // 天井から下がる裸電球。通り道の上に、4 つ(奥の壁の 2 つは壁といっしょに描く)
+    for (const y of [270, 360]) {
+      for (const q of [1, 4]) {
+        const X = Math.round(ox + bfPathX(q, y)), Y = Math.round(oy + y);
+        const g = ctx.createRadialGradient(X, Y + 2 * T, 4, X, Y + 2 * T, 3 * T);
+        g.addColorStop(0, "rgba(255, 220, 140, 0.16)");
+        g.addColorStop(1, "rgba(255, 220, 140, 0)");
+        ctx.fillStyle = g;
+        ctx.fillRect(X - 3 * T, Y - T, 6 * T, 6 * T);
+        ctx.fillStyle = "#28241f";
+        ctx.fillRect(X, Y - 18, 1, 18);
+        ctx.fillStyle = "#fff0b0";
+        ctx.fillRect(X - 3, Y, 6, 6);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(X - 1, Y + 1, 2, 2);
+      }
+    }
+  },
+  triggers: [{ id: "toKichi", x: 150, y: 15.0 * T, w: 115, h: 0.6 * T, warp: { map: "kichi", spawn: "farm" } }],
+  objects: [
+    {
+      // 奥の壁の掛け時計(D409)。針がぐるぐる速く回る。時間の進みかたが速い
+      id: "clock",
+      x: 208,
+      y: 6 * T,
+      w: 1,
+      h: 1,
+      draw(ctx, sx, sy, t) {
+        const cx = Math.round(sx), cy = Math.round(sy - 74), r = 23; // 奥の壁のまん中の柱に
+        ctx.fillStyle = "#28241f";
+        ctx.beginPath();
+        ctx.arc(cx, cy, r + 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#5a4632";
+        ctx.beginPath();
+        ctx.arc(cx, cy, r + 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#e8e2cc";
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#28241f";
+        for (let k = 0; k < 12; k++) {
+          const a = (k * Math.PI) / 6;
+          ctx.fillRect(Math.round(cx + Math.sin(a) * (r - 4)) - (k % 3 ? 0 : 1), Math.round(cy - Math.cos(a) * (r - 4)) - (k % 3 ? 0 : 1), k % 3 ? 1 : 2, k % 3 ? 1 : 2);
+        }
+        const m = t * Math.PI * 2; // 長針は 1 秒で 1 回り
+        const h = m / 3; // 短針は 3 秒で 1 回り
+        ctx.lineCap = "round";
+        ctx.strokeStyle = "#28241f";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.sin(h) * r * 0.45, cy - Math.cos(h) * r * 0.45);
+        ctx.stroke();
+        ctx.strokeStyle = "#962820";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.sin(m) * r * 0.8, cy - Math.cos(m) * r * 0.8);
+        ctx.stroke();
+        ctx.fillStyle = "#28241f";
+        ctx.fillRect(cx - 1, cy - 1, 3, 3);
+        // 奥の壁の裸電球(時計の左右)
+        for (const x of [-100, 100]) {
+          const X = Math.round(sx + x), Y = Math.round(sy - 70);
+          ctx.fillStyle = "#28241f";
+          ctx.fillRect(X, Y - 1.4 * T, 1, 1.4 * T);
+          ctx.fillStyle = "#fff0b0";
+          ctx.fillRect(X - 3, Y, 6, 6);
+        }
+      },
+    },
+    // うね(歩けない)
+    ...BF_RX.flatMap((_, k) => [0, 1, 2, 3, 4].map((m) => ({ id: `ridge${k}_${m}`, x: bfRidgeX(k, 230 + m * 40), y: 230 + m * 40, w: 1, h: 1, solid: { w: 28, h: 40 }, sortDy: -40, draw() {} }))),
+    // 植わっているもの。A で引きぬいて掲げる
+    ...BF_PLANTS.map((p, n) => ({
+      id: `plant${n}`,
+      x: p.x,
+      y: p.y,
+      w: 1,
+      h: 1,
+      range: 44,
+      noLook: true,
+      hidden: () => bfS.pulled.includes(n),
+      draw(ctx, sx, sy, t, api) {
+        const im = api.image(`plant_${p.kind}`);
+        if (im) ctx.drawImage(im, Math.round(sx - im.width / 2), Math.round(sy - im.height));
+      },
+      interact(api) {
+        bfS.pulled.push(n);
+        api.sfx("pop"); // スポッ
+        api.hold(BF_KINDS[p.kind], 1.4);
+      },
+    })),
+    ...BF_CARE,
   ],
 };
