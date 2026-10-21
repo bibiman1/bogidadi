@@ -53,8 +53,11 @@ const B_Y = 16.5 * T; // 機体が地面に接する高さ(車輪の下)
 const B_GROUND = 205;
 const B_LAND_SEC = 9; // 着陸にかける秒
 const B_PROPS = [[72, 57], [72, 88], [72, 131], [72, 160]];
+// 影のプロペラ 4 基(bomber_shadow_props の中の中心と、行のはば。docs/assets/bomber/plan/shadow_props.py)
+const B_SHADOW_PROPS = [[87, 74, 60, 88], [87, 103, 89, 117], [87, 147, 134, 161], [87, 177, 162, 192]];
+const B_CHOCK = { l: -24, r: 23, y: 5.95 * T - 7.5 }; // 車輪止め(はめている間)の左はし・右はしと上の、機体の中心からの位置
 const B_GEAR = { main: -0.4 * T, nose: 0.5 * T }; // 機体の中心(x)からの、リボンを下げる所と車輪止めの所(どちらも手前の主脚)
-const bMorning = () => Object.assign(bS, { phase: "morning", t0: 0, pin: false, chocks: false, offered: false, boomed: false, booms: 0, answered: false, seq: false, revT0: -1, farewell: false, capAt: null, greeted: false, salT0: -1, loadT0: bNow(), shown: false });
+const bMorning = () => Object.assign(bS, { phase: "morning", t0: 0, pin: false, chocks: false, offered: false, boomed: false, booms: 0, answered: false, seq: false, revT0: -1, farewell: false, capAt: null, greeted: false, salT0: -1, loadT0: bNow(), shown: false, chocksT: 0 });
 // 爆装(D182): 機首の前(東)に、翼の前のふちと平行な列で爆弾とミサイルを並べる(参考写真 docs/record/2026-10-05-bomber/ref_munitions.jpg)
 // 列 0 が機首にいちばん近い。クルーは近い列から積んでいく
 // 機首の前に、翼の前のふちと平行な列で並べる(D182)。斜めの見下ろしの機体(D208)に合わせ、列の頂点は機首の正面、腕は前縁と同じ傾きで左上・左下へ。
@@ -88,6 +91,10 @@ const B_BOMBS = (() => {
 // 帰ってきたあとは、機首の下から運び出して、列に並べなおす(D204)。
 // だれが、いつ、どこからどこへ、何をかついで歩くかは、はじめに区間の並びとして決めておく
 const B_PORTER_N = 48;
+// 見送りの列(D403): エンジンがかかると、運び手のうち 20 体が格納庫から出て、滑走路の南のわき(旗の台より東)に並ぶ
+const B_SEE_N = 20;
+const B_SEE_X0 = 25.5 * T;
+const B_SEE_Y = 18.5 * T;
 const B_HATCH = { x: B_NOSE.x - 34, y: B_NOSE.y }; // 機首の下(翼にかくれる所)
 const B_HANGAR = { x: 925, y: 186 }; // 格納庫の口(背景の絵の、暗いアーチの下)
 // 修理の持ち場(D223、D225): 翼の上の 18 か所だけ(機体の絵の中の位置、絵の左上がマップの (384, 323))
@@ -142,7 +149,8 @@ const bPlan = (morning) => {
       b.tp = free[j];
       walk(j, B_HATCH, b.img, k);
     });
-    // 積み終えた者は、翼の下にもぐって見えなくなる
+    // 積み終えた者は、格納庫(ハンガー)へ歩いて帰る(D403。前は翼の下にもぐって見えなくなっていた)
+    for (let j = 0; j < n; j++) walk(j, B_HANGAR, null);
   } else {
     // 帰ってきたら、一斉に修理(D223。爆弾を並べなおすのはやめた)。バンカーから走り出て、翼の上に散る
     // 修理に上がるのは 18 体だけ(作者「修理クルーを機上18人だけに減らそうか。」)。ほかのぼぎは出てこない
@@ -471,7 +479,7 @@ const B_KICHI = {
         if (e > 2) return; // 途中から(撮影の道具などで)入ったときは見せない
         bS.shown = true;
         const keys = bShowKeys().map((k) => Object.assign({}, k, { t: Math.max(0, k.t - e) }));
-        api.camPath(keys);
+        api.camPath(keys, null, { noSkip: !api.flag("loadSeen") }); // 1 回目は A で飛ばせない(D403)。2 回目からは飛ばせる(D268)
         api.later(Math.max(0, (B_SHOW.photo - e) * 1000), () => {
           if (bS.phase !== "morning" || !api.camPathOn()) return;
           api.sfx("shutter");
@@ -509,7 +517,26 @@ const B_KICHI = {
         const { lift } = bPose();
         const x0 = Math.round(sx - im.width / 2);
         const y0 = Math.round(sy + (B_Y - 10.5 * T) - B_GROUND);
-        if (sh) ctx.drawImage(sh, x0 + Math.round(lift * 0.3), y0 + Math.round(lift * 0.6));
+        if (sh) {
+          const shx = x0 + Math.round(lift * 0.3);
+          const shy = y0 + Math.round(lift * 0.6);
+          ctx.drawImage(sh, shx, shy);
+          // 影のプロペラ(D403): 止まっているときは羽根の影、回っているときは、うすい円。帰りは 1 基もげている
+          const spin = bS.phase === "taxi" || bS.phase === "landing" || (bS.phase === "morning" && bS.chocks);
+          const lost = bS.phase === "landing" || bS.phase === "back";
+          B_SHADOW_PROPS.forEach(([cx, cy, y0b, y1b], i) => {
+            if (lost && i === 2) return;
+            if (spin) {
+              ctx.fillStyle = "rgba(0, 0, 0, 0.14)";
+              ctx.beginPath();
+              ctx.ellipse(shx + cx, shy + cy, 13, 13, 0, 0, Math.PI * 2);
+              ctx.fill();
+            } else {
+              const pr = api.image("bomber_shadow_props");
+              if (pr) ctx.drawImage(pr, 0, y0b, 95, y1b - y0b + 1, shx, shy + y0b, 95, y1b - y0b + 1);
+            }
+          });
+        }
         // ジュラルミン無塗装の XB-35(D205)。帰ってきたときはボロボロ(D206)。クルーがふさいでいくと、少しずつ元の銀にもどる
         const ly = y0 - Math.round(lift);
         const dmg = api.image("bomber_dmg");
@@ -601,8 +628,18 @@ const B_KICHI = {
           if (rb && !bS.pin) ctx.drawImage(rb, Math.round(sx + B_GEAR.main - rb.width / 2), Math.round(sy + 5.6 * T - rb.height / 2)); // 主脚にさがっている
           const ck = api.image("chock");
           if (ck) {
-            const cx = bS.chocks ? sx + B_GEAR.nose + 1 * T : sx + B_GEAR.nose; // 主脚の車輪に
-            ctx.drawImage(ck, Math.round(cx - ck.width / 2), Math.round(sy + (bS.chocks ? 6.7 : 5.95) * T - ck.height / 2));
+            if (bS.chocks) {
+              // 外した後は、脚のわきの地面に置く
+              const cx = sx + B_GEAR.nose + 1 * T;
+              ctx.drawImage(ck, Math.round(cx - ck.width / 2), Math.round(sy + 6.7 * T - ck.height / 2));
+            } else {
+              // 手前の主脚の 2 つの車輪を、前とうしろからはさむ(todo 124)。くさびの斜めの面を車輪にあて、ロープは車輪の下を通す
+              const lx = Math.round(sx + B_CHOCK.l), rx = Math.round(sx + B_CHOCK.r) - 11, ty = Math.round(sy + B_CHOCK.y);
+              ctx.drawImage(ck, 0, 0, 11, 14, lx, ty, 11, 14);
+              ctx.drawImage(ck, 11, 0, 11, 14, rx, ty, 11, 14);
+              ctx.fillStyle = "rgb(150, 120, 80)";
+              ctx.fillRect(lx + 4, ty + 14, rx + 7 - (lx + 4), 1);
+            }
           }
         }
       },
@@ -682,6 +719,7 @@ const B_KICHI = {
       interact(api) {
         if (bStep() !== 1) return api.bubble("crew1", "……", 1000); // ピンが先
         bS.chocks = true;
+        bS.chocksT = bNow(); // エンジンがかかる。運び手が格納庫から出て、見送りに並ぶ(D403)
         bS.revT0 = bNow(); // エンジンがかかる
         api.bubble("crew1", "カン", 700);
         api.sfx("whir");
@@ -782,12 +820,27 @@ const B_KICHI = {
       img: ["crew_hawk", "crew_wagtail", "crew_rooster"][j % 3],
       seg: null,
       hidden() {
-        return !this.seg;
+        return !this.seg && !this.see;
       },
       update() {
         const e = bCarryT();
         const segs = e === null ? null : B_SEGS[bS.phase][j]; // 修理は、きーが去るあいだも続く
         this.seg = (segs && segs.find((sg) => sg.t0 <= e && e < sg.t1)) || null;
+        // 見送り(D403): エンジンがかかると、格納庫から出てきて、滑走路の南のわきに一列に並ぶ。飛び立って、爆撃が終わるまで
+        this.see = null;
+        if (!this.seg && j < B_SEE_N && bS.chocksT && (bS.phase === "taxi" || bS.phase === "away" || (bS.phase === "morning" && bS.chocks))) {
+          const to = { x: B_SEE_X0 + j * 0.5 * T, y: B_SEE_Y };
+          const u = Math.max(0, Math.min(1, (bNow() - bS.chocksT - j * 0.12) / 3));
+          if (u > 0) {
+            this.x = B_HANGAR.x + (to.x - B_HANGAR.x) * u;
+            this.y = B_HANGAR.y + (to.y - B_HANGAR.y) * u;
+            this.west = to.x < B_HANGAR.x && u < 1;
+            this.moving = u < 1;
+            this.e = bNow();
+            this.see = true;
+          }
+          return;
+        }
         if (!this.seg) return;
         const sg = this.seg;
         const k = Math.min(1, (e - sg.t0) / Math.max(0.01, sg.t1 - sg.t0 - 0.25)); // さいごの 0.25 秒は、かつぐ・下ろす
@@ -802,7 +855,24 @@ const B_KICHI = {
       },
       draw(ctx, sx, sy, t, api) {
         const im = api.image(this.seg && this.seg.pose === "salute" ? B_SALUTE[this.img] : this.img) || api.image(this.img);
-        if (!im || !this.seg) return;
+        if (!im) return;
+        if (this.see) {
+          if (bBlast()) {
+            // 爆風のあいだは、クルーと同じく張りつく(D402)
+            const w = Math.round(im.width * 1.35);
+            const h = Math.round(im.height * 0.5);
+            ctx.drawImage(im, Math.round(sx - w / 2), Math.round(sy - h), w, h);
+            return;
+          }
+          const hop = this.moving ? (Math.floor(this.e * 9 + j) % 2 ? 2 : 0) : 0;
+          ctx.save();
+          ctx.translate(Math.round(sx), Math.round(sy - hop));
+          if (this.west) ctx.scale(-1, 1);
+          ctx.drawImage(im, -Math.round(im.width / 2), -im.height);
+          ctx.restore();
+          return;
+        }
+        if (!this.seg) return;
         // 小走り。修理は、ぴょこぴょこ小刻みに上下する(作者「ぴょこぴょこ上下に小刻みに動いていると、修理みたいになる」)
         const hop = this.moving ? (Math.floor(this.e * 9 + j) % 2 ? 2 : 0) : this.seg.pose === "repair" ? [0, 1, 2, 1][Math.floor(this.e * 14 + j * 1.7) % 4] : 0;
         const b = this.seg.carry ? api.image(this.seg.carry) : null;

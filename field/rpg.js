@@ -156,8 +156,9 @@ const ASSET_V = (() => {
         },
         // 見せ場のカメラワーク: keys は時刻(秒)ごとの中心 x, y と寄り z(1 がふつう、小さいほど引き)。
         // 最後の点のあと 1.2 秒でふつうのカメラに戻る。そのあいだ、きーは動かない。A で飛ばせる
-        camPath(keys, onDone) {
-          camPath = { keys, t0: clock, onDone: onDone || null };
+        // opts.noSkip: A で飛ばせない(はじめて見る見せ場など)
+        camPath(keys, onDone, opts) {
+          camPath = { keys, t0: clock, onDone: onDone || null, noSkip: !!(opts && opts.noSkip) };
         },
         camPathOn() {
           return !!camPath;
@@ -864,6 +865,7 @@ const ASSET_V = (() => {
       aHeld = true;
       if (!world) return false;
       if (camPath && !cutscene) {
+        if (camPath.noSkip) return true; // 飛ばせない見せ場(A は何もしない)
         // 見せ場を飛ばす: 最後の点へ行ったことにして、ふつうのカメラに戻りはじめる
         const ks = camPath.keys;
         if (clock - camPath.t0 < ks[ks.length - 1].t) camPath.t0 = clock - ks[ks.length - 1].t;
