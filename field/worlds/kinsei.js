@@ -202,9 +202,14 @@ const KN_CREW_V = 120; // 撮影隊の登る速さ(px/秒)。木箱を運ぶき�
 // D395: 撮影隊は道の終わり(山頂への口の手前)で止まって待ち、きーが近づくと、ひと足先に山頂へ入る(道のはしを越えると見えなくなる)
 const KN_CREW_END = 28.4 * T; // ききこり(列のいちばん前)が止まる所。ほかは同じ間をあけて止まる
 const KN_CREW_LEAD = 5.6 * T; // ききこりの、はじめの位置
+// 撮影隊は木箱を運ぶきーより速いので、きーの少し先(画面の中)で歩みをゆるめて待つ(先に行きすぎて、画面の外で消えていた)
+const KN_CREW_AHEAD = 4.2 * T; // ききこりが、きーより先に行ってよいはば
 const knCrewX = (x0) => {
   if (knS.walkT0 < 0) return x0;
-  const x = Math.min(x0 + (knNow() - knS.walkT0) * KN_CREW_V, KN_CREW_END - (KN_CREW_LEAD - x0));
+  const near = (knS.px || x0) + KN_CREW_AHEAD - (KN_CREW_LEAD - x0);
+  const key = "c" + x0;
+  const x = Math.max(knS[key] || x0, Math.min(x0 + (knNow() - knS.walkT0) * KN_CREW_V, near, KN_CREW_END - (KN_CREW_LEAD - x0))); // あと戻りはしない
+  knS[key] = x;
   return knS.crewGoT0 < 0 ? x : x + (knNow() - knS.crewGoT0) * KN_CREW_V;
 };
 const KN_SANDO = {
@@ -246,6 +251,7 @@ const KN_SANDO = {
           knS.phase = "climb";
           knS.walkT0 = knNow();
           knS.crewGoT0 = -1;
+          for (const k of Object.keys(knS)) if (k.startsWith("c") && /^c\d/.test(k)) delete knS[k];
         });
       },
     },
@@ -319,6 +325,7 @@ const KN_SANDO = {
           knS.kx = this.x;
           return;
         }
+        knS.px = api.player().x;
         if (knS.crewGoT0 < 0 && api.player().x > KN_CREW_END - 4 * T) knS.crewGoT0 = knNow(); // きーが来たので、先に山頂へ
         const target = Math.min(29.5 * T, api.player().x + 2.6 * T + Math.sin(t * 1.4) * 2.2 * T);
         knS.kx += Math.max(-1, Math.min(1, target - knS.kx)) * Math.min(Math.abs(target - knS.kx), 260 * dt);
