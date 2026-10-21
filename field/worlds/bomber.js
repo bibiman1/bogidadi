@@ -103,7 +103,8 @@ const bPlan = (morning) => {
   const n = B_PORTER_N;
   const free = Array.from({ length: n }, (_, j) => j * (morning ? 0.12 : 0.07)); // 一体ずつ、つぎつぎに出てくる
   const speed = Array.from({ length: n }, (_, j) => (morning ? 190 : 230) + ((j * 37) % 30)); // 足の速さは少しずつちがう。修理には駆けつける
-  const at = Array.from({ length: n }, () => B_HANGAR);
+  // 帰った後は、見送りの列(D403)にいる者は、列から修理に駆けつける(todo 126)
+  const at = Array.from({ length: n }, (_, j) => (!morning && j < B_SEE_N ? { x: B_SEE_X0 + j * 0.5 * T, y: B_SEE_Y } : B_HANGAR));
   const segs = Array.from({ length: n }, () => []);
   const LIFT = 0.25; // かつぎ上げる、下ろす手間
   const pick = () => {
@@ -158,8 +159,18 @@ const bPlan = (morning) => {
       walk(j, B_REPAIR[j], null);
       wait(j, 1e5, "repair");
     }
+    // 修理に上がらない列の者は、格納庫へ歩いて帰る
+    for (let j = B_REPAIR.length; j < Math.min(n, B_SEE_N); j++) walk(j, B_HANGAR, null);
   }
   return segs;
+};
+// 爆風のあいだ、クルーは木の体のまま横にたおれて伏せる(todo 126。D402 のつぶれるをやめた)。頭は西、足は爆風の来る東
+const bProne = (ctx, im, sx, sy) => {
+  ctx.save();
+  ctx.translate(Math.round(sx), Math.round(sy - im.width / 2));
+  ctx.rotate(-Math.PI / 2);
+  ctx.drawImage(im, -Math.round(im.width / 2), -Math.round(im.height / 2));
+  ctx.restore();
 };
 const B_SHOW = {}; // 朝の見せ場の時刻(積みこみの段取りから決まる)
 const B_SEGS = { morning: bPlan(true), back: bPlan(false) };
@@ -228,11 +239,9 @@ const bCrew = (id, img, x, y, phase, extra) =>
         const u = saluting ? 0.9 : (t + phase) % 1.3;
         const working = (bS.phase === "morning" || bS.phase === "back") && !bS.farewell; // 帰ってきたら、すぐ傷をふさぐ(D204)。見送るときは手を止める
         const hop = u < 0.12 && working ? 2 : 0; // 整備の手つき
-        // D402: 爆風のあいだは、毎朝のことで慣れたクルーも、つぶれて地面に張りつく(きーのふんばると同じ形。言葉なしの手本)
+        // D402: 爆風のあいだは、毎朝のことで慣れたクルーも、地面に伏せる(言葉なしの手本。木の体なので縮まずに伏せる todo 126)
         if (bBlast()) {
-          const w = Math.round(im.width * 1.35);
-          const h = Math.round(im.height * 0.5);
-          ctx.drawImage(im, Math.round(sx - w / 2), Math.round(sy - h), w, h);
+          bProne(ctx, im, sx, sy);
           return;
         }
         if (bS.farewell) {
@@ -828,7 +837,9 @@ const B_KICHI = {
         this.seg = (segs && segs.find((sg) => sg.t0 <= e && e < sg.t1)) || null;
         // 見送り(D403): エンジンがかかると、格納庫から出てきて、滑走路の南のわきに一列に並ぶ。飛び立って、爆撃が終わるまで
         this.see = null;
-        if (!this.seg && j < B_SEE_N && bS.chocksT && (bS.phase === "taxi" || bS.phase === "away" || (bS.phase === "morning" && bS.chocks))) {
+        // 着陸のあいだも並んだまま出迎え、止まったら、列から持ち場へ(todo 126)
+        const waitBack = bS.phase === "back" && segs && segs[0] && e < segs[0].t0;
+        if (!this.seg && j < B_SEE_N && bS.chocksT && (bS.phase === "taxi" || bS.phase === "away" || bS.phase === "landing" || waitBack || (bS.phase === "morning" && bS.chocks))) {
           const to = { x: B_SEE_X0 + j * 0.5 * T, y: B_SEE_Y };
           const u = Math.max(0, Math.min(1, (bNow() - bS.chocksT - j * 0.12) / 3));
           if (u > 0) {
@@ -858,10 +869,8 @@ const B_KICHI = {
         if (!im) return;
         if (this.see) {
           if (bBlast()) {
-            // 爆風のあいだは、クルーと同じく張りつく(D402)
-            const w = Math.round(im.width * 1.35);
-            const h = Math.round(im.height * 0.5);
-            ctx.drawImage(im, Math.round(sx - w / 2), Math.round(sy - h), w, h);
+            // 爆風のあいだは、クルーと同じく伏せる(D402、todo 126)
+            bProne(ctx, im, sx, sy);
             return;
           }
           const hop = this.moving ? (Math.floor(this.e * 9 + j) % 2 ? 2 : 0) : 0;
