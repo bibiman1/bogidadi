@@ -11,7 +11,7 @@
 //       → 作業台に残ったピザピールを持って、さかいの手前から口へのばし、焼けたピザを取り出す(D383。電池はなくした D380)→ 帰る条件。西から帰る
 //       山頂の百葉箱を調べると、こわれた温度計の一枚絵(D382)
 // 向き(D148): きーは左(西)から登り、金星は右(東)のはし。図: docs/assets/kinsei/plan/(配置図 K2、絵コンテ K3)、三面図 K1(sanmen/venera7.py、第 3 版)
-const knS = { phase: "idle", t0: 0, walkT0: -1, cookT0: -1, setupT0: -1, goneT0: -1, bakeT0: -1, eatT0: -1, kx: 0 };
+const knS = { phase: "idle", t0: 0, walkT0: -1, cookT0: -1, setupT0: -1, goneT0: -1, eatT0: -1, kx: 0 };
 const knNow = () => performance.now() / 1000;
 const KN_EDGE = 14.6 * T; // 金星のさかい(山頂)
 const KN_HEAT_X = KN_EDGE - 0.9 * T; // ここより東へは、熱くて行けない(D391)
@@ -342,7 +342,8 @@ const KN_SANDO = {
 
 // ---- 気象台の中: ロケ「ぼぎだぢクッキング」(D378〜D380、絵コンテ K3) ----
 // 時刻(ロケが始まってからの秒)。カチンコ → こねる → 丸める → 押し広げる → 放り投げて回す ×3 → ソース → チーズ → バジル → 予報 → 撮影隊は外へ → きこりが飛び出す
-const KN_COOK = { clap: 1.0, knead: 3.0, ball: 5.0, press: 7.0, toss1: 9.0, toss3: 13.0, sauce: 16.0, cheese: 18.0, basil: 20.0, radio: 23.5, crew: 25.0, bolt: 26.0, end: 26.4 };
+// D394: 予報のあと、きこりがピザだけつかんで飛び出し(crew〜bolt)、撮影隊がピールを持って追いかける(chase〜end)
+const KN_COOK = { clap: 1.0, knead: 3.0, ball: 5.0, press: 7.0, toss1: 9.0, toss3: 13.0, sauce: 16.0, cheese: 18.0, basil: 20.0, radio: 23.5, crew: 25.0, bolt: 26.0, chase: 25.6, grab: 26.0, end: 27.0 };
 const KN_TABLE = { x: 7 * T, y: 4.45 * T }; // 作業台の足もと
 const KN_TV = { x: 10.1 * T, y: 3.45 * T }; // テレビの足もと(北の壁ぎわ、戸棚の左)
 const KN_TV_SCREEN = { x: 6, y: 19, w: 29, h: 19 }; // テレビの絵の中の画面(左上と大きさ。絵を替えたら測りなおす)
@@ -381,8 +382,8 @@ const knCookStart = (api) => {
   ]);
   api.later(KN_COOK.basil * 1000, () => api.bubble("radio", KN_FORECAST, 3400));
   api.later(KN_COOK.crew * 1000, () => api.sfx("oink"));
-  api.later(KN_COOK.bolt * 1000, () => {
-    api.setFlag("dashed"); // 撮影隊は外へ、きこりはピザを持って飛び出した
+  api.later(KN_COOK.end * 1000, () => {
+    api.setFlag("dashed"); // きこりはピザを持って飛び出し、撮影隊はピールを持って追いかけた(D394)
     knS.cookT0 = -1;
   });
 };
@@ -459,7 +460,7 @@ const KN_NAKA = {
         // 台の上のピザ(ロケの段に合わせて)
         const el = knCookEl();
         // ピザピール(D383): できたピザはピールにのる。きこりがピザだけつかんで飛び出したあと、ピールが台に残る
-        const peelOnTable = (el >= KN_COOK.basil) || (api.flag("dashed") && !api.flag("peel"));
+        const peelOnTable = el >= KN_COOK.basil && el < KN_COOK.grab; // ごろんがつかんで、追いかけていく(D394)
         if (peelOnTable) knDraw(ctx, api.image("k_peel"), sx + 4, sy - 17);
         if (el < 0) return;
         const C = KN_COOK;
@@ -482,16 +483,11 @@ const KN_NAKA = {
         else if (el < C.crew + 0.35 * (C.bolt - C.crew)) knPizza(ctx, px + 13, py - 1, 13, "done"); // ピールの上
       },
       interact(api) {
-        if (api.flag("dashed")) {
-          api.setFlag("peel"); // ピールを持つ(D383)
-          api.sfx("item");
-          return;
-        }
         api.setFlag("placed");
         api.sfx("item");
         knSetupStart(api);
       },
-      canInteract: (api) => (api.flag("boxed") && !api.flag("placed")) || (api.flag("dashed") && !api.flag("peel")),
+      canInteract: (api) => api.flag("boxed") && !api.flag("placed"),
     },
     {
       // きこり: 台の向こうでピザを作る。できたら掲げ、予報のあと、待ちきれずに飛び出す
@@ -564,13 +560,15 @@ const KN_NAKA = {
         const el = knCookEl();
         let x = sx;
         let y = sy;
-        if (el >= KN_COOK.radio) {
-          const u = (el - KN_COOK.radio) / 1.4;
+        const C = KN_COOK;
+        if (el >= C.chase) {
+          // きこりを追いかけて、戸口へ走る(D394)
+          const u = (el - C.chase) / (C.end - C.chase - 0.2);
           if (u >= 1) return;
           x = knLerp(sx, KN_DOOR_IN.x - this.x + sx, u);
-          y = knLerp(sy, KN_DOOR_IN.y - this.y + sy, u) - Math.abs(Math.sin(el * 9)) * 1.5;
+          y = knLerp(sy, KN_DOOR_IN.y - this.y + sy, u) - Math.abs(Math.sin(el * 16)) * 2.5;
         }
-        knDraw(ctx, knCrew(api, "kikikori", el >= KN_COOK.radio ? -1 : 1), x, y); // 台の方(東)を向いて撮る。戸口へは西へ
+        knDraw(ctx, knCrew(api, "kikikori", el >= C.chase ? -1 : 1), x, y); // 台の方(東)を向いて撮る。戸口へは西へ
       },
     },
     {
@@ -642,16 +640,15 @@ const KN_NAKA = {
       hidden: (api) => !api.flag("gone") || (knS.goneT0 >= 0 && knNow() - knS.goneT0 < KN_ORO.end),
       draw(ctx, sx, sy, t, api) {
         const fast = knNow() < this.fastUntil ? 2.2 : 1;
-        // 外でベネラに入れて焼いたピザ(D393)。焼くまでは、撮影隊は中で待っている(テレビを見ているだけ)
-        const baked = api.flag("baked");
+        // 撮影隊のピザ(どこから来たかは言わない。D394 で、ベネラで焼く場面 D393 はやめた)
         // 台の上のピザ: 二切れ欠けている(欠けた所は台の色)。きーも食べたら三切れ(todo 117)
         const px = sx - 14;
         const py = sy - 23;
-        if (baked) knPizza(ctx, px, py, 14, "done");
+        knPizza(ctx, px, py, 14, "done");
         ctx.fillStyle = "#96744f";
         const cuts = [[-0.35, 0.45], [1.6, 2.4]];
         if (api.flag("ate")) cuts.push([3.3, 4.1]);
-        for (const [a0, a1] of baked ? cuts : []) {
+        for (const [a0, a1] of cuts) {
           ctx.beginPath();
           ctx.moveTo(px, py - 0.5);
           for (let k = 0; k <= 6; k++) {
@@ -664,9 +661,8 @@ const KN_NAKA = {
         // ききこり(左)とごろん(右)。一切れずつ持って、もぐもぐ
         // テレビの前の撮影隊(D389): テレビの方を向いて、一切れずつ持って見ている(もぐもぐ)
         const eat = (key, x, y, d, ph, mouthY) => {
-          const chew = baked ? Math.floor((t * 6 * fast + ph) % 2) : 0; // 1 ドット上下
+          const chew = Math.floor((t * 6 * fast + ph) % 2); // 1 ドット上下
           knDraw(ctx, knCrew(api, key, d), x, y - chew);
-          if (!baked) return;
           // 口の前に一切れ(耳が外がわ、とがった方が口へ)
           const hx = Math.round(x + d * 9);
           const hy = Math.round(y - mouthY - chew);
@@ -712,8 +708,8 @@ const KN_NAKA = {
         }
         this.fastUntil = knNow() + 1.5;
       },
-      // 台のピールを取るまでは反応しない(同じ場所の作業台が先。ここが先に反応して、ピールが持てなかった)。焼いたピザが来てから
-      canInteract: (api) => api.flag("peel") && api.flag("baked"),
+      // ピールは外にあるので、台はもうピールを渡さない(D394)
+      canInteract: (api) => api.flag("gone"),
     },
     {
       // ごろん(ディレクター): カチンコを鳴らす。できたら外へ
@@ -728,13 +724,19 @@ const KN_NAKA = {
         const el = knCookEl();
         let x = sx;
         let y = sy;
-        if (el >= KN_COOK.radio + 0.5) {
-          const u = (el - KN_COOK.radio - 0.5) / 1.6;
+        const C = KN_COOK;
+        let peel = false;
+        if (el >= C.chase) {
+          // 台のピールをつかんで(D394)、きこりを追いかけて戸口へ
+          const u = Math.min(1, (el - C.chase) / (C.end - C.chase));
           if (u >= 1) return;
-          x = knLerp(sx, KN_DOOR_IN.x - this.x + sx, u);
-          y = knLerp(sy, KN_DOOR_IN.y - this.y + sy, u) - Math.abs(Math.sin(el * 9)) * 1.5;
+          const [ax, ay] = knAlong([[this.x, this.y], [KN_TABLE.x + 0.9 * T, KN_TABLE.y + 0.6 * T], [KN_DOOR_IN.x, KN_DOOR_IN.y]], u);
+          x = sx + ax - this.x;
+          y = sy + ay - this.y - Math.abs(Math.sin(el * 16)) * 2.5;
+          peel = el >= C.grab;
         }
         knDraw(ctx, knCrew(api, "goron", -1), x, y); // 台の方(西)を向く。戸口へも西へ
+        if (peel) knPeelHeld(ctx, x, y, -1);
       },
     },
   ],
@@ -748,28 +750,27 @@ const KN_PEEL = { reach: 0.8, in: 1.2, back: 2.0 }; // ピールをのばして�
 let knPeelT0 = -1;
 const KN_DOOR_OUT = { x: 5.35 * T, y: 3.75 * T };
 const knRunEl = () => (knS.phase === "run" ? knNow() - knS.t0 : -1);
-const KN_ORO = { oro: 4.0, end: 7.0, wait: 9.5 }; // きこりが消えてから: オロオロ / 戸口に着いて中へ / 予備のピールとピザを持って出てくる
-// 撮影隊がベネラでピザを焼く(D393。出てきてからの秒): さかいへ歩く → ピールをのばす → 口に入れる → 戻す → 口が赤く光る → 暗転 → 明ける
-const KN_BAKE = { walk: 3.2, reach: 4.0, in: 4.6, back: 5.4, dark: 6.8, black: 7.6, light: 8.6, end: 9.4 };
-const KN_BAKE_AT = { x: KN_HEAT_X - 0.4 * T, y: 8.1 * T }; // ききこりが立つ所(熱ではじかれる線の手前。きーがピザを取り出す所と同じ)
+const KN_ORO = { oro: 4.0, end: 7.0 }; // きこりが消えてから: オロオロ / ピールを置いて、戸口に着いて中へ
 const KN_EAT = 2.0; // きーが一切れ食べる(秒)
-const knBakeEl = () => (knS.bakeT0 < 0 ? -1 : knNow() - knS.bakeT0);
-const knBakeStart = (api) => {
-  const B = KN_BAKE;
-  knS.bakeT0 = knNow();
-  api.freeze(B.end); // きーは見ているだけ
-  api.camPath([
-    { t: 0, x: 6.5 * T, y: 5.2 * T, z: 1 },
-    { t: B.walk, x: 12.6 * T, y: 7.0 * T, z: 1.15 },
-    { t: B.light, x: 12.6 * T, y: 7.0 * T, z: 1.15 },
-  ]);
-  api.later(B.walk * 1000, () => api.sfx("whir"));
-  api.later(B.in * 1000, () => api.sfx("pop"));
-  // 真っ暗なあいだに、撮影隊は中へ(D388 のピザは、このピザ)
-  api.later(((B.black + B.light) / 2) * 1000, () => api.setFlag("baked"));
-  api.later(B.end * 1000, () => {
-    knS.bakeT0 = -1;
-  });
+// 撮影隊が追いかけて止まる所(熱ではじかれる線の手前。D394)と、ごろんがピールを置く所
+const KN_CHASE_K = { x: KN_HEAT_X - 0.7 * T, y: 7.3 * T };
+const KN_CHASE_G = { x: KN_HEAT_X - 1.2 * T, y: 8.1 * T };
+const KN_PEEL_DROP = { x: KN_CHASE_G.x + 0.6 * T, y: KN_CHASE_G.y + 0.2 * T };
+// 前に持ったピール(柄の先に丸い板)。d は向き
+const knPeelHeld = (ctx, x, y, d) => {
+  const hx = x + d * 7;
+  const hy = y - 12;
+  ctx.strokeStyle = "#6e4c28";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(hx, hy);
+  ctx.lineTo(hx + d * 14, hy);
+  ctx.stroke();
+  ctx.strokeStyle = "#c4965f";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  knEll(ctx, hx + d * 20, hy, 7, 4, "#6e4c28");
+  knEll(ctx, hx + d * 20, hy, 6, 3, "#c4965f");
 };
 const KN_SANCHO = {
   tile: T,
@@ -814,14 +815,6 @@ const KN_SANCHO = {
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     knStorm(ctx, t, 0.22, ox + KN_EDGE); // 雨はさかいの左だけ(D381)
     knHaze(ctx, ox + KN_EDGE, t, 2); // 陽炎(D381)
-    // 撮影隊がピザを焼きはじめたら暗転(D393)
-    const be = knBakeEl();
-    if (be >= KN_BAKE.dark) {
-      const B = KN_BAKE;
-      const a = be < B.black ? (be - B.dark) / (B.black - B.dark) : be < B.light ? 1 : Math.max(0, 1 - (be - B.light) / (B.end - B.light));
-      ctx.fillStyle = `rgba(0, 0, 0, ${a})`;
-      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    }
   },
   triggers: [
     { id: "toSando", x: -T, y: 5 * T, w: 1.6 * T, h: 4 * T, enabled: () => knS.phase !== "run", warp: { map: "sando", spawn: "east" } },
@@ -842,8 +835,7 @@ const KN_SANCHO = {
       draw(ctx, sx, sy, t, api) {
         knDraw(ctx, api.image("venera"), sx, sy);
         const el = knRunEl();
-        const be = knBakeEl();
-        const flare = el > KN_RUN.leap && el < KN_RUN.melt ? 1 - (el - KN_RUN.leap) / (KN_RUN.melt - KN_RUN.leap) : be > KN_BAKE.in && be < KN_BAKE.light ? Math.min(1, (be - KN_BAKE.in) / 1.2) * 0.8 : 0;
+        const flare = el > KN_RUN.leap && el < KN_RUN.melt ? 1 - (el - KN_RUN.leap) / (KN_RUN.melt - KN_RUN.leap) : 0;
         const a = 0.18 + Math.sin(t * 3) * 0.08 + flare * 0.5;
         const cx = sx;
         const cy = sy - 30;
@@ -857,83 +849,67 @@ const KN_SANCHO = {
     {
       // 撮影隊: ロケのあと、さかいの手前で三脚を立てて準備している
       id: "crewOut",
-      x: 11.4 * T,
-      y: 7.7 * T,
+      x: KN_CHASE_G.x,
+      y: KN_CHASE_G.y,
       w: 1,
       h: 1,
-      // きこりが消えたあと(D389): 4 秒ほどオロオロ(左右に小走り、向きを変える)→ あきらめて戸口へ歩き、気象台の中へ
+      // D394: きこりを追いかけて、戸口から、さかいの手前まで走る(ごろんはピールを持つ)→ きこりが消える →
+      // 4 秒ほどオロオロ → ごろんがピールをその場に置き、あきらめて戸口へ歩いて中へ(中では別のピザを食べている D388)
       hidden: (api) => !api.flag("dashed") || (api.flag("gone") && (knS.goneT0 < 0 || knNow() - knS.goneT0 > KN_ORO.end)),
       draw(ctx, sx, sy, t, api) {
-        const el = api.flag("gone") ? knNow() - knS.goneT0 : -1;
-        const pts = [
-          ["kikikori", 0, 0, 0],
-          ["goron", 1.2 * T, 0.7 * T, 1.7],
+        const ox = sx - this.x;
+        const oy = sy - this.y;
+        const re = knRunEl();
+        const ge = api.flag("gone") && knS.goneT0 >= 0 ? knNow() - knS.goneT0 : -1;
+        const crew = [
+          ["kikikori", KN_CHASE_K, 0.4, 0, false],
+          ["goron", KN_CHASE_G, 0.7, 1.7, true],
         ];
-        for (const [key, dx, dy, ph] of pts) {
-          let x = sx + dx;
-          let y = sy + dy;
-          let dir = 1; // 金星の方(東)を向いて準備
-          if (el >= 0 && el < KN_ORO.oro) {
-            const w = Math.sin(el * 3.1 + ph);
-            x += w * 0.7 * T;
-            y -= Math.abs(Math.sin(el * 11 + ph)) * 3;
-            dir = Math.cos(el * 3.1 + ph) >= 0 ? 1 : -1;
-          } else if (el >= KN_ORO.oro) {
-            const u = Math.min(1, (el - KN_ORO.oro) / (KN_ORO.end - KN_ORO.oro));
-            x = knLerp(x, sx - this.x + KN_DOOR_OUT.x, u);
-            y = knLerp(y, sy - this.y + KN_DOOR_OUT.y, u) - Math.abs(Math.sin(el * 8 + ph)) * 1.5;
+        for (const [key, at, delay, ph, carry] of crew) {
+          let x = ox + at.x;
+          let y = oy + at.y;
+          let dir = 1;
+          let peel = carry;
+          if (re >= 0) {
+            // 追いかける(戸口から出てくるのは、きこりより少しおくれて)
+            if (re < delay) continue;
+            const u = Math.min(1, (re - delay) / 2.4);
+            const [ax, ay] = knAlong([[KN_DOOR_OUT.x, KN_DOOR_OUT.y], [8 * T, 5.8 * T], [11 * T, 6.9 * T], [at.x, at.y]], u);
+            x = ox + ax;
+            y = oy + ay - (u < 1 ? Math.abs(Math.sin(re * 16 + ph)) * 2.5 : 0);
+          } else if (ge >= 0 && ge < KN_ORO.oro) {
+            const w = Math.sin(ge * 3.1 + ph);
+            x += w * 0.6 * T;
+            y -= Math.abs(Math.sin(ge * 11 + ph)) * 3;
+            dir = Math.cos(ge * 3.1 + ph) >= 0 ? 1 : -1;
+          } else if (ge >= KN_ORO.oro) {
+            const u = Math.min(1, (ge - KN_ORO.oro) / (KN_ORO.end - KN_ORO.oro));
+            x = knLerp(x, ox + KN_DOOR_OUT.x, u);
+            y = knLerp(y, oy + KN_DOOR_OUT.y, u) - Math.abs(Math.sin(ge * 8 + ph)) * 1.5;
             dir = -1;
+            peel = false; // ピールは、その場に置いていく
           }
           knDraw(ctx, knCrew(api, key, dir), x, y);
+          if (peel) knPeelHeld(ctx, x, y, dir);
         }
       },
     },
     {
-      // 撮影隊がベネラでピザを焼く(D393): 戸口から、ききこりが予備のピールにピザをのせて出てくる(ごろんがつづく)。
-      // さかいの手前で止まり、ピールをのばして口へ入れ、戻す。口が赤く光ったら暗転。明けると、撮影隊は中でピザを食べている(D388)
-      id: "crewBake",
-      x: KN_DOOR_OUT.x,
-      y: KN_DOOR_OUT.y,
+      // 撮影隊が置いていったピール(D394)。拾うと頭にのせて運び、さかいの手前から口へのばして、きこりのピザを取り出す(D383)
+      id: "peelGround",
+      x: KN_PEEL_DROP.x,
+      y: KN_PEEL_DROP.y,
       w: 1,
       h: 1,
-      hidden: () => knS.bakeT0 < 0 || knBakeEl() > KN_BAKE.light,
-      draw() {},
-      drawOver(ctx, sx, sy, t, api) {
-        const el = knBakeEl();
-        const B = KN_BAKE;
-        const ox = sx - this.x;
-        const oy = sy - this.y;
-        const path = [[KN_DOOR_OUT.x, KN_DOOR_OUT.y], [8 * T, 5.8 * T], [11 * T, 7.4 * T], [KN_BAKE_AT.x, KN_BAKE_AT.y]];
-        const step = (u) => (u < 1 ? Math.abs(Math.sin(el * 9)) * 1.5 : 0);
-        // ごろん: 少しおくれて、うしろに立つ
-        const ug = Math.max(0, Math.min(1, (el - 0.5) / B.walk));
-        const [gx, gy] = knAlong(path.slice(0, 3).concat([[KN_BAKE_AT.x - 1.2 * T, KN_BAKE_AT.y - 0.5 * T]]), ug);
-        knDraw(ctx, knCrew(api, "goron", 1), ox + gx, oy + gy - step(ug));
-        // ききこり: ピールにピザをのせて、前に持つ
-        const u = Math.max(0, Math.min(1, el / B.walk));
-        const [kx, ky] = knAlong(path, u);
-        const x = ox + kx;
-        const y = oy + ky - step(u);
-        knDraw(ctx, knCrew(api, "kikikori", 1), x, y);
-        const hx = x + 8;
-        const hy = y - 14;
-        const mx = ox + KN_WINDOW.x;
-        const my = oy + KN_WINDOW.y;
-        const r = el < B.walk ? 0 : el < B.reach ? (el - B.walk) / (B.reach - B.walk) : el < B.in ? 1 : el < B.back ? 1 - (el - B.in) / (B.back - B.in) : 0;
-        const ex = knLerp(hx + 14, mx, r);
-        const ey = knLerp(hy, my, r);
-        ctx.strokeStyle = "#6e4c28";
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(hx, hy);
-        ctx.lineTo(ex, ey);
-        ctx.stroke();
-        ctx.strokeStyle = "#c4965f";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        knEll(ctx, ex, ey, 7, 4, "#6e4c28");
-        knEll(ctx, ex, ey, 6, 3, "#c4965f");
-        if (el < B.in) knPizza(ctx, ex, ey - 1, 6, "done"); // 口に入れるまでは、ピールの上に生のピザ
+      headY: 16,
+      range: 38,
+      hidden: (api) => !api.flag("gone") || api.flag("peel") || (knS.goneT0 >= 0 && knNow() - knS.goneT0 < KN_ORO.oro),
+      draw(ctx, sx, sy, t, api) {
+        knDraw(ctx, api.image("k_peel"), sx, sy);
+      },
+      interact(api) {
+        api.setFlag("peel");
+        api.sfx("item");
       },
     },
     {
@@ -987,10 +963,8 @@ const KN_SANCHO = {
       draw() {},
       last: 0,
       update(dt, t, api) {
-        // 撮影隊がピザを焼く(D393): 中へ入ってしばらくすると、予備のピールにピザをのせて出てくる。きーが山頂にいるときだけ(中にいるあいだは、撮影隊も中で待つ)
-        if (api.flag("gone") && !api.flag("baked") && knS.bakeT0 < 0 && knS.goneT0 >= 0 && knNow() - knS.goneT0 > KN_ORO.wait && knS.phase !== "run") knBakeStart(api);
         // ちりんは、きこりが消えたあと、いつもと違う音で鳴り続ける(仮)
-        if (api.flag("gone") && !api.flag("observed") && knS.bakeT0 < 0 && t - this.last > 3.5) { // 撮影隊が焼くあいだ(暗転も)は鳴らさない
+        if (api.flag("gone") && !api.flag("observed") && t - this.last > 3.5) {
           this.last = t;
           api.bubble("chirin", "チリ　リ……", 1800);
         }
