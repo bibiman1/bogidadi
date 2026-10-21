@@ -253,6 +253,13 @@ const B_KICHI = {
     start: { x: 1.2 * T, y: 13.5 * T, facing: "east" },
     morning: { x: 12 * T, y: 17.6 * T, facing: "east" },
   },
+  // D401: 谷の向こうの投下のたびに、東から爆風が飛行場へ吹きつける(地ひびきと同じとき)。見届けの間ずっと。
+  // ふんばる(ぱーでれで覚える)なら、つぶれて張りつき、旗の台で空を見ていられる。覚えていなければ、西へ押し戻されて見届けられない
+  wind(api, x) {
+    if (bS.phase !== "away" || bS.seq || bS.booms < 1 || x < 12 * T) return null;
+    const gust = bS.boomAt && bNow() - bS.boomAt < 0.6 ? 160 : 0; // 一発ごとに、ひときわ強く
+    return { x: -260 - gust, y: 0 };
+  },
   onEnter(api) {
     // 朝の持ち場へ(見送りの列から戻す)
     for (const [id, x, y] of [["crew1", 14.6, 17.3], ["crew2", 18.5, 17.4], ["crew3", 21.6, 17.0]]) Object.assign(B_KICHI.objects.find((o) => o.id === id), { x: x * T, y: y * T });
