@@ -201,6 +201,8 @@ const bPose = () => {
   }
   return { x: B_HOME, lift: 0 };
 };
+// 爆風が吹いているあいだ(D401): 谷の向こうの投下が始まってから、着陸に入るまで
+const bBlast = () => bS.phase === "away" && !bS.seq && bS.booms >= 1;
 const bCrew = (id, img, x, y, phase, extra) =>
   Object.assign(
     {
@@ -218,6 +220,13 @@ const bCrew = (id, img, x, y, phase, extra) =>
         const u = saluting ? 0.9 : (t + phase) % 1.3;
         const working = (bS.phase === "morning" || bS.phase === "back") && !bS.farewell; // 帰ってきたら、すぐ傷をふさぐ(D204)。見送るときは手を止める
         const hop = u < 0.12 && working ? 2 : 0; // 整備の手つき
+        // D402: 爆風のあいだは、毎朝のことで慣れたクルーも、つぶれて地面に張りつく(きーのふんばると同じ形。言葉なしの手本)
+        if (bBlast()) {
+          const w = Math.round(im.width * 1.35);
+          const h = Math.round(im.height * 0.5);
+          ctx.drawImage(im, Math.round(sx - w / 2), Math.round(sy - h), w, h);
+          return;
+        }
         if (bS.farewell) {
           // 見送るときは、西へ去っていくきーのほうを向く(絵は東向きなので左右を反転。作者「きーの方を向いたほうが」)
           ctx.save();
@@ -256,7 +265,7 @@ const B_KICHI = {
   // D401: 谷の向こうの投下のたびに、東から爆風が飛行場へ吹きつける(地ひびきと同じとき)。見届けの間ずっと。
   // ふんばる(ぱーでれで覚える)なら、つぶれて張りつき、旗の台で空を見ていられる。覚えていなければ、西へ押し戻されて見届けられない
   wind(api, x) {
-    if (bS.phase !== "away" || bS.seq || bS.booms < 1 || x < 12 * T) return null;
+    if (!bBlast() || x < 12 * T) return null;
     const gust = bS.boomAt && bNow() - bS.boomAt < 0.6 ? 160 : 0; // 一発ごとに、ひときわ強く
     return { x: -260 - gust, y: 0 };
   },

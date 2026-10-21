@@ -284,7 +284,14 @@ const KN_SANDO = {
     },
     knImg("goron", 3.3 * T, 6.6 * T, {
       // ごろん(ディレクター)。押し付けのあと、山頂を指し(右向き)、撮影隊の先頭で登っていく
-      hidden: (api) => api.flag("boxed") && (knS.phase !== "oshitsuke" && knS.phase !== "climb" || knCrewX(this.x) > 30 * T),
+      // 登るときは、置き場所(x)ごと動かす(絵だけずらすと、置き場所が画面の外に出たところで描かれなくなり、途中で消えていた)
+      x0: 3.3 * T,
+      update() {
+        this.x = knS.phase === "climb" ? knCrewX(this.x0) : this.x0;
+      },
+      hidden(api) {
+        return api.flag("boxed") && ((knS.phase !== "oshitsuke" && knS.phase !== "climb") || this.x > 30 * T);
+      },
       draw(ctx, sx, sy, t, api) {
         let x = sx;
         let y = sy;
@@ -302,7 +309,6 @@ const KN_SANDO = {
           }
         }
         if (knS.phase === "climb") {
-          x = sx + (knCrewX(this.x) - this.x);
           y -= Math.abs(Math.sin(t * 9)) * 1.5;
           flip = false;
         }
@@ -310,19 +316,25 @@ const KN_SANDO = {
       },
     }),
     knImg("kikikori", 5.6 * T, 6.0 * T, {
-      // ききこり(カメラ係)。機材を持って登る
-      hidden: (api) => api.flag("boxed") && (knS.phase !== "oshitsuke" && knS.phase !== "climb" || knCrewX(this.x) > 30 * T),
+      // ききこり(カメラ係)。機材を持って登る(置き場所ごと動かす)
+      x0: 5.6 * T,
+      update() {
+        this.x = knS.phase === "climb" ? knCrewX(this.x0) : this.x0;
+      },
+      hidden(api) {
+        return api.flag("boxed") && ((knS.phase !== "oshitsuke" && knS.phase !== "climb") || this.x > 30 * T);
+      },
       draw(ctx, sx, sy, t, api) {
-        const x = sx + (knS.phase === "climb" ? knCrewX(this.x) - this.x : 0);
-        knDraw(ctx, api.image("kikikori"), x, sy - (knS.phase === "climb" ? Math.abs(Math.sin(t * 8 + 1)) * 1.5 : 0));
+        knDraw(ctx, api.image("kikikori"), sx, sy - (knS.phase === "climb" ? Math.abs(Math.sin(t * 8 + 1)) * 1.5 : 0));
       },
     }),
     knImg("kikori", 9 * T, 6.3 * T, {
       // きこり: 落ち着きなく跳ねる。登るときは、きーより先へ走っては戻る
       hidden: (api) => api.flag("boxed") && (knS.phase !== "oshitsuke" && knS.phase !== "climb"),
+      x0: 9 * T,
       update(dt, t, api) {
         if (knS.phase !== "climb") {
-          knS.kx = this.x;
+          knS.kx = this.x = this.x0;
           return;
         }
         knS.px = api.player().x;
@@ -330,10 +342,10 @@ const KN_SANDO = {
         const target = Math.min(29.5 * T, api.player().x + 2.6 * T + Math.sin(t * 1.4) * 2.2 * T);
         knS.kx += Math.max(-1, Math.min(1, target - knS.kx)) * Math.min(Math.abs(target - knS.kx), 260 * dt);
         this.dir = target > knS.kx + 2 ? 1 : target < knS.kx - 2 ? -1 : this.dir || 1;
+        this.x = knS.kx; // 置き場所ごと動かす
       },
       draw(ctx, sx, sy, t, api) {
-        const x = sx + (knS.kx || this.x) - this.x;
-        knDraw(ctx, api.image("kikori"), x, sy - Math.abs(Math.sin(t * 9)) * 3, { flip: this.dir < 0 });
+        knDraw(ctx, api.image("kikori"), sx, sy - Math.abs(Math.sin(t * 9)) * 3, { flip: this.dir < 0 });
       },
       range: 40,
       interact: (api) => {
@@ -345,9 +357,12 @@ const KN_SANDO = {
     knImg("chirin", 8.2 * T, 6.0 * T, {
       // ちりん: きこりのそばでゆれる(きこりに執着)
       hidden: (api) => api.flag("boxed") && knS.phase !== "oshitsuke" && knS.phase !== "climb",
+      x0: 8.2 * T,
+      update() {
+        this.x = this.x0 + ((knS.kx || 9 * T) - 9 * T) * 0.92; // きこりについていく(置き場所ごと)
+      },
       draw(ctx, sx, sy, t, api) {
-        const x = sx + Math.sin(t * 3) * 1.5 + ((knS.kx || 9 * T) - 9 * T) * 0.92;
-        knDraw(ctx, api.image("chirin"), x, sy - 6);
+        knDraw(ctx, api.image("chirin"), sx + Math.sin(t * 3) * 1.5, sy - 6);
       },
       range: 40,
       interact: (api) => api.bubble("chirin", "チリーン", 1200), // 仮
