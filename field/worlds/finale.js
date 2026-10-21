@@ -54,6 +54,7 @@ const fEnd = (api, ending) => {
   api.clear(); // 最後の場面を見た(懲罰空間に戻っても、もう始まらない)
 };
 // 赤い丸が押される(B。D238)。だれが押しても同じ: 寄って、押しこまれ、灰色の筐体に順に火が灯り、演算が始まる
+const F_KIKORI_LEAP = 0.7; // 走ってきて、ここから赤い丸へ跳びつく(1.3 秒のうちの割合。D398)
 const fPress = (api, who) => {
   if (fS.phase === "pressed") return;
   fS.phase = "pressed";
@@ -71,7 +72,7 @@ const fPress = (api, who) => {
     { t: 4.8, x: 15 * T, y: 9.5 * T, z: 0.55 }, // 引いて、墓標の列に火が灯っていくのを見せる
     { t: 8.2, x: 15 * T, y: 9.5 * T, z: 0.55 },
   ]);
-  if (who === "kikori") api.later(400, () => (api.bubble("kikori", "ブヒッ", 900), api.sfx("oink"))); // 鳴き声(仮)
+  if (who === "kikori") api.later(400, () => (api.bubble("kikori", "ピザ", 900), api.sfx("oink"))); // きこりの声は「ピザ」(D399)
   api.later(1000, () => {
     fS.down = true;
     api.sfx("clang");
@@ -376,7 +377,7 @@ const F_WHITE = {
               api.later(ms, () => {
                 fS.pokeT = fNow();
                 api.sfx("pop");
-                if (i === 0) api.bubble("kikori", "ブヒッ", 800); // 鳴き声(仮)
+                if (i === 0) api.bubble("kikori", "ピザ", 800); // きこりの声は「ピザ」(D399)
               })
             );
             api.later(8600, () => {
@@ -474,19 +475,27 @@ const F_WHITE = {
       h: 1,
       headY: 40,
       hidden: () => !["kikori", "pressed", "selfoff"].includes(fS.phase) || fS.by === "ki",
-      update() {
+      update(dt, t, api) {
         if (fS.phase !== "kikori" && fS.phase !== "selfoff") return;
         // 右(未来)から、筐体の右わきへ突っ込んでくる(電源を切るのを見せるため、去るときは少し遅れて)
+        // D398: 金星でベネラの赤い口に飛びこんだときと同じ走り方・跳び方・音。赤い丸をピザ(窯)だと思っている(言葉では言わない)
         const delay = fS.phase === "selfoff" ? 1.6 : 0;
         const u = Math.max(0, Math.min(1, (fNow() - fS.t1 - delay) / 1.3));
-        this.x = F_SIM.x + 30 + (1 - u) * 10 * T;
+        const run = Math.min(1, u / F_KIKORI_LEAP);
+        this.x = F_SIM.x + 30 + (1 - run) * 10 * T;
         this.y = F_SIM.y + 6;
+        this.leap = u > F_KIKORI_LEAP ? (u - F_KIKORI_LEAP) / (1 - F_KIKORI_LEAP) : -1;
+        if (this.leap >= 0 && !this.popped) {
+          this.popped = true;
+          api.sfx("pop"); // ベネラに飛びこむときと同じ音
+        }
+        if (u <= 0) this.popped = false;
         this.arrived = u >= 1;
       },
       draw(ctx, sx, sy, t, api) {
         const im = api.image("kikori");
         if (!im) return;
-        let run = (fS.phase === "kikori" || fS.phase === "selfoff") && !this.arrived ? Math.abs(Math.sin(t * 14)) * 3 : 0;
+        let run = (fS.phase === "kikori" || fS.phase === "selfoff") && !this.arrived ? (this.leap >= 0 ? Math.sin(this.leap * Math.PI) * 24 : Math.abs(Math.sin(t * 18)) * 3) : 0; // 金星と同じ跳ね方、最後は赤い丸へ跳びつく
         // 消えた赤い丸を押す: 押すたびに前へのめる。最後は止まる
         if (fS.phase === "selfoff" && this.arrived && fS.pokeT) {
           const k = fNow() - fS.pokeT;

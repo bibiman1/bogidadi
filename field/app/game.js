@@ -42,7 +42,8 @@ function loadState() {
     // 廃兵院は景品をもらえば終わり(D266)。前の版で景品だけもらって屋上へ行かなかった保存も、終えたことにする
     if (st.items.includes("おたかぽっぽ") && !st.cleared.includes("haihei")) st.cleared.push("haihei");
     // きこりと金星の持ち帰る物は、電池から焼けたピザに替えた(D380)。前の版の保存の電池は、焼けたピザにする
-    st.items = st.items.map((it) => (it === "電池" ? "焼けたピザ" : it));
+    // さらに、ピザを切り分けて残ったひと切れに替えた(D395)
+    st.items = st.items.map((it) => (it === "電池" || it === "焼けたピザ" ? "焼けたピザのひと切れ" : it));
     return st;
   } catch (e) {
     return empty;

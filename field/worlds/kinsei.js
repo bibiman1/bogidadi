@@ -11,7 +11,7 @@
 //       → 作業台に残ったピザピールを持って、さかいの手前から口へのばし、焼けたピザを取り出す(D383。電池はなくした D380)→ 帰る条件。西から帰る
 //       山頂の百葉箱を調べると、こわれた温度計の一枚絵(D382)
 // 向き(D148): きーは左(西)から登り、金星は右(東)のはし。図: docs/assets/kinsei/plan/(配置図 K2、絵コンテ K3)、三面図 K1(sanmen/venera7.py、第 3 版)
-const knS = { phase: "idle", t0: 0, walkT0: -1, cookT0: -1, setupT0: -1, goneT0: -1, eatT0: -1, kx: 0 };
+const knS = { phase: "idle", t0: 0, walkT0: -1, cookT0: -1, setupT0: -1, goneT0: -1, crewGoT0: -1, cutT0: -1, cutDoneT0: -1, cuts: [], kx: 0 };
 const knNow = () => performance.now() / 1000;
 const KN_EDGE = 14.6 * T; // 金星のさかい(山頂)
 const KN_HEAT_X = KN_EDGE - 0.9 * T; // ここより東へは、熱くて行けない(D391)
@@ -199,7 +199,14 @@ const knImg = (key, x, y, extra) =>
 
 // ---- 山道: 撮影隊が機材を持って登る。きーは木箱を押し付けられる(D380) ----
 const KN_CREW_V = 120; // 撮影隊の登る速さ(px/秒)。木箱を運ぶきー(105)より少し速く、先に山頂へ
-const knCrewX = (x0) => (knS.walkT0 < 0 ? x0 : x0 + (knNow() - knS.walkT0) * KN_CREW_V);
+// D395: 撮影隊は道の終わり(山頂への口の手前)で止まって待ち、きーが近づくと、ひと足先に山頂へ入る(道のはしを越えると見えなくなる)
+const KN_CREW_END = 28.4 * T; // ききこり(列のいちばん前)が止まる所。ほかは同じ間をあけて止まる
+const KN_CREW_LEAD = 5.6 * T; // ききこりの、はじめの位置
+const knCrewX = (x0) => {
+  if (knS.walkT0 < 0) return x0;
+  const x = Math.min(x0 + (knNow() - knS.walkT0) * KN_CREW_V, KN_CREW_END - (KN_CREW_LEAD - x0));
+  return knS.crewGoT0 < 0 ? x : x + (knNow() - knS.crewGoT0) * KN_CREW_V;
+};
 const KN_SANDO = {
   tile: T,
   bg: "#46504a",
@@ -238,6 +245,7 @@ const KN_SANDO = {
         api.later(2200, () => {
           knS.phase = "climb";
           knS.walkT0 = knNow();
+          knS.crewGoT0 = -1;
         });
       },
     },
@@ -311,6 +319,7 @@ const KN_SANDO = {
           knS.kx = this.x;
           return;
         }
+        if (knS.crewGoT0 < 0 && api.player().x > KN_CREW_END - 4 * T) knS.crewGoT0 = knNow(); // きーが来たので、先に山頂へ
         const target = Math.min(29.5 * T, api.player().x + 2.6 * T + Math.sin(t * 1.4) * 2.2 * T);
         knS.kx += Math.max(-1, Math.min(1, target - knS.kx)) * Math.min(Math.abs(target - knS.kx), 260 * dt);
         this.dir = target > knS.kx + 2 ? 1 : target < knS.kx - 2 ? -1 : this.dir || 1;
@@ -322,7 +331,7 @@ const KN_SANDO = {
       range: 40,
       interact: (api) => {
         api.sfx("oink");
-        api.bubble("kikori", "ブヒッ", 900);
+        api.bubble("kikori", "ピザ", 900);
       },
       canInteract: (api) => !api.flag("boxed") && knS.phase === "idle",
     }),
@@ -387,6 +396,133 @@ const knCookStart = (api) => {
     knS.cookT0 = -1;
   });
 };
+// ---- ピザを 3 つに切る(D395) ----
+// 上から見たピザの上を、切る線が中心のまわりを回る。A で 1 本ずつ切る。3 本で 3 切れ。
+// 切ったあと、ごろんがいちばん大きい切れ、ききこりが 2 番目を取り、きーには残りのひと切れ(おみやげ)
+const KN_CUT = { spin: 1.7, sep: 0.6, take1: 1.0, take2: 2.1, end: 3.4 }; // 回る速さ(ラジアン/秒)と、切ったあとの段(秒)
+const KN_SLICE = "焼けたピザのひと切れ";
+const knCutStart = (api) => {
+  knS.cutT0 = knNow();
+  knS.cuts = [];
+  knS.cutDoneT0 = -1;
+  api.face("north");
+  api.freeze(600);
+  api.sfx("item");
+};
+// 切った角度から、3 切れの [はじめ, おわり, 大きさの順位](大きい順に 0, 1, 2)
+const knCutPieces = () => {
+  const c = knS.cuts.slice().sort((a, b) => a - b);
+  const ps = [0, 1, 2].map((k) => ({ a0: c[k], a1: k < 2 ? c[k + 1] : c[0] + Math.PI * 2 }));
+  ps.slice().sort((p, q) => q.a1 - q.a0 - (p.a1 - p.a0)).forEach((p, k) => (p.rank = k));
+  return ps;
+};
+// A を押すたび(短く押しても)、作業台の interact から呼ばれる(切っているあいだ、きーは台の前で止まっている)
+const knCutPress = (api) => {
+  if (knS.cutT0 < 0 || knS.cutDoneT0 >= 0 || knNow() - knS.cutT0 < 0.3) return;
+  const ang = ((knNow() - knS.cutT0) * KN_CUT.spin) % (Math.PI * 2);
+  knS.cuts.push(ang);
+  api.sfx("knock");
+  if (knS.cuts.length < 3) return;
+  // 3 本切れた: 切れが離れる → ごろんが大きい切れ → ききこりが 2 番目 → きーにひと切れ
+  knS.cutDoneT0 = knNow();
+  const C = KN_CUT;
+  api.later(C.take1 * 1000, () => api.sfx("pop"));
+  api.later(C.take2 * 1000, () => api.sfx("pop"));
+  api.later(C.end * 1000, () => {
+    knS.cutT0 = -1;
+    knS.cutDoneT0 = -1;
+    api.freeze(0);
+    api.hold("ic_slice", 1.8, () => {
+      api.setFlag("cut");
+      api.takeItem("焼けたピザ"); // 前の版のおみやげ(丸ごと)
+      if (!api.hasItem(KN_SLICE)) api.giveItem(KN_SLICE);
+      api.clear();
+    });
+  });
+};
+const knCutDraw = (ctx, api, t) => {
+  if (knS.cutT0 < 0) return;
+  const im = api.image("k_pizza_top"); // 上から見たピザ(PixelLab、D396 でふつうのピザに)
+  if (!im) return;
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  const W = ctx.canvas.width;
+  const H = ctx.canvas.height;
+  ctx.fillStyle = "rgba(10, 8, 6, 0.6)";
+  ctx.fillRect(0, 0, W, H);
+  const k = Math.max(2, Math.floor((Math.min(W, H) * 0.55) / im.width));
+  const R = (im.width / 2) * k;
+  const cx = Math.round(W / 2);
+  const cy = Math.round(H / 2);
+  const C = KN_CUT;
+  const de = knS.cutDoneT0 < 0 ? -1 : knNow() - knS.cutDoneT0;
+  if (de < 0) {
+    ctx.drawImage(im, cx - R, cy - R, R * 2, R * 2);
+    // 切ったあと
+    ctx.strokeStyle = "#1c120a";
+    ctx.lineWidth = k;
+    for (const a of knS.cuts) {
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R);
+      ctx.stroke();
+    }
+    // 回る切る線(ピザカッター)。刃の輪が、ふちを回る
+    const a = ((knNow() - knS.cutT0) * C.spin) % (Math.PI * 2);
+    const wr = Math.max(3 * k, Math.round(R * 0.08)); // 刃の輪の大きさ(ピザに合わせる)
+    const ex = cx + Math.cos(a) * (R + wr);
+    const ey = cy + Math.sin(a) * (R + wr);
+    ctx.strokeStyle = "rgba(242, 240, 234, 0.9)";
+    ctx.lineWidth = Math.max(2, k);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+    ctx.fillStyle = "#c9ccd1";
+    ctx.beginPath();
+    ctx.arc(ex, ey, wr, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#6c7076";
+    ctx.fillRect(Math.round(ex - wr / 4), Math.round(ey - wr / 4), Math.round(wr / 2), Math.round(wr / 2));
+    // A の合図(言葉なし)
+    if (Math.floor(t * 2.5) % 2 === 0) {
+      const ts = Math.max(1, Math.round(k / 4));
+      const br = 10 * ts;
+      const bx = cx;
+      const by = Math.min(H - br - 4, cy + R + 4 * k + br);
+      ctx.fillStyle = "#b5352b";
+      ctx.beginPath();
+      ctx.arc(bx, by, br, 0, Math.PI * 2);
+      ctx.fill();
+      if (window.bogiPix) {
+        const tw = window.bogiPix.width("A") * ts;
+        window.bogiPix.text(ctx, "A", Math.round(bx - tw / 2), Math.round(by - 8 * ts), ts, "#f2f0ea");
+      }
+    }
+  } else {
+    // 3 切れ: 離れる → 大きい順に持っていかれる(右上、テレビの方へ)
+    const sep = Math.min(1, de / C.sep) * 4 * k;
+    for (const p of knCutPieces()) {
+      const go = p.rank === 0 ? (de - C.take1) / 0.8 : p.rank === 1 ? (de - C.take2) / 0.8 : 0;
+      const u = Math.max(0, Math.min(1, go));
+      if (u >= 1) continue;
+      const mid = (p.a0 + p.a1) / 2;
+      const dx = Math.cos(mid) * sep + u * W * 0.5;
+      const dy = Math.sin(mid) * sep - u * H * 0.35;
+      ctx.save();
+      ctx.globalAlpha = 1 - u;
+      ctx.beginPath();
+      ctx.moveTo(cx + dx, cy + dy);
+      ctx.arc(cx + dx, cy + dy, R + k, p.a0, p.a1);
+      ctx.closePath();
+      ctx.clip();
+      ctx.drawImage(im, cx - R + dx, cy - R + dy, R * 2, R * 2);
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+};
 const KN_NAKA = {
   tile: T,
   bg: "#1e1c1a",
@@ -435,6 +571,7 @@ const KN_NAKA = {
       ctx.drawImage(stick, -6 * k, -stick.height * k, stick.width * k, stick.height * k);
       ctx.restore();
     }
+    knCutDraw(ctx, api, t); // ピザを 3 つに切る(D395)
   },
   triggers: [{ id: "toSancho", x: 5.55 * T, y: 8.75 * T, w: 1.9 * T, h: T, enabled: () => knS.cookT0 < 0, warp: { map: "sancho", spawn: "door" } }],
   objects: [
@@ -483,11 +620,19 @@ const KN_NAKA = {
         else if (el < C.crew + 0.35 * (C.bolt - C.crew)) knPizza(ctx, px + 13, py - 1, 13, "done"); // ピールの上
       },
       interact(api) {
+        if (knS.cutT0 >= 0) {
+          knCutPress(api); // 切っているあいだの A は、ミニゲームが受けとる
+          return;
+        }
+        if (api.flag("pizza") && !api.flag("cut")) {
+          knCutStart(api);
+          return;
+        }
         api.setFlag("placed");
         api.sfx("item");
         knSetupStart(api);
       },
-      canInteract: (api) => api.flag("boxed") && !api.flag("placed"),
+      canInteract: (api) => (api.flag("boxed") && !api.flag("placed")) || (api.flag("pizza") && !api.flag("cut")),
     },
     {
       // きこり: 台の向こうでピザを作る。できたら掲げ、予報のあと、待ちきれずに飛び出す
@@ -543,7 +688,7 @@ const KN_NAKA = {
       range: 40,
       interact: (api) => {
         api.sfx("oink");
-        api.bubble("kikori", "ブヒッ", 900);
+        api.bubble("kikori", "ピザ", 900);
       },
       canInteract: () => knCookEl() < 0,
     },
@@ -637,79 +782,34 @@ const KN_NAKA = {
       headY: 40,
       range: 70,
       fastUntil: 0,
+      // D395: きこりが消えたあと、撮影隊は中でテレビを見て待つ。きーが運んできたきこりのピザを切り分けると、
+      // 大きい切れから取って、食べる(「スタッフがおいしくいただきました」D388。言葉なし)
       hidden: (api) => !api.flag("gone") || (knS.goneT0 >= 0 && knNow() - knS.goneT0 < KN_ORO.end),
       draw(ctx, sx, sy, t, api) {
         const fast = knNow() < this.fastUntil ? 2.2 : 1;
-        // 撮影隊のピザ(どこから来たかは言わない。D394 で、ベネラで焼く場面 D393 はやめた)
-        // 台の上のピザ: 二切れ欠けている(欠けた所は台の色)。きーも食べたら三切れ(todo 117)
-        const px = sx - 14;
-        const py = sy - 23;
-        knPizza(ctx, px, py, 14, "done");
-        ctx.fillStyle = "#96744f";
-        const cuts = [[-0.35, 0.45], [1.6, 2.4]];
-        if (api.flag("ate")) cuts.push([3.3, 4.1]);
-        for (const [a0, a1] of cuts) {
-          ctx.beginPath();
-          ctx.moveTo(px, py - 0.5);
-          for (let k = 0; k <= 6; k++) {
-            const a = a0 + ((a1 - a0) * k) / 6;
-            ctx.lineTo(px + Math.cos(a) * 14, py - 0.5 + Math.sin(a) * 5.2);
-          }
-          ctx.closePath();
-          ctx.fill();
-        }
-        // ききこり(左)とごろん(右)。一切れずつ持って、もぐもぐ
-        // テレビの前の撮影隊(D389): テレビの方を向いて、一切れずつ持って見ている(もぐもぐ)
+        const ate = api.flag("cut");
         const eat = (key, x, y, d, ph, mouthY) => {
-          const chew = Math.floor((t * 6 * fast + ph) % 2); // 1 ドット上下
+          const chew = ate ? Math.floor((t * 6 * fast + ph) % 2) : 0; // 1 ドット上下
           knDraw(ctx, knCrew(api, key, d), x, y - chew);
-          // 口の前に一切れ(耳が外がわ、とがった方が口へ)
+          if (!ate) return;
+          // 口の前に、こげたピザのひと切れ(耳が外がわ、とがった方が口へ)
           const hx = Math.round(x + d * 9);
           const hy = Math.round(y - mouthY - chew);
           for (let k = 0; k < 7; k++) {
             const w = 7 - k;
-            ctx.fillStyle = k === 0 ? "#c99a5e" : "#c8402c";
+            ctx.fillStyle = k === 0 ? "#3a2416" : k % 3 === 1 ? "#2a1a10" : "#a8361f";
             ctx.fillRect(hx - d * k, hy - Math.ceil(w / 2), 1, w);
           }
-          ctx.fillStyle = "#fbf6e6";
+          ctx.fillStyle = "#e9c46a";
           ctx.fillRect(hx - d * 3, hy - 1, 1, 1);
-          ctx.fillRect(hx - d * 2, hy + 1, 1, 1);
         };
         eat("goron", sx + (KN_TV.x - 1.1 * T - this.x), sy + (KN_TV.y + 1.25 * T - this.y), 1, 1, 17);
         eat("kikikori", sx + (KN_TV.x + 1.2 * T - this.x), sy + (KN_TV.y + 1.1 * T - this.y), -1, 0, 26);
       },
-      // きーも一切れ食べる(todo 117、D393)。一回だけ。言葉なし。食べたあとは、撮影隊のもぐもぐが少し速くなるだけ
-      drawOver(ctx, sx, sy, t, api) {
-        if (knS.eatT0 < 0) return;
-        const e = knNow() - knS.eatT0;
-        if (e > KN_EAT) {
-          knS.eatT0 = -1;
-          return;
-        }
-        const p = api.player();
-        const hx = Math.round(sx - this.x + p.x + 4); // とがった方をくちばしへ、耳(外がわ)を右に
-        const hy = Math.round(sy - this.y + p.y - 11 - (Math.floor(t * 6) % 2));
-        const n = Math.max(1, 7 - Math.floor(e / (KN_EAT / 6))); // ひと口ずつ短くなる
-        for (let k = 0; k < n; k++) {
-          const w = 7 - (7 - n) - k;
-          if (w <= 0) break;
-          ctx.fillStyle = k === 0 ? "#c99a5e" : "#c8402c";
-          ctx.fillRect(hx + (n - 1 - k), hy - Math.ceil(w / 2), 1, w);
-        }
-      },
-      interact(api) {
-        if (!api.flag("ate")) {
-          api.setFlag("ate");
-          api.face("south");
-          api.freeze(KN_EAT + 0.2);
-          knS.eatT0 = knNow();
-          for (let k = 1; k <= 3; k++) api.later((k * KN_EAT * 1000) / 4, () => api.sfx("pop"));
-          return;
-        }
+      interact() {
         this.fastUntil = knNow() + 1.5;
       },
-      // ピールは外にあるので、台はもうピールを渡さない(D394)
-      canInteract: (api) => api.flag("gone"),
+      canInteract: (api) => api.flag("cut") && knS.cutT0 < 0,
     },
     {
       // ごろん(ディレクター): カチンコを鳴らす。できたら外へ
@@ -751,7 +851,6 @@ let knPeelT0 = -1;
 const KN_DOOR_OUT = { x: 5.35 * T, y: 3.75 * T };
 const knRunEl = () => (knS.phase === "run" ? knNow() - knS.t0 : -1);
 const KN_ORO = { oro: 4.0, end: 7.0 }; // きこりが消えてから: オロオロ / ピールを置いて、戸口に着いて中へ
-const KN_EAT = 2.0; // きーが一切れ食べる(秒)
 // 撮影隊が追いかけて止まる所(熱ではじかれる線の手前。D394)と、ごろんがピールを置く所
 const KN_CHASE_K = { x: KN_HEAT_X - 0.7 * T, y: 7.3 * T };
 const KN_CHASE_G = { x: KN_HEAT_X - 1.2 * T, y: 8.1 * T };
@@ -1114,11 +1213,8 @@ const KN_SANCHO = {
         api.later(KN_PEEL.in * 1000, () => api.sfx("pop"));
         api.later(KN_PEEL.back * 1000, () => {
           knPeelT0 = -1;
-          api.hold("ic_pizza", 1.8, () => {
-            api.setFlag("pizza");
-            if (!api.hasItem("焼けたピザ")) api.giveItem("焼けたピザ");
-            api.clear();
-          });
+          // ピールにのせたまま、気象台の中の作業台へ運ぶ(D395)。おみやげは、切り分けて残ったひと切れ
+          api.hold("ic_pizza", 1.8, () => api.setFlag("pizza"));
         });
       },
     },

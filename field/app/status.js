@@ -47,7 +47,7 @@ const ABILITIES = [
 // フラグの画面(D385)で、はじめから並べる断片ごとの主な旗(名前: 説明)。保存に入っているほかの旗も並ぶ。
 // 名前だけのものは、コードの setFlag から拾った(説明はまだない)
 const ST_FLAGS = {
-  kinsei: { boxed: "木箱をもった", placed: "台に置いた(ロケ)", dashed: "きこりが飛び出した", peel: "ピールをもった", gone: "きこりが消えた", pizza: "焼けたピザを取り出した", ate: "きーもピザを食べた", observed: "見届けた" },
+  kinsei: { boxed: "木箱をもった", placed: "台に置いた(ロケ)", dashed: "きこりが飛び出した", peel: "ピールをもった", gone: "きこりが消えた", pizza: "焼けたピザを取り出した", cut: "ピザを切り分けた", observed: "見届けた" },
   lake: { ate: "", homeward: "", memory: "", saidHoutou: "", observed: "見届けた" },
   haihei: { card: "", heard: "", prize: "", stand: "", observed: "見届けた" },
   kasumi: { jump: "", observed: "見届けた" },
