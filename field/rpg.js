@@ -895,6 +895,9 @@ const ASSET_V = (() => {
         if (done) done();
         return true;
       }
+      // 手に入れた物を頭の上に掲げている間は、A を受けつけない。掲げている間は、近くの物を選びなおさないので、
+      // 続けて押すと同じ物をまた調べてしまっていた(ハンガーの畑で、引きぬいた物を掲げなおす。作者「テンポわるくなるから直して」)
+      if (held) return true;
       // A ボタンをマップが自分で受けとる(競争の合図など、調べる物がない場面)
       if (!pan && map.onA) return map.onA(world.api) !== false;
       if (pan) return false;
