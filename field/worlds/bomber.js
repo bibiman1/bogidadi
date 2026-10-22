@@ -975,8 +975,70 @@ const bfReset = () => {
 };
 const BF_FLY = 0.5; // 投げてから落ちるまで(秒)
 const BF_BOOM_P = 0.1; // 投げた爆弾が、落ちたところで大爆発する見こみ(毎回 10% のくじ。野菜は爆発しない D415)
-const BF_WHITE = 0.5; // 落ちてから真っ白になるまで(秒)
-const BF_OVER = 1.3; // 落ちてから「ゲームオーバー」が出るまで(秒)。出てから A で畑の入り口へ
+const BF_WHITE = [1.0, 1.7]; // 落ちてから、画面全体が白くなりはじめ、真っ白になるまで(秒)
+const BF_OVER = 2.4; // 落ちてから「ゲームオーバー」が出るまで(秒)。出てから A で畑の入り口へ
+// 大爆発のつくり(D416): 爆心地で閃光 → 火の玉がゆらぎながらふくらむ → 土と煙とかけらが飛ぶ。
+// まわりに植わっている爆弾が、爆心地から近い順に誘爆する。最後に画面全体が白に飛ぶ
+const bfRand = (k) => {
+  const v = Math.sin(k * 127.1 + 311.7) * 43758.5453;
+  return v - Math.floor(v);
+};
+const bfChain = (x, y) => {
+  const near = BF_PLANTS.map((q, n) => ({ n, x: q.x, y: q.y, d: Math.hypot(q.x - x, q.y - y), kind: q.kind }))
+    .filter((q) => ["s", "m", "w", "l"].includes(q.kind) && !bfS.pulled.includes(q.n))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, 16);
+  return [{ x, y, t: 0, R: 46, seed: 1 }].concat(near.map((q, i) => ({ n: q.n, x: q.x, y: q.y - 6, t: 0.12 + q.d / 260 + bfRand(i + 3) * 0.08, R: 20 + bfRand(i + 7) * 16, seed: i + 2 })));
+};
+// 一つの火の玉(2 ドットのます目で描く)。u は火の玉ができてからの秒
+const bfFireball = (ctx, X, Y, R0, u, seed) => {
+  if (u < 0) return;
+  const G = 2;
+  // 閃光: はじめの一瞬、小さく強く光る
+  if (u < 0.09) {
+    ctx.fillStyle = "#ffffff";
+    const r = 4 + (u / 0.09) * R0 * 0.4;
+    for (let dy = -r; dy <= r; dy += G) for (let dx = -r; dx <= r; dx += G) if (dx * dx + dy * dy < r * r) ctx.fillRect(Math.round(X + dx), Math.round(Y + dy), G, G);
+    return;
+  }
+  const grow = Math.min(1, (u - 0.09) / 0.35);
+  const R = R0 * (0.35 + 0.65 * (1 - (1 - grow) * (1 - grow)));
+  const cool = Math.max(0, Math.min(1, (u - 0.5) / 0.7)); // 燃えつきて、煙に変わる
+  const rise = cool * R0 * 0.6; // 煙は上へ
+  // もこもこした玉をいくつか重ねて、カリフラワーのような形に(きれいな丸にしない)
+  const puffs = [[0, 0, 0.62]];
+  for (let k = 0; k < 7; k++) {
+    const a = (k / 7) * Math.PI * 2 + bfRand(seed * 5 + k) * 0.8;
+    const d = 0.38 + bfRand(seed * 9 + k) * 0.22;
+    puffs.push([Math.cos(a) * d, Math.sin(a) * d * 0.85 - 0.08, 0.3 + bfRand(seed * 3 + k) * 0.18]);
+  }
+  const hot = ["#fffbe0", "#ffd84a", "#ff8a1e", "#b8321a"];
+  const smoke = ["#d8b890", "#9a7a62", "#6a5a52", "#3e3632"];
+  for (let dy = -R * 1.2; dy <= R * 1.2; dy += G) {
+    for (let dx = -R * 1.2; dx <= R * 1.2; dx += G) {
+      let f = 9;
+      for (const [px, py, pr] of puffs) {
+        const r = pr * R * (1 + 0.06 * Math.sin(u * 13 + px * 9 + py * 7));
+        const q = Math.hypot(dx - px * R, dy - py * R) / r;
+        if (q < f) f = q;
+      }
+      if (f > 1) continue;
+      // 中ほど熱く、ふちほど暗い。燃えつきると煙の色へ
+      const g = Math.min(0.99, Math.hypot(dx, dy) / (R * 1.05)) * 0.6 + f * 0.4 + (bfRand(dx * 13 + dy * 7 + seed) - 0.5) * 0.14;
+      const pal = bfRand(dx * 3 + dy * 11 + seed) < cool ? smoke : hot;
+      ctx.fillStyle = g < 0.32 ? pal[0] : g < 0.55 ? pal[1] : g < 0.8 ? pal[2] : pal[3];
+      ctx.fillRect(Math.round(X + dx), Math.round(Y + dy - rise), G, G);
+    }
+  }
+  // 土とかけら: 四方へ飛んで、落ちる
+  for (let k = 0; k < 18; k++) {
+    const a = bfRand(seed * 31 + k) * Math.PI * 2, v = R0 * (1.2 + bfRand(seed * 17 + k) * 1.6);
+    const s = Math.min(u, 1.1);
+    const px = X + Math.cos(a) * v * s, py = Y + Math.sin(a) * v * s * 0.7 - (s * 90 - s * s * 80) * (0.5 + bfRand(k + seed));
+    ctx.fillStyle = k % 3 ? "#3a2c22" : "#55504a";
+    ctx.fillRect(Math.round(px), Math.round(py), k % 4 ? 2 : 3, 2);
+  }
+};
 const BF_PLANTS = [];
 BF_RX.forEach((_, i) => {
   for (let k = 0; k < 8; k++) {
@@ -1141,19 +1203,21 @@ const BF_MAP = {
     const b = bfS.boom;
     if (b) {
       const u = bNow() - b.t0;
-      const k = Math.min(1, u / BF_WHITE);
-      // 光の玉は、マップの上の落ちたところから
-      ctx.fillStyle = "#ffffff";
-      ctx.globalAlpha = 0.95;
-      ctx.beginPath();
-      ctx.arc(Math.round(ox + b.x), Math.round(oy + b.y - 10), 6 + k * k * 900, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      if (k >= 1) {
-        const W = ctx.canvas.width, H = ctx.canvas.height;
+      // 誘爆のたびに、音とゆれ(D416)
+      while (b.hit < b.chain.length && u >= b.chain[b.hit].t) {
+        if (b.hit > 0 && window.bogiAudio) window.bogiAudio.sfx(b.hit % 3 ? "knock" : "boom");
+        b.hit++;
+      }
+      for (const c of b.chain) bfFireball(ctx, ox + c.x, oy + c.y, c.R, u - c.t, c.seed);
+      const W = ctx.canvas.width, H = ctx.canvas.height;
+      // 画面全体が白に飛ぶ(丸くひろげない)。はじめは明滅しながら、だんだん白く
+      const w = Math.max(0, Math.min(1, (u - BF_WHITE[0]) / (BF_WHITE[1] - BF_WHITE[0])));
+      const flick = u < 0.12 ? 0.55 : 0; // 閃光の瞬間にも、画面が一度白む
+      const al = Math.min(1, Math.max(flick, w * w * (0.85 + 0.15 * Math.sin(u * 40))));
+      if (al > 0) {
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.fillStyle = "#ffffff";
+        ctx.fillStyle = `rgba(255, 255, 255, ${w >= 1 ? 1 : al})`;
         ctx.fillRect(0, 0, W, H);
         const P = window.bogiPix;
         if (P && u > BF_OVER) {
@@ -1235,7 +1299,7 @@ const BF_MAP = {
       h: 1,
       range: 44,
       noLook: true,
-      hidden: () => bfS.pulled.includes(n),
+      hidden: () => bfS.pulled.includes(n) || (bfS.boom && bfS.boom.chain.some((c) => c.n === n && bNow() - bfS.boom.t0 > c.t + 0.05)),
       canInteract: () => bfS.carry === null && !bfS.boom, // 持っている間は、次のものを引きぬけない(大爆発のあとも)
       draw(ctx, sx, sy, t, api) {
         const im = api.image(`plant_${p.kind}`);
@@ -1292,9 +1356,9 @@ const BF_MAP = {
           th.landed = true;
           const kind = BF_PLANTS[th.n].kind;
           if (["s", "m", "w", "l"].includes(kind) && Math.random() < BF_BOOM_P) {
-            bfS.boom = { t0: bNow(), x: th.x1, y: th.y1, leaving: false };
+            bfS.boom = { t0: bNow(), x: th.x1, y: th.y1, leaving: false, chain: bfChain(th.x1, th.y1), hit: 0 };
             api.sfx("boom");
-            api.shake(0.8, 6);
+            api.shake(2.0, 9);
           }
         }
         this.x = th.x0 + (th.x1 - th.x0) * u;
