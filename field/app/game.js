@@ -60,6 +60,18 @@ function resetGame() {
   location.reload();
 }
 
+// ゲームオーバー(ハンガーの畑の大爆発 D421): 保存を全部消して、タイトルから最初へ。終えた断片も能力も消える
+// (作者「セーブも消そう」「ペナルティをあたえたい」)。音の大きさの設定は別の保存なので残る
+window.bogiGameOver = function () {
+  try {
+    localStorage.removeItem(SAVE_KEY);
+    sessionStorage.removeItem("bogidachi.skipTitle");
+  } catch (e) {
+    // 保存が使えない環境でも、読みこみ直せば最初からになる
+  }
+  location.reload();
+};
+
 // テストプレイ用(作者の注文): すべての条件を満たした状態にする。断片を見つけて終え、見届け、持ち帰った物、
 // 太宰治全集 10 冊、とくぎ全部、真のエンディング(C)を見たしるし(書庫が開く)。扉が開く場面などは、懲罰空間に戻ったときに流れる
 function grantAll() {

@@ -976,7 +976,9 @@ const bfReset = () => {
 const BF_FLY = 0.5; // 投げてから落ちるまで(秒)
 const BF_BOOM_P = 0.1; // 投げた爆弾が、落ちたところで大爆発する見こみ(毎回 10% のくじ。野菜は爆発しない D415)
 const BF_WHITE = [1.4, 1.9]; // 落ちてから、画面全体が白くなりはじめ、真っ白になるまで(秒)
-const BF_OVER = 3.2; // 落ちてから「ゲームオーバー」が出るまで(秒)。出てから A で畑の入り口へ
+// 真っ白になったら、白だけが 2 秒 → 「ゲームオーバー」が 3 秒かけて白の中から浮かぶ → 1 秒おいて、セーブを消してタイトルへ(D421)
+const BF_OVER = [3.9, 6.9]; // 落ちてから、字が浮かびはじめ、出きるまで(秒)
+const BF_TITLE = 7.9; // 落ちてから、タイトルへ戻るまで(秒)
 // 大爆発のつくり(D416): 爆心地で閃光 → 火の玉がゆらぎながらふくらむ → 土と煙とかけらが飛ぶ。
 // まわりに植わっている爆弾が、爆心地から近い順に誘爆する。最後に画面全体が白に飛ぶ
 const bfRand = (k) => {
@@ -1208,17 +1210,11 @@ const BF_MAP = {
   onEnter() {
     bfReset();
   },
-  // 大爆発のあとは、操作を止める。「ゲームオーバー」が出たら、A(どのキーでも)で畑の入り口からやり直し(D415)
+  // 大爆発のあとは、操作を止める。ボタンは受けつけず、そのままタイトルへ(D421。D415 の「A で畑の入り口から」は替えた)
   get lockInput() {
     return !!bfS.boom;
   },
-  onLockedPress(api) {
-    const b = bfS.boom;
-    if (!b || b.leaving || bNow() - b.t0 < BF_OVER + 0.4) return;
-    b.leaving = true;
-    api.sfx("ok");
-    api.warp("farm", "door"); // 入るときに、持ち物と抜いた跡は元に戻る(bfReset)
-  },
+  onLockedPress() {},
   drawOverlay(ctx, ox, oy, t, api) {
     // 天井から下がる裸電球。通り道の上に、4 つ(奥の壁の 2 つは壁といっしょに描く)
     for (const y of [270, 360]) {
@@ -1261,10 +1257,23 @@ const BF_MAP = {
         ctx.fillStyle = `rgba(255, 255, 255, ${w >= 1 ? 1 : al})`;
         ctx.fillRect(0, 0, W, H);
         const P = window.bogiPix;
-        if (P && u > BF_OVER) {
+        if (P && u > BF_OVER[0]) {
+          // 白の中から、じわじわ浮かぶ
           const S = Math.max(2, Math.round(W / 320));
           const text = "ゲームオーバー";
+          ctx.globalAlpha = Math.min(1, (u - BF_OVER[0]) / (BF_OVER[1] - BF_OVER[0]));
           P.text(ctx, text, Math.round((W - P.width(text) * S) / 2), Math.round(H / 2 - 8 * S), S, "#28241f");
+          ctx.globalAlpha = 1;
+        }
+        // 真っ白のあいだは、音楽も止めて静かに
+        if (!b.quiet && window.bogiAudio) {
+          b.quiet = true;
+          window.bogiAudio.bgm("silence");
+        }
+        // ペナルティ: セーブを全部消して、タイトルへ(作者「セーブも消そう」「ペナルティをあたえたい」)
+        if (u > BF_TITLE && !b.leaving) {
+          b.leaving = true;
+          if (window.bogiGameOver) window.bogiGameOver();
         }
         ctx.restore();
       }
