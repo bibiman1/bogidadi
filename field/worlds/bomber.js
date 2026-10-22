@@ -967,12 +967,16 @@ const bfPathX = (q, y) => (q === 0 ? (bfWallX(y)[0] + bfRidgeX(0, y)) / 2 : q ==
 const BF_KINDS = { s: "bomb_s", m: "bomb_m", w: "bomb_w", l: "bomb_l", daikon: "daikon", kabocha: "kabocha" };
 // pulled: ぬかれて、まだ植えなおされていないもの(植わっているものの番号)。carry: きーが頭にのせて運んでいるもの。
 // thrown: きーが放り投げたもの({ n, x0, y0, x1, y1, t0, by })。by は拾いに来た世話係(拾ったあとは、その頭の上)
-const bfS = { pulled: [], carry: null, thrown: null };
+// boom: 投げた爆弾が大爆発した({ t0, leaving })。真っ白になって、ゲームオーバー(D415)
+const bfS = { pulled: [], carry: null, thrown: null, boom: null };
 const bfReset = () => {
-  Object.assign(bfS, { pulled: [], carry: null, thrown: null });
+  Object.assign(bfS, { pulled: [], carry: null, thrown: null, boom: null });
   for (const o of BF_CARE) Object.assign(o, { task: null, x: o.home[0], y: o.home[1] });
 };
 const BF_FLY = 0.5; // 投げてから落ちるまで(秒)
+const BF_BOOM_P = 0.1; // 投げた爆弾が、落ちたところで大爆発する見こみ(毎回 10% のくじ。野菜は爆発しない D415)
+const BF_WHITE = 0.5; // 落ちてから真っ白になるまで(秒)
+const BF_OVER = 1.3; // 落ちてから「ゲームオーバー」が出るまで(秒)。出てから A で畑の入り口へ
 const BF_PLANTS = [];
 BF_RX.forEach((_, i) => {
   for (let k = 0; k < 8; k++) {
@@ -1016,6 +1020,7 @@ const BF_CARE = [
     };
     // きーが放り投げたものが落ちたら、いちばん近い者が、すぐ拾いに駆けつける
     const th = bfS.thrown;
+    if (bfS.boom) return; // 大爆発のあとは、だれも駆けつけない(D415)
     if (!this.task && th && !th.by && bNow() - th.t0 > BF_FLY) {
       const near = BF_CARE.filter((o) => !o.task).sort((a, b) => Math.hypot(a.x - th.x1, a.y - th.y1) - Math.hypot(b.x - th.x1, b.y - th.y1))[0];
       if (near === this) {
@@ -1103,6 +1108,17 @@ const BF_MAP = {
   onEnter() {
     bfReset();
   },
+  // 大爆発のあとは、操作を止める。「ゲームオーバー」が出たら、A(どのキーでも)で畑の入り口からやり直し(D415)
+  get lockInput() {
+    return !!bfS.boom;
+  },
+  onLockedPress(api) {
+    const b = bfS.boom;
+    if (!b || b.leaving || bNow() - b.t0 < BF_OVER + 0.4) return;
+    b.leaving = true;
+    api.sfx("ok");
+    api.warp("farm", "door"); // 入るときに、持ち物と抜いた跡は元に戻る(bfReset)
+  },
   drawOverlay(ctx, ox, oy, t) {
     // 天井から下がる裸電球。通り道の上に、4 つ(奥の壁の 2 つは壁といっしょに描く)
     for (const y of [270, 360]) {
@@ -1119,6 +1135,33 @@ const BF_MAP = {
         ctx.fillRect(X - 3, Y, 6, 6);
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(X - 1, Y + 1, 2, 2);
+      }
+    }
+    // 大爆発: 落ちたところから白い光がひろがって、画面が真っ白になる。白の中に「ゲームオーバー」(D415)
+    const b = bfS.boom;
+    if (b) {
+      const u = bNow() - b.t0;
+      const k = Math.min(1, u / BF_WHITE);
+      // 光の玉は、マップの上の落ちたところから
+      ctx.fillStyle = "#ffffff";
+      ctx.globalAlpha = 0.95;
+      ctx.beginPath();
+      ctx.arc(Math.round(ox + b.x), Math.round(oy + b.y - 10), 6 + k * k * 900, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      if (k >= 1) {
+        const W = ctx.canvas.width, H = ctx.canvas.height;
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, W, H);
+        const P = window.bogiPix;
+        if (P && u > BF_OVER) {
+          const S = Math.max(2, Math.round(W / 320));
+          const text = "ゲームオーバー";
+          P.text(ctx, text, Math.round((W - P.width(text) * S) / 2), Math.round(H / 2 - 8 * S), S, "#28241f");
+        }
+        ctx.restore();
       }
     }
   },
@@ -1193,7 +1236,7 @@ const BF_MAP = {
       range: 44,
       noLook: true,
       hidden: () => bfS.pulled.includes(n),
-      canInteract: () => bfS.carry === null, // 持っている間は、次のものを引きぬけない
+      canInteract: () => bfS.carry === null && !bfS.boom, // 持っている間は、次のものを引きぬけない(大爆発のあとも)
       draw(ctx, sx, sy, t, api) {
         const im = api.image(`plant_${p.kind}`);
         if (im) ctx.drawImage(im, Math.round(sx - im.width / 2), Math.round(sy - im.height));
@@ -1239,11 +1282,21 @@ const BF_MAP = {
       y: 0,
       w: 1,
       h: 1,
-      hidden: () => !bfS.thrown || bfS.thrown.held,
-      update() {
+      hidden: () => !bfS.thrown || bfS.thrown.held || !!bfS.boom,
+      update(dt, t, api) {
         const th = bfS.thrown;
         if (!th) return;
         const u = Math.min(1, (bNow() - th.t0) / BF_FLY);
+        // 落ちたとき、爆弾なら 10 回に 1 回、大爆発する(D415。D414 の「爆発しない」を上書き)
+        if (u >= 1 && !th.landed) {
+          th.landed = true;
+          const kind = BF_PLANTS[th.n].kind;
+          if (["s", "m", "w", "l"].includes(kind) && Math.random() < BF_BOOM_P) {
+            bfS.boom = { t0: bNow(), x: th.x1, y: th.y1, leaving: false };
+            api.sfx("boom");
+            api.shake(0.8, 6);
+          }
+        }
         this.x = th.x0 + (th.x1 - th.x0) * u;
         this.y = th.y0 + (th.y1 - th.y0) * u;
         this.z = Math.sin(u * Math.PI) * 26 + (1 - u) * 22; // 頭の高さから投げて、地面に落ちる
