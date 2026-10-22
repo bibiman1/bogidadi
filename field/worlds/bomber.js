@@ -983,6 +983,25 @@ const bfRand = (k) => {
   const v = Math.sin(k * 127.1 + 311.7) * 43758.5453;
   return v - Math.floor(v);
 };
+// 背景の絵(bg_hatake)の明るさ(0〜1)を読む関数を、一度だけ作る(α と Ω のペンキを壁の凹凸に沿わせる D417)
+let bfLum = null;
+const bfWallLum = (api) => {
+  if (bfLum) return bfLum;
+  const im = api.image("bg_hatake");
+  if (!im || !im.width) return null;
+  const c = document.createElement("canvas");
+  c.width = im.width;
+  c.height = im.height;
+  const g = c.getContext("2d");
+  g.drawImage(im, 0, 0);
+  const d = g.getImageData(0, 0, c.width, c.height).data;
+  bfLum = (x, y) => {
+    if (x < 0 || y < 0 || x >= c.width || y >= c.height) return 0.5;
+    const k = (y * c.width + x) * 4;
+    return (d[k] * 0.3 + d[k + 1] * 0.59 + d[k + 2] * 0.11) / 255;
+  };
+  return bfLum;
+};
 const bfChain = (x, y) => {
   const near = BF_PLANTS.map((q, n) => ({ n, x: q.x, y: q.y, d: Math.hypot(q.x - x, q.y - y), kind: q.kind }))
     .filter((q) => ["s", "m", "w", "l"].includes(q.kind) && !bfS.pulled.includes(q.n))
@@ -1242,7 +1261,7 @@ const BF_MAP = {
       y: 6 * T,
       w: 1,
       h: 1,
-      draw(ctx, sx, sy, t) {
+      draw(ctx, sx, sy, t, api) {
         const cx = Math.round(sx), cy = Math.round(sy - 74), r = 23; // 奥の壁のまん中の柱に
         ctx.fillStyle = "#28241f";
         ctx.beginPath();
@@ -1278,6 +1297,42 @@ const BF_MAP = {
         ctx.stroke();
         ctx.fillStyle = "#28241f";
         ctx.fillRect(cx - 1, cy - 1, 3, 3);
+        // 時計をはさんで、左にアルファ、右にオメガ(はじまりと、おわり。D417)。壁にペンキで手描きした字:
+        // 影はつけず、筆のはばがところどころ太く、はげて、下へたれている
+        const BF_GLYPH = {
+          a: ["...###....#", "..#...#..#.", ".#.....##..", ".#.....#...", ".#.....##..", "..#...#..#.", "...###....#"],
+          o: ["...#####...", "..#.....#..", ".#.......#.", ".#.......#.", "..#.....#..", "...#...#...", ".###...###."],
+        };
+        // 壁の凹凸に沿わせる: 背景の明るさを、ペンキの下で 1 ドットずつ読む。
+        // 出っぱり(明るい)ではペンキも明るく、くぼみ(暗い)では暗く、溝や柱のふちの黒い線には入らない
+        const lum = bfWallLum(api);
+        const ix = sx - 208, iy = sy - 6 * T; // 画面の座標 → 背景の絵の座標
+        for (const [g, gx, sd] of [["a", -52, 3], ["o", 52, 11]]) {
+          const rows = BF_GLYPH[g], G = 2;
+          const x0 = Math.round(cx + gx - (rows[0].length * G) / 2), y0 = Math.round(cy - (rows.length * G) / 2);
+          const dots = new Map(); // "x,y" → 濃さ
+          const put = (x, y, w, h, a) => {
+            for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) dots.set(`${xx},${yy}`, Math.max(a, dots.get(`${xx},${yy}`) || 0));
+          };
+          rows.forEach((r, j) =>
+            [...r].forEach((c, i) => {
+              if (c !== "#") return;
+              const h = bfRand(sd * 37 + i * 7 + j * 13);
+              // 筆のはばは 3 ドット(となりと重なる)。はげたところは消さずに、うすくなる
+              put(x0 + i * G, y0 + j * G, 3, 3, h < 0.18 ? 0.45 : 0.85);
+              if (h > 0.8) put(x0 + i * G - 1, y0 + j * G + 1, 1, 2, 0.85); // 筆のむら
+              if (j === rows.length - 1 && h > 0.5) put(x0 + i * G + 1, y0 + (j + 1) * G + 1, 1, 2 + Math.round(h * 6), 0.7); // たれ
+            })
+          );
+          for (const [k, al] of dots) {
+            const [x, y] = k.split(",").map(Number);
+            const L = lum ? lum(Math.round(x - ix), Math.round(y - iy)) : 0.5;
+            if (L < 0.16) continue; // 溝や柱のふちの黒い線
+            const sh = Math.min(1.08, 0.5 + L * 1.1);
+            ctx.fillStyle = `rgba(${Math.round(226 * sh)}, ${Math.round(214 * sh)}, ${Math.round(188 * sh)}, ${al})`;
+            ctx.fillRect(x, y, 1, 1);
+          }
+        }
         // 奥の壁の裸電球(時計の左右)
         for (const x of [-100, 100]) {
           const X = Math.round(sx + x), Y = Math.round(sy - 70);
