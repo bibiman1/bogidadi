@@ -965,7 +965,14 @@ const bfWallX = (y) => {
 // 通り道のまん中の x(0 = 左の壁と 1 本目のあいだ … 5 = 5 本目と右の壁のあいだ)
 const bfPathX = (q, y) => (q === 0 ? (bfWallX(y)[0] + bfRidgeX(0, y)) / 2 : q === 5 ? (bfRidgeX(4, y) + bfWallX(y)[1]) / 2 : (bfRidgeX(q - 1, y) + bfRidgeX(q, y)) / 2);
 const BF_KINDS = { s: "bomb_s", m: "bomb_m", w: "bomb_w", l: "bomb_l", daikon: "daikon", kabocha: "kabocha" };
-const bfS = { pulled: [] }; // ぬかれて、まだ植えなおされていないもの(植わっているものの番号)
+// pulled: ぬかれて、まだ植えなおされていないもの(植わっているものの番号)。carry: きーが頭にのせて運んでいるもの。
+// thrown: きーが放り投げたもの({ n, x0, y0, x1, y1, t0, by })。by は拾いに来た世話係(拾ったあとは、その頭の上)
+const bfS = { pulled: [], carry: null, thrown: null };
+const bfReset = () => {
+  Object.assign(bfS, { pulled: [], carry: null, thrown: null });
+  for (const o of BF_CARE) Object.assign(o, { task: null, x: o.home[0], y: o.home[1] });
+};
+const BF_FLY = 0.5; // 投げてから落ちるまで(秒)
 const BF_PLANTS = [];
 BF_RX.forEach((_, i) => {
   for (let k = 0; k < 8; k++) {
@@ -994,38 +1001,60 @@ const BF_CARE = [
   img,
   q,
   home: [bfPathX(q, y), y],
-  job: null, // 植えなおしに行く先(植わっているものの番号)
+  task: null, // 投げられたものの始末(D414): fetch 拾いに行く → hit きーを殴りに行く → replant 元の穴に植えなおす
   t0: 0,
-  update(dt, t) {
-    // ぬかれたものがあれば、手のあいている者が、いちばん近いものへ植えなおしに行く
-    if (this.job === null) {
-      const busy = BF_CARE.map((o) => o.job);
-      let best = null;
-      for (const n of bfS.pulled) {
-        if (busy.includes(n)) continue;
-        const d = Math.hypot(BF_PLANTS[n].x - this.x, BF_PLANTS[n].y - this.y);
-        if (!best || d < best.d) best = { n, d };
+  update(dt, t, api) {
+    const go = (to, spd) => {
+      const dx = to[0] - this.x, dy = to[1] - this.y, d = Math.hypot(dx, dy);
+      this.moving = d > 2;
+      if (this.moving) {
+        this.west = dx < 0;
+        this.x += (dx / d) * Math.min(d, spd * dt);
+        this.y += (dy / d) * Math.min(d, spd * dt);
       }
-      if (best) {
-        this.job = best.n;
+      return !this.moving;
+    };
+    // きーが放り投げたものが落ちたら、いちばん近い者が、すぐ拾いに駆けつける
+    const th = bfS.thrown;
+    if (!this.task && th && !th.by && bNow() - th.t0 > BF_FLY) {
+      const near = BF_CARE.filter((o) => !o.task).sort((a, b) => Math.hypot(a.x - th.x1, a.y - th.y1) - Math.hypot(b.x - th.x1, b.y - th.y1))[0];
+      if (near === this) {
+        th.by = this;
+        this.task = { kind: "fetch", n: th.n };
         this.t0 = 0;
       }
     }
-    if (this.job !== null) {
-      const to = bfBeside(BF_PLANTS[this.job]);
-      this.moving = Math.hypot(to[0] - this.x, to[1] - this.y) > 2;
-      if (this.moving) {
-        this.west = to[0] < this.x;
-        const dx = to[0] - this.x, dy = to[1] - this.y, d = Math.hypot(dx, dy);
-        this.x += (dx / d) * Math.min(d, 110 * dt);
-        this.y += (dy / d) * Math.min(d, 110 * dt);
-      } else {
-        this.west = BF_PLANTS[this.job].x < this.x;
+    if (this.task) {
+      const tk = this.task;
+      if (tk.kind === "fetch") {
+        if (go([th.x1, th.y1 + 4], 170)) {
+          tk.kind = "hit"; // 拾った。頭にのせて、きーを殴りに行く
+          th.held = true;
+        }
+      } else if (tk.kind === "hit") {
+        const p = api.player();
+        const dx = p.x - this.x, dy = p.y - this.y, d = Math.hypot(dx, dy) || 1;
+        if (d > 18) go([p.x, p.y], 170);
+        else {
+          // ポカ。きーは少しはじかれる(ほかの罰はない)
+          this.moving = false;
+          this.west = dx < 0;
+          api.knock((dx / d) * 240, (dy / d) * 240);
+          api.sfx("knock");
+          api.bubble(this.id, "ポカ", 900);
+          tk.kind = "replant";
+          this.t0 = -0.4; // 殴ったあと、少し間をおく
+        }
+      } else if (tk.kind === "replant") {
         this.t0 += dt;
-        if (this.t0 > 1.0) {
-          // 植えなおした
-          bfS.pulled = bfS.pulled.filter((n) => n !== this.job);
-          this.job = null;
+        if (this.t0 > 0 && go(bfBeside(BF_PLANTS[tk.n]), 120)) {
+          this.west = BF_PLANTS[tk.n].x < this.x;
+          if (this.t0 > 1.4) {
+            // 元の穴に植えなおした
+            bfS.pulled = bfS.pulled.filter((n) => n !== tk.n);
+            if (bfS.thrown && bfS.thrown.n === tk.n) bfS.thrown = null;
+            this.task = null;
+          }
         }
       }
       return;
@@ -1040,15 +1069,20 @@ const BF_CARE = [
   draw(ctx, sx, sy, t, api) {
     const im = api.image(this.img);
     if (!im) return;
-    const working = this.job !== null ? !this.moving : !this.moving || Math.floor(t * 0.5 + j) % 3 === 0;
-    const hop = this.moving && this.job !== null ? (Math.floor(t * 9 + j) % 2 ? 2 : 0) : working ? [0, 1, 2, 1][Math.floor(t * 14 + j * 1.7) % 4] : 0; // 修理と同じ、ぴょこぴょこ
+    const working = this.task ? !this.moving : !this.moving || Math.floor(t * 0.5 + j) % 3 === 0;
+    const hop = this.moving && this.task ? (Math.floor(t * 9 + j) % 2 ? 2 : 0) : working ? [0, 1, 2, 1][Math.floor(t * 14 + j * 1.7) % 4] : 0; // 修理と同じ、ぴょこぴょこ
     ctx.save();
     ctx.translate(Math.round(sx), Math.round(sy - hop));
     if (this.west) ctx.scale(-1, 1);
     ctx.drawImage(im, -Math.round(im.width / 2), -im.height);
     ctx.restore();
+    // 拾ったものは、頭にのせて運ぶ(植えなおすまで)
+    if (this.task && this.task.kind !== "fetch") {
+      const it = api.image(BF_KINDS[BF_PLANTS[this.task.n].kind]);
+      if (it) ctx.drawImage(it, Math.round(sx - it.width / 2), Math.round(sy - hop - im.height - it.height + 4));
+    }
     // 水やり: 手もとから、しずくが 3 つ
-    if (working && this.job === null && j % 2 === 0) {
+    if (working && !this.task && j % 2 === 0) {
       ctx.fillStyle = "rgba(150, 200, 255, 0.85)";
       for (let k = 0; k < 3; k++) {
         const f = (t * 1.6 + k / 3) % 1;
@@ -1065,6 +1099,9 @@ const BF_MAP = {
   drawGround: kImage("bg_hatake", 416, 496),
   spawns: {
     door: { x: 208, y: 14.3 * T, facing: "north" },
+  },
+  onEnter() {
+    bfReset();
   },
   drawOverlay(ctx, ox, oy, t) {
     // 天井から下がる裸電球。通り道の上に、4 つ(奥の壁の 2 つは壁といっしょに描く)
@@ -1085,7 +1122,11 @@ const BF_MAP = {
       }
     }
   },
-  triggers: [{ id: "toKichi", x: 150, y: 15.0 * T, w: 115, h: 0.6 * T, warp: { map: "kichi", spawn: "farm" } }],
+  triggers: [
+    // 持ったままは外へ出られない。そっとはじき返す(D414)
+    { id: "bfKeep", x: 150, y: 14.75 * T, w: 115, h: 0.5 * T, enabled: () => bfS.carry !== null, run: (api) => api.knock(0, -200) },
+    { id: "toKichi", x: 150, y: 15.0 * T, w: 115, h: 0.6 * T, enabled: () => bfS.carry === null, warp: { map: "kichi", spawn: "farm" } },
+  ],
   objects: [
     {
       // 奥の壁の掛け時計(D409)。針がぐるぐる速く回る。時間の進みかたが速い
@@ -1152,6 +1193,7 @@ const BF_MAP = {
       range: 44,
       noLook: true,
       hidden: () => bfS.pulled.includes(n),
+      canInteract: () => bfS.carry === null, // 持っている間は、次のものを引きぬけない
       draw(ctx, sx, sy, t, api) {
         const im = api.image(`plant_${p.kind}`);
         if (im) ctx.drawImage(im, Math.round(sx - im.width / 2), Math.round(sy - im.height));
@@ -1159,9 +1201,66 @@ const BF_MAP = {
       interact(api) {
         bfS.pulled.push(n);
         api.sfx("pop"); // スポッ
-        api.hold(BF_KINDS[p.kind], 1.4);
+        api.hold(BF_KINDS[p.kind], 1.4, () => {
+          bfS.carry = n; // 掲げたあと、頭にのせて運ぶ(木箱と同じ: 少し遅く、跳べない D414)
+        });
       },
     })),
+    {
+      // 持っている間、もう一度 A で、向いている方へ放り投げる(D414)。きーについて歩く、見えない調べ先
+      id: "bfThrow",
+      x: 0,
+      y: 0,
+      w: 1,
+      h: 1,
+      range: 400,
+      noLook: true,
+      canInteract: () => bfS.carry !== null,
+      update(dt, t, api) {
+        const p = api.player();
+        this.x = p.x;
+        this.y = p.y;
+      },
+      draw() {},
+      interact(api) {
+        const p = api.player();
+        const v = { east: [1, 0], west: [-1, 0], north: [0, -1], south: [0, 1] }[p.facing] || [0, 1];
+        const x1 = Math.max(40, Math.min(376, p.x + v[0] * 2.5 * T));
+        const y1 = Math.max(215, Math.min(440, p.y + v[1] * 2.5 * T));
+        bfS.thrown = { n: bfS.carry, x0: p.x, y0: p.y, x1, y1, t0: bNow(), by: null };
+        bfS.carry = null;
+        api.sfx("whir");
+      },
+    },
+    {
+      // 放り投げたもの: 弧をえがいて飛び、落ちたら拾われるまで地面に置かれている(転がらない、爆発しない)
+      id: "bfFly",
+      x: 0,
+      y: 0,
+      w: 1,
+      h: 1,
+      hidden: () => !bfS.thrown || bfS.thrown.held,
+      update() {
+        const th = bfS.thrown;
+        if (!th) return;
+        const u = Math.min(1, (bNow() - th.t0) / BF_FLY);
+        this.x = th.x0 + (th.x1 - th.x0) * u;
+        this.y = th.y0 + (th.y1 - th.y0) * u;
+        this.z = Math.sin(u * Math.PI) * 26 + (1 - u) * 22; // 頭の高さから投げて、地面に落ちる
+      },
+      draw(ctx, sx, sy, t, api) {
+        const th = bfS.thrown;
+        const it = th && api.image(BF_KINDS[BF_PLANTS[th.n].kind]);
+        if (!it) return;
+        if (this.z > 1) {
+          ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
+          ctx.beginPath();
+          ctx.ellipse(Math.round(sx), Math.round(sy), 7, 3, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.drawImage(it, Math.round(sx - it.width / 2), Math.round(sy - it.height - this.z));
+      },
+    },
     ...BF_CARE,
   ],
 };

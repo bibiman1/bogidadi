@@ -248,6 +248,7 @@ window.BOGI_WORLDS = {
     start: "kichi",
     startSpawn: "start",
     maps: { kichi: B_KICHI, farm: BF_MAP },
+    carry: () => (bfS.carry !== null ? BF_KINDS[BF_PLANTS[bfS.carry].kind] : null), // ハンガーの畑で引きぬいたものを頭にのせて運ぶ(D414)
     onEnterWorld() {
       bMorning(); // 入るたびに、朝の手順から
     },
