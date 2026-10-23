@@ -96,6 +96,87 @@
     out.stop = () => oscs.forEach(([o, l]) => (o.stop(), l.stop()));
     return out;
   }
+  // 旋律を音の部品で鳴らす(ファイルなし)。ぱーでれの断片の「遠き山に日は落ちて」(ドヴォルザーク「新世界より」第 2 楽章の旋律。D432)
+  // 霧の向こうから聞こえるように、やわらかい音、こもった音色、こだま。1 回ごとに間をあけてくり返す
+  const MELODIES = {
+    padre: {
+      beat: 0.92,
+      gap: 7,
+      base: 261.63 * 2 ** (1 / 12), // ハ長調より半音上(原曲の変ニ長調)
+      // [半音(ドから), 拍]
+      notes: [
+        [4, 1.5], [7, 0.5], [7, 2], [4, 1.5], [2, 0.5], [0, 2], [2, 1], [4, 1], [7, 1], [4, 1], [2, 4],
+        [4, 1.5], [7, 0.5], [7, 2], [4, 1.5], [2, 0.5], [0, 2], [2, 1], [4, 1], [2, 1], [0, 1], [0, 4],
+      ],
+    },
+  };
+  function melodyNode(m) {
+    const out = ctx.createGain();
+    out.gain.value = 0.32;
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 1500;
+    // こだま(遠く、霧の向こう)
+    const dl = ctx.createDelay(2);
+    dl.delayTime.value = 0.42;
+    const fb = ctx.createGain();
+    fb.gain.value = 0.38;
+    lp.connect(out);
+    lp.connect(dl);
+    dl.connect(fb).connect(dl);
+    dl.connect(out);
+    let timer = null;
+    let next = 0; // つぎの回が始まる時刻
+    const total = m.notes.reduce((a, n) => a + n[1], 0) * m.beat + m.gap;
+    const note = (semi, t0, dur) => {
+      const f = m.base * 2 ** (semi / 12);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(0.5, t0 + 0.08);
+      g.gain.setTargetAtTime(0.28, t0 + 0.12, 0.4);
+      g.gain.setTargetAtTime(0, t0 + dur * 0.92, 0.18);
+      g.connect(lp);
+      const vib = ctx.createOscillator();
+      vib.frequency.value = 4.6;
+      const vg = ctx.createGain();
+      vg.gain.value = f * 0.004;
+      vib.connect(vg);
+      [[1, "sine", 1], [2, "triangle", 0.22], [0.5, "sine", 0.18]].forEach(([mul, type, amp]) => {
+        const o = ctx.createOscillator();
+        o.type = type;
+        o.frequency.value = f * mul;
+        vg.connect(o.frequency);
+        const og = ctx.createGain();
+        og.gain.value = amp;
+        o.connect(og).connect(g);
+        o.start(t0);
+        o.stop(t0 + dur + 1);
+      });
+      vib.start(t0);
+      vib.stop(t0 + dur + 1);
+    };
+    const queue = () => {
+      // 次の回を、始まる 2 秒前までに並べておく
+      while (next < ctx.currentTime + 2) {
+        let t = next;
+        for (const [semi, b] of m.notes) {
+          note(semi, t, b * m.beat);
+          t += b * m.beat;
+        }
+        next += total;
+      }
+    };
+    out.start = () => {
+      next = ctx.currentTime + 1.2;
+      queue();
+      timer = setInterval(queue, 500);
+    };
+    out.stop = () => {
+      clearInterval(timer);
+      out.disconnect();
+    };
+    return out;
+  }
   // opts.once: くり返さず 1 回だけかけ、終わったら opts.onEnd(ジュークボックスのレコード)
   function bgm(key, opts = {}) {
     if (!key) return;
@@ -157,6 +238,7 @@
           };
         start(s);
       });
+    else if (MELODIES[key]) start(melodyNode(MELODIES[key]));
     else start(droneNode(key));
     if (old) {
       old.gain.gain.cancelScheduledValues(ctx.currentTime);

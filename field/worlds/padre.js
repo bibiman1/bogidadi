@@ -106,6 +106,7 @@ const pFg = (key, x0, y0, baseY, solid) => ({
   },
 });
 const P_VOICE = { kobosi: "コロン", denden: "デン　デン", hato: "ポー" }; // 仮
+const P_PIL_GONE = new Set(); // 霧の道の巡礼で、もう空き地へ入ったもの
 const P_MICHI = {
   tile: T,
   bg: "#9a9484",
@@ -126,6 +127,34 @@ const P_MICHI = {
   objects: [
     pFg("fg_michi_pole1", 200, 0, 172, { w: 12, h: 6, dx: 10, dy: -3 }),
     pFg("fg_michi_pole2", 520, 0, 172, { w: 12, h: 6, dx: 10, dy: -3 }),
+    // 巡礼(D431): 壊れたぼぎだぢが一列になって、ゆっくり東の空き地へ歩いていく。足どりは不ぞろい。空き地に着いたら、もういない
+    ...["pb_5", "pb_3", "pb_1", "pb_4", "pb_2"].map((key, i) => ({
+      id: "pil_" + key,
+      x: (4 + i * 4.2) * T,
+      y: (5.6 + (i % 2) * 0.8) * T,
+      w: 1,
+      h: 1,
+      walk: 0,
+      hidden: (api) => api.flag("sawPadre") || api.flag("gone") || P_PIL_GONE.has(key),
+      update(dt, t) {
+        // 進んでは止まる。止まっているあいだは、少しゆれるだけ
+        const go = Math.max(0, Math.sin(t * 0.8 + i * 1.9));
+        this.walk = go;
+        this.x += (6 + 16 * go) * dt;
+        if (this.x > 29.6 * T) P_PIL_GONE.add(key);
+      },
+      draw(ctx, sx, sy, t, api) {
+        const im = api.image(key);
+        if (!im) return;
+        const bob = this.walk > 0.2 ? Math.abs(Math.sin(t * 6 + i)) * 2 : 0;
+        const lean = Math.sin(t * 1.3 + i) * 0.05; // 壊れていて、まっすぐ立てない
+        ctx.save();
+        ctx.translate(Math.round(sx), Math.round(sy - bob));
+        ctx.rotate(lean);
+        ctx.drawImage(im, -Math.round(im.width / 2), -im.height);
+        ctx.restore();
+      },
+    })),
     // 霧の東から聞こえる拍子木(姿は見えない)
     {
       id: "hyoshigi",
@@ -153,11 +182,12 @@ const P_Q = [
   { key: "b_denden", home: [10.5 * T, 6.6 * T] },
   { key: "b_kobosi", home: [9.5 * T, 6.6 * T] },
   { key: "b_hato", home: [12.5 * T, 6.6 * T] },
-  { key: "pb_1", home: [7.6 * T, 8.9 * T] },
-  { key: "pb_2", home: [13.8 * T, 5.1 * T] },
-  { key: "pb_3", home: [8.8 * T, 10.1 * T] },
-  { key: "pb_4", home: [14.2 * T, 9.8 * T] },
-  { key: "pb_5", home: [6.4 * T, 5.2 * T] },
+  // 壊れたぼぎだぢは巡礼に来て、ぱーでれを囲む半円にならぶ(D431)
+  { key: "pb_1", home: [14.0 * T, 4.7 * T] },
+  { key: "pb_2", home: [13.2 * T, 6.0 * T] },
+  { key: "pb_3", home: [13.4 * T, 8.0 * T] },
+  { key: "pb_4", home: [14.8 * T, 9.4 * T] },
+  { key: "pb_5", home: [16.6 * T, 9.8 * T] },
 ].map((q, i) => Object.assign(q, { i, x: q.home[0], y: q.home[1], up: null }));
 const P_VOICES = { b_denden: "デン　デン", b_kobosi: "コロン", b_hato: "ポー" };
 const pLeft = () => P_Q.filter((q) => q.up == null);
@@ -407,7 +437,16 @@ const P_AKICHI = {
         const moving = pS.phase === "gather" && q.up == null;
         const bob = moving ? Math.abs(Math.sin(t * 9 + q.i)) * 2 : 0;
         ctx.globalAlpha = a;
-        ctx.drawImage(im, Math.round(sx - im.width / 2), Math.round(sy - im.height - dy - bob));
+        // 巡礼の壊れたぼぎだぢ: 待つあいだ、ときどき、ぱーでれの方へ小さくおじぎする(D431)
+        const ph = (t * 0.2 + q.i * 0.37) % 1;
+        const bow = pS.phase === "wait" && q.key.startsWith("pb_") && ph < 0.16 ? Math.sin((ph / 0.16) * Math.PI) * 0.22 : 0;
+        if (bow) {
+          ctx.save();
+          ctx.translate(Math.round(sx), Math.round(sy - dy - bob));
+          ctx.rotate(q.x < P_CART.x + 24 ? bow : -bow);
+          ctx.drawImage(im, -Math.round(im.width / 2), -im.height);
+          ctx.restore();
+        } else ctx.drawImage(im, Math.round(sx - im.width / 2), Math.round(sy - im.height - dy - bob));
         ctx.globalAlpha = 1;
       },
       interact: (api) => api.bubble(q.key, P_VOICES[q.key] || "……", 1400),
