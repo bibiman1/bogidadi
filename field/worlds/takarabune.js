@@ -16,10 +16,10 @@ const TK_GRIDS = {
     "################",
     "################",
     "#########.######",
-    "######.......###",
-    "#..#..###...#..#",
-    "#..#..###...#..#",
-    "#..#........#..#",
+    "######......####",
+    "#..#..###...##.#",
+    "#..#..###...##.#",
+    "#..#........##.#",
     "#########..#####",
   ],
   port: [
@@ -402,7 +402,52 @@ const TK_WORKSHOP = tkMap("workshop", 16, 12, {
 // 港湾ぼぎの食堂兼休憩所(D441、作者「港湾ぼぎの食堂兼休憩所」「マトリョシカにして。わたしのスケッチ参考に。きーも飲食する。」「もつ煮とウォッカ」)
 // 食堂の人たちはマトリョシカ(作者のイメージボードのとおり、頭巾、丸い顔にほお紅、前かけの花。大きさがばらばら)。客は港湾ぼぎ(ヘルメット、手ぬぐい、ゴム長)。下絵(docs/assets/takarabune/canteen/)
 // おかみに話しかけると、きーは空いた席に座り、もつ煮とウォッカが出て、食べて飲む
-let tkMealT0 = -1;
+let tkMealT0 = -1; // 料理が机に置かれた時刻(小さい子が運んでくる、todo 145)
+let tkServeT0 = -1; // きーが座った時刻。ここから小さい子が運びはじめる
+const TK_SERVE_SEC = 4.0; // 座ってから料理が届くまで
+// 小さい子(給仕)が歩き回る床の道(マス単位。机と長いすの上は通らない)
+const TK_SMALL_PATH = [[5.8, 6.15], [5.6, 8.7], [9.4, 8.7], [9.4, 6.15]]; // 上の通りは、長いすの足もとより手前(6.15)を歩く
+const TK_SMALL_PICK = [5.8, 6.15]; // カウンターの右はしで受け取る
+const TK_SMALL_SERVE = [9.35, 7.3]; // きーの机の右から置く
+const tkLerp = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
+// 折れ線 pts の上を、全体の k(0〜1)だけ進んだ点
+function tkAlong(pts, k) {
+  const ds = [];
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) total += ds[i - 1] = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+  let u = Math.max(0, Math.min(1, k)) * total;
+  for (let i = 1; i < pts.length; i++) {
+    if (u <= ds[i - 1] || i === pts.length - 1) return tkLerp(pts[i - 1], pts[i], ds[i - 1] ? Math.min(1, u / ds[i - 1]) : 1);
+    u -= ds[i - 1];
+  }
+  return pts[pts.length - 1];
+}
+// 見回りの道(まん中の机をかこむ四角)の上の点から、カウンターの右はし(角 0)までの道。机の上は通らない
+function tkSmallToPick(pos) {
+  const [A, B, C, D] = TK_SMALL_PATH;
+  if (pos[1] > 8.4) return [pos, B, A]; // 下の通り(角 1→2)にいる
+  if (pos[0] > 9.0) return [pos, D, A]; // 右の通り(角 2→3)にいる
+  return [pos, A];
+}
+// ふだんの見回り: 区間を 0.8 マス/秒で歩き、角で 1.2 秒とまる
+function tkSmallPatrol(pt) {
+  const P = TK_SMALL_PATH, legs = [];
+  let total = 0;
+  for (let i = 0; i < P.length; i++) {
+    const a = P[i], b = P[(i + 1) % P.length];
+    const d = Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.8;
+    legs.push([a, b, d]);
+    total += d + 1.2;
+  }
+  let u = pt % total;
+  for (const [a, b, d] of legs) {
+    if (u < 1.2) return a;
+    u -= 1.2;
+    if (u < d) return tkLerp(a, b, u / d);
+    u -= d;
+  }
+  return P[0];
+}
 const TK_SEAT = { x: 8.2 * T, y: 8.4 * T }; // きーの席(まん中の机の手前のベンチ)。本番の絵(PixelLab)に合わせた
 const tkMatry = (id, img, x, y, voice, extra) =>
   Object.assign(
@@ -418,7 +463,11 @@ const tkMatry = (id, img, x, y, voice, extra) =>
         const im = api.image(img);
         if (!im) return;
         const sway = Math.sin(t * 1.4 + x) * 0.6; // 人形がかすかにゆれる
-        ctx.drawImage(im, Math.round(sx - im.width / 2 + sway), Math.round(sy - im.height));
+        // behind: カウンターの奥に立つ人は、カウンターの天板の線(この y)より下を描かない
+        const cut = this.behind ? Math.max(0, Math.min(im.height, Math.round(y - this.behind))) : 0;
+        const h = im.height - cut;
+        if (h <= 0) return;
+        ctx.drawImage(im, 0, 0, im.width, h, Math.round(sx - im.width / 2 + sway), Math.round(sy - im.height), im.width, h);
       },
       interact: (api) => api.bubble(id, voice, 1400),
     },
@@ -440,7 +489,8 @@ const TK_CANTEEN = tkMap("canteen", 16, 10, {
   triggers: [{ id: "out", x: 9 * T, y: 9.6 * T, w: 2 * T, h: T, warp: { map: "port", spawn: "canteen" } }],
   objects: [
     // 食堂のおかみ(大きなマトリョシカ)。話しかけると、もつ煮とウォッカ
-    tkMatry("okami", "m_okami", 4.2 * T, 3.75 * T, "……", {
+    tkMatry("okami", "m_okami", 3.9 * T, 4.5 * T, "……", {
+      behind: 3.97 * T, // カウンターの奥。天板より下は隠れる
       headY: 64,
       range: 100,
       interact(api) {
@@ -449,18 +499,88 @@ const TK_CANTEEN = tkMap("canteen", 16, 10, {
         api.later(900, () => {
           api.place(TK_SEAT.x, TK_SEAT.y);
           api.face("north");
-          api.freeze(6.2);
-          tkMealT0 = tkNow();
-          api.later(1200, () => api.mutter("もぐもぐ", 1300));
-          api.later(2900, () => api.mutter("もぐもぐ", 1100));
-          api.later(4400, () => api.mutter("くいっ", 1100)); // ウォッカ
-          api.later(5600, () => api.mutter("ふう", 1000));
+          api.freeze(6.2 + TK_SERVE_SEC);
+          tkServeT0 = tkNow();
+          tkMealT0 = tkServeT0 + TK_SERVE_SEC; // 小さい子が運んできて、机に置く(todo 145)
+          const w = TK_SERVE_SEC * 1000;
+          // 字は出さず、動きで見せる(作者「もぐもぐ　くぃっ　はいらないかな。動きでわかるようにして」)
+          // 食べる: 机に向いて、こくこくと小さくうなずく(2 回に分けて)
+          for (const [t0, n] of [[400, 6], [2100, 6]]) {
+            for (let i = 0; i < n; i++) api.later(w + t0 + i * 170, () => api.place(TK_SEAT.x, TK_SEAT.y + (i % 2 ? 0 : 1.5)));
+            api.later(w + t0 + n * 170, () => api.place(TK_SEAT.x, TK_SEAT.y));
+          }
+          // 飲む: グラスが口もとへ上がって傾く(絵は meal の側)。そのとき、ひと跳ね
+          api.later(w + 4500, () => api.hop());
+          // ひと息: 手前を向いて、白い息
+          api.later(w + 5600, () => {
+            api.face("south");
+            tkPuff(TK_SEAT.x - 6, TK_SEAT.y - 14, -6, -10, 1.4, 5);
+          });
         });
       },
     }),
     // 食堂の人たち(マトリョシカ): 手伝いは大鍋のそば、いちばん小さい子はカウンターの西のはし(D441)
-    tkMatry("mt_help", "m_mid2", 1.4 * T, 3.7 * T, "……"),
-    tkMatry("mt_small", "m_small2", 5.2 * T, 3.75 * T, "……"),
+    tkMatry("mt_help", "m_mid2", 12.85 * T, 5.4 * T, "……"), // ストーブのそば(床)
+    // いちばん小さい子は給仕(todo 145): ふだんは床を歩き回り、きーが座ると、カウンターで料理と酒を受け取って運ぶ
+    tkMatry("mt_small", "m_small2", 5.8 * T, 6.0 * T, "……", {
+      range: 26, // おかみへの話しかけをじゃましない近さ
+      pt: 0, // 見回りの時計(運んでいるあいだは止まる)
+      last: -1,
+      pos: [5.8, 6.15],
+      back: null, // 運び終えて道へもどる途中 [出発点, 出発時刻]
+      draw(ctx, sx, sy, t, api) {
+        const now = tkNow();
+        const dt = this.last < 0 ? 0 : Math.min(0.1, Math.max(0, now - this.last));
+        this.last = now;
+        let carry = false;
+        const e = tkServeT0 < 0 ? -1 : now - tkServeT0;
+        if (e >= 0 && e < TK_SERVE_SEC) {
+          // 0〜1.4 秒: カウンターの右はしへ / 1.4〜1.8 秒: 受け取る / 1.8〜4.0 秒: きーの机へ
+          // 机の上は通らない: 行きは道ぞいにカウンターへ、運ぶのは机の北の通りから右の通りへ回る
+          if (!this.from) this.from = tkSmallToPick(this.pos.slice());
+          if (e < 1.4) this.pos = tkAlong(this.from, e / 1.4);
+          else if (e < 1.8) this.pos = TK_SMALL_PICK.slice();
+          else this.pos = tkAlong([TK_SMALL_PICK, TK_SMALL_PATH[3], TK_SMALL_SERVE], (e - 1.8) / (TK_SERVE_SEC - 1.8));
+          carry = e >= 1.4;
+          this.back = null;
+        } else {
+          if (this.from) {
+            // 置き終えたら、右の通りの角(角 3)へもどり、そこから見回りをつづける
+            this.from = null;
+            this.back = [this.pos.slice(), now];
+            const P = TK_SMALL_PATH;
+            this.pt = 0;
+            for (let i = 0; i < 3; i++) this.pt += 1.2 + Math.hypot(P[i + 1][0] - P[i][0], P[i + 1][1] - P[i][1]) / 0.8;
+          }
+          let target;
+          if (this.back) {
+            const k = (now - this.back[1]) / 1.0;
+            target = tkSmallPatrol(this.pt);
+            if (k >= 1) this.back = null;
+            else target = tkLerp(this.back[0], target, k);
+          } else {
+            this.pt += dt;
+            target = tkSmallPatrol(this.pt);
+          }
+          this.pos = target;
+        }
+        // 動いた分だけ描く位置をずらす(この絵は今の位置から描く)
+        const nx = this.pos[0] * T, ny = this.pos[1] * T;
+        sx += nx - this.x;
+        sy += ny - this.y;
+        this.x = nx;
+        this.y = ny;
+        const im = api.image("m_small2");
+        if (!im) return;
+        ctx.drawImage(im, Math.round(sx - im.width / 2), Math.round(sy - im.height));
+        if (carry) {
+          // 胸の前に、もつ煮とウォッカ
+          const b = api.image("c_motsu"), v = api.image("c_vodka");
+          if (b) ctx.drawImage(b, Math.round(sx - 10), Math.round(sy - 16));
+          if (v) ctx.drawImage(v, Math.round(sx + 5), Math.round(sy - 14));
+        }
+      },
+    }),
     // 港湾ぼぎ(仕事帰りの客。ヘルメット、手ぬぐい、ゴム長): もつ煮を食べる / 湯のみで休む / 居眠り(D441)
     tkMatry("w1", "w_eat", 6.9 * T, 8.4 * T, "もぐもぐ", { headY: 40 }),
     tkMatry("w2", "w_tea", 11 * T, 5.6 * T, "ずず……", { headY: 40 }),
@@ -473,11 +593,22 @@ const TK_CANTEEN = tkMap("canteen", 16, 10, {
       w: 1,
       h: 1,
       draw(ctx, sx, sy, t, api) {
-        if (tkMealT0 < 0 || tkNow() - tkMealT0 > 7) return;
+        if (tkMealT0 < 0 || tkNow() < tkMealT0 || tkNow() - tkMealT0 > 7) return;
         const e = tkNow() - tkMealT0;
         const b = api.image("c_motsu"), v = api.image("c_vodka");
         if (b) ctx.drawImage(b, Math.round(sx - 12), Math.round(sy - 12));
-        if (v && e < 4.4) ctx.drawImage(v, Math.round(sx + 8), Math.round(sy - 9));
+        if (v && e < 4.9) {
+          // 4.0 秒まで机の上。4.0〜4.4 秒できーの口もとへ上がり、4.4〜4.9 秒で傾けて飲みほす(消える)
+          const k = Math.max(0, Math.min(1, (e - 4.0) / 0.4));
+          const gx = sx + 8 + (TK_SEAT.x - 9 - (this.x + 8)) * k;
+          const gy = sy - 9 + (TK_SEAT.y - 26 - (this.y - 9)) * k;
+          const tilt = e > 4.4 ? -Math.min(1, (e - 4.4) / 0.4) * 1.6 : 0;
+          ctx.save();
+          ctx.translate(Math.round(gx + 3), Math.round(gy + 4));
+          ctx.rotate(tilt);
+          ctx.drawImage(v, -3, -4);
+          ctx.restore();
+        }
         if (e < 3.5 && Math.random() < 0.15) tkPuff(this.x - 4, this.y - 12, 0, -14, 1.2, 4);
       },
     },
