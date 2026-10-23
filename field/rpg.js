@@ -151,8 +151,9 @@ const ASSET_V = (() => {
           freezeUntil = clock + sec;
         },
         // 一枚絵を何枚か、ボタンを待たずに、ゆっくり重ねて移り変わらせる(最後の絵のあとで onDone)
-        showSeq(keys, holdSec, onDone) {
-          cutscene = { img: keys[0], seq: keys, hold: holdSec, t0: clock, onDone: onDone || null, full: true };
+        // opts.slide: 重ねずに、今の絵を右へすべらせて抜き、下の次の絵を見せる(紙芝居 D428)
+        showSeq(keys, holdSec, onDone, opts) {
+          cutscene = { img: keys[0], seq: keys, hold: holdSec, t0: clock, onDone: onDone || null, full: true, slide: !!(opts && opts.slide) };
         },
         // 見せ場のカメラワーク: keys は時刻(秒)ごとの中心 x, y と寄り z(1 がふつう、小さいほど引き)。
         // 最後の点のあと 1.2 秒でふつうのカメラに戻る。そのあいだ、きーは動かない。A で飛ばせる
@@ -1363,7 +1364,7 @@ const ASSET_V = (() => {
       ctx.fillRect(0, 0, VW, VH);
       const i = Math.floor(el / cutscene.hold);
       const into = el - i * cutscene.hold;
-      const put = (k, alpha) => {
+      const put = (k, alpha, dx) => {
         // 動く一枚絵: world.anims に名前があれば、そのコマを時間で送る(例: B の最後の旗 D273)
         const an = world.anims && world.anims[k];
         if (an) k = an.frames[Math.floor(clock * an.fps) % an.frames.length];
@@ -1376,10 +1377,27 @@ const ASSET_V = (() => {
         ctx.globalAlpha = alpha;
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(c, Math.round((VW - w) / 2), Math.round((VH - h) / 2), w, h);
+        ctx.drawImage(c, Math.round((VW - w) / 2 + (dx || 0)), Math.round((VH - h) / 2), w, h);
         ctx.imageSmoothingEnabled = false;
         ctx.globalAlpha = 1;
       };
+      if (cutscene.slide) {
+        // 紙芝居: 終わりの 0.6 秒で、今の絵を右へ抜く(はじめゆっくり、だんだん速く)。下には次の絵
+        const left = cutscene.hold - into;
+        const sl = Math.min(0.6, cutscene.hold * 0.4);
+        if (left < sl && i + 1 < n) {
+          const u = 1 - left / sl;
+          put(cutscene.seq[i + 1], 1);
+          put(cutscene.seq[i], 1, u * u * VW);
+        } else {
+          put(cutscene.seq[i], 1);
+          if (left < sl) {
+            ctx.fillStyle = `rgba(8, 8, 12, ${1 - left / sl})`;
+            ctx.fillRect(0, 0, VW, VH);
+          }
+        }
+        return;
+      }
       put(cutscene.seq[i], 1);
       // 次の絵へ、ゆっくり重ねる(最後の絵は、そのまま暗くなって終わる)
       const left = cutscene.hold - into;

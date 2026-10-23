@@ -44,6 +44,20 @@ const pFog = (ctx, ox, oy, mapW, t, base) => {
     ctx.fill();
   }
 };
+// ぱーでれの姿を描く。霧の下で 1 回、霧の上にうすく 1 回(東の濃い霧に沈んで見えにくいので。todo 143)
+const pPadreDraw = (ctx, sx, sy, api, k) => {
+  const im = api.image(["gather", "queue", "ascend", "pi"].includes(pS.phase) ? "padre_fig_open" : "padre_fig");
+  if (!im) return;
+  let dy = 0, a = 1;
+  if (pS.phase === "leave") {
+    const u = (pNow() - pS.t0) / 4.5;
+    dy = pRise(u) * 1.4; // ぱーでれも、自転車ごと空へ
+    a = Math.max(0, 1 - u * 1.05);
+  }
+  ctx.globalAlpha = a * k;
+  ctx.drawImage(im, Math.round(sx - 24), Math.round(sy - im.height - dy)); // 光の柱(P_HEAD)にかからないよう、右へ(D425 の本番の絵)
+  ctx.globalAlpha = 1;
+};
 const pImg = (key, x, y, extra) =>
   Object.assign(
     {
@@ -178,6 +192,7 @@ const P_AKICHI = {
     ctx.fillStyle = lg;
     ctx.fillRect(ox + 10 * T - 70, oy + 1.35 * T - 70, 140, 140);
     pFog(ctx, ox, oy, 20 * T, t, 0.08);
+    if (!api.flag("gone")) pPadreDraw(ctx, ox + P_CART.x, oy + P_CART.y, api, 0.55);
     // 列の先頭に、空へのびる光の柱(列ができてから、ぱーでれがのぼりきるまで)
     if (["gather", "queue", "ascend", "pi", "leave"].includes(pS.phase)) {
       let a = 0.5;
@@ -335,17 +350,7 @@ const P_AKICHI = {
       hidden: (api) => api.flag("gone"),
       img: () => (["gather", "queue", "ascend", "pi"].includes(pS.phase) ? "padre_fig_open" : "padre_fig"),
       draw(ctx, sx, sy, t, api) {
-        const im = api.image(this.img(api));
-        if (!im) return;
-        let dy = 0, a = 1;
-        if (pS.phase === "leave") {
-          const u = (pNow() - pS.t0) / 4.5;
-          dy = pRise(u) * 1.4; // ぱーでれも、自転車ごと空へ
-          a = Math.max(0, 1 - u * 1.05);
-        }
-        ctx.globalAlpha = a;
-        ctx.drawImage(im, Math.round(sx - 24), Math.round(sy - im.height - dy)); // 光の柱(P_HEAD)にかからないよう、右へ(D425 の本番の絵)
-        ctx.globalAlpha = 1;
+        pPadreDraw(ctx, sx, sy, api, 1);
       },
       interact: (api) => api.bubble("padre", "カチ　カチ", 1400),
       canInteract: () => pS.phase === "wait",
@@ -422,7 +427,7 @@ const P_AKICHI = {
             api.cut("akichi", "seat");
             pS.phase = "gather";
             pS.t0 = pNow();
-          })
+          }, { slide: true })
         );
       },
     },
