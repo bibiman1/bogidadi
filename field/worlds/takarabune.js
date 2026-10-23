@@ -421,33 +421,42 @@ const TK_MEAL = {
   picked: 1.8, //             受け取って歩きだす
   serve: 4.0, //              きーの机に置く(ここから下は、置いてからの時刻)
   steam: 3.5, // もつ煮の湯気が立つあいだ
-  chew: [0.4, 2.1], // 食べる: こくこくうなずきはじめる時刻(2 回)
-  chewN: 6, //        うなずく数(1 回ぶん)
-  chewStep: 0.17, //  うなずきの間
+  chew: [0.4, 2.1], // 食べる: 上下に小刻みにゆれはじめる時刻(2 回)
+  chewN: 12, //       ゆれる数(1 回ぶん)
+  chewStep: 0.08, //  ゆれの間
+  chewAmp: 2, //      ゆれの大きさ(ドット)
+  sip: 4.4, //   飲む: 上下に小刻みにゆれはじめる(グラスを傾けるのと同時)
+  sipN: 8,
+  sipStep: 0.07,
   lift: 4.0, //  グラスが口もとへ上がりはじめる
   tilt: 4.4, //  傾けはじめる
   gone: 4.9, //  飲みほして消える
-  hop: 4.5, //   飲むときのひと跳ね
   sigh: 5.6, //  手前を向いて白い息
   done: 6.2, //  きーが動けるようになる
   clear: 7.0, // 料理が消える(このあと、また頼める)
 };
 const TK_SERVE_SEC = TK_MEAL.serve; // 座ってから料理が届くまで
-// おかみの前から席までの道(机と長いすの上は通らない): 上の通りへ出て、カウンターの右はし → 左の通り → 下の通り → 席
+// きーの席(作者「食べる場所、ここがいい。」): 手前の左の机の、西の長いす。机に向いて東を向く
+const TK_SEAT = { x: 74, y: 234 };
+// 机の下の手前の通り(机の脚と南の壁のあいだ)。席へも、小さい子が運ぶのも、ここを通る
+const TK_UNDER_Y = 266;
+// おかみの前から席までの道(机の上は通らない): カウンターの右はし → 左の通り → 机の下の手前 → 席
 function tkSeatRoute(p) {
-  const tail = [[5.8 * T, 7.8 * T], [TK_SEAT.x, 7.8 * T], [TK_SEAT.x, TK_SEAT.y]];
-  // 手前の左の机の西(壁とのあいだ)にいるときは、机の下の手前を回る(机の上を横切らない)
-  if (p.x < 100) return [[p.x, 266], [164, 266], ...tail];
+  const tail = [[TK_SEAT.x, TK_UNDER_Y], [TK_SEAT.x, TK_SEAT.y]];
+  // もう机の西(壁とのあいだ)にいるときは、そのまま下へ出て回る
+  if (p.x < 100) return [[p.x, TK_UNDER_Y], ...tail];
   const pts = [];
   if (p.x < 5.8 * T && p.y > 6.15 * T) pts.push([p.x, 6.15 * T]);
-  pts.push([5.8 * T, 6.15 * T], ...tail);
+  pts.push([5.8 * T, 6.15 * T], [5.8 * T, 7.8 * T], [164, TK_UNDER_Y], ...tail);
   return pts;
 }
 // 小さい子(給仕)が歩き回る床の道(マス単位。机と長いすの上は通らない)
 // 上の通り(6.15)は奥の長いすの足もとより手前、下の通り(7.8)はまん中の机と長いすのあいだ。南の壁ぎわは歩かない
 const TK_SMALL_PATH = [[5.8, 6.15], [5.8, 7.8], [9.35, 7.8], [9.35, 6.15]];
 const TK_SMALL_PICK = [5.8, 6.15]; // カウンターの右はしで受け取る
-const TK_SMALL_SERVE = [9.45, 7.3]; // きーの机の右から置く
+const TK_SMALL_SERVE = [3.5, TK_UNDER_Y / T]; // きーの机の手前(南)から置く
+// 運ぶ道: カウンターの右はし → 左の通り → 机の下の手前を西へ(机の上は通らない)。帰りは逆にたどって角 0 へ
+const TK_SMALL_SERVE_ROUTE = [TK_SMALL_PICK, [5.8, 7.8], [5.12, TK_UNDER_Y / T], TK_SMALL_SERVE];
 const tkLerp = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
 // 折れ線 pts の上を、全体の k(0〜1)だけ進んだ点
 function tkAlong(pts, k) {
@@ -487,7 +496,6 @@ function tkSmallPatrol(pt) {
   }
   return P[0];
 }
-const TK_SEAT = { x: 8.2 * T, y: 8.4 * T }; // きーの席(まん中の机の手前のベンチ)。本番の絵(PixelLab)に合わせた
 const tkMatry = (id, img, x, y, voice, extra) =>
   Object.assign(
     {
@@ -559,7 +567,7 @@ const TK_CANTEEN = tkMap("canteen", 16, 10, {
         // 注文したら、きーは自分で席まで歩く(ワープしない。作者「女将に話しかけるときーがワープするのおかしい」→ B)
         api.later(700, () => api.walk(tkSeatRoute(api.player()), 90, () => {
           tkS.ordering = false;
-          api.face("north");
+          api.face("east");
           api.freeze(TK_MEAL.done + TK_SERVE_SEC);
           tkS.serveT0 = tkNow();
           tkS.mealT0 = tkS.serveT0 + TK_SERVE_SEC; // 小さい子が運んできて、机に置く(todo 145)
@@ -567,12 +575,14 @@ const TK_CANTEEN = tkMap("canteen", 16, 10, {
           // 字は出さず、動きで見せる(作者「もぐもぐ　くぃっ　はいらないかな。動きでわかるようにして」)
           // 食べる: 机に向いて、こくこくと小さくうなずく(2 回に分けて)
           const ms = (sec) => w + sec * 1000;
-          for (const c of TK_MEAL.chew) {
-            for (let i = 0; i < TK_MEAL.chewN; i++) api.later(ms(c + i * TK_MEAL.chewStep), () => api.place(TK_SEAT.x, TK_SEAT.y + (i % 2 ? 0 : 1.5)));
-            api.later(ms(c + TK_MEAL.chewN * TK_MEAL.chewStep), () => api.place(TK_SEAT.x, TK_SEAT.y));
-          }
-          // 飲む: グラスが口もとへ上がって傾く(絵は meal の側)。そのとき、ひと跳ね
-          api.later(ms(TK_MEAL.hop), () => api.hop());
+          // 上下に小刻みにゆらす(t0 からの n 回、step 秒ごと)。食べるのも飲むのも同じしぐさ(作者「上下に小刻みに動かすのはどうか」)
+          const jiggle = (t0, n, step) => {
+            for (let i = 0; i < n; i++) api.later(ms(t0 + i * step), () => api.place(TK_SEAT.x, TK_SEAT.y - (i % 2 ? 0 : TK_MEAL.chewAmp)));
+            api.later(ms(t0 + n * step), () => api.place(TK_SEAT.x, TK_SEAT.y));
+          };
+          for (const c of TK_MEAL.chew) jiggle(c, TK_MEAL.chewN, TK_MEAL.chewStep);
+          // 飲む: グラスが口もとへ上がって傾く(絵は meal の側)。そのあいだ、小刻みにゆれる
+          jiggle(TK_MEAL.sip, TK_MEAL.sipN, TK_MEAL.sipStep);
           // ひと息: 手前を向いて、白い息
           api.later(ms(TK_MEAL.sigh), () => {
             api.face("south");
@@ -598,29 +608,27 @@ const TK_CANTEEN = tkMap("canteen", 16, 10, {
         const e = tkS.serveT0 < 0 ? -1 : now - tkS.serveT0;
         if (e >= 0 && e < TK_SERVE_SEC) {
           // カウンターの右はしへ → 受け取る → きーの机へ(時刻は TK_MEAL)
-          // 机の上は通らない: 行きは道ぞいにカウンターへ、運ぶのは机の北の通りから右の通りへ回る
+          // 机の上は通らない: 行きは道ぞいにカウンターへ、運ぶのは左の通りから机の下の手前へ回る
           if (!this.from) this.from = tkSmallToPick(this.pos.slice());
           const M = TK_MEAL;
           if (e < M.toPick) this.pos = tkAlong(this.from, e / M.toPick);
           else if (e < M.picked) this.pos = TK_SMALL_PICK.slice();
-          else this.pos = tkAlong([TK_SMALL_PICK, TK_SMALL_PATH[3], TK_SMALL_SERVE], (e - M.picked) / (M.serve - M.picked));
+          else this.pos = tkAlong(TK_SMALL_SERVE_ROUTE, (e - M.picked) / (M.serve - M.picked));
           carry = e >= M.toPick;
           this.back = null;
         } else {
           if (this.from) {
-            // 置き終えたら、右の通りの角(角 3)へもどり、そこから見回りをつづける
+            // 置き終えたら、運んだ道を逆にたどってカウンターの右はし(角 0)へもどり、そこから見回りをつづける
             this.from = null;
-            this.back = [this.pos.slice(), now];
-            const P = TK_SMALL_PATH;
+            this.back = [TK_SMALL_SERVE_ROUTE.slice().reverse(), now];
             this.pt = 0;
-            for (let i = 0; i < 3; i++) this.pt += 1.2 + Math.hypot(P[i + 1][0] - P[i][0], P[i + 1][1] - P[i][1]) / 0.8;
           }
           let target;
           if (this.back) {
-            const k = (now - this.back[1]) / 1.0;
+            const k = (now - this.back[1]) / 2.4;
             target = tkSmallPatrol(this.pt);
             if (k >= 1) this.back = null;
-            else target = tkLerp(this.back[0], target, k);
+            else target = tkAlong(this.back[0], k);
           } else {
             this.pt += dt;
             target = tkSmallPatrol(this.pt);
@@ -651,8 +659,8 @@ const TK_CANTEEN = tkMap("canteen", 16, 10, {
     // きーの前に出る、もつ煮とウォッカ
     {
       id: "meal",
-      x: TK_SEAT.x,
-      y: 7.4 * T,
+      x: TK_SEAT.x + 32, // 机の西のはし(きーの前)
+      y: TK_SEAT.y + 4,
       w: 1,
       h: 1,
       draw(ctx, sx, sy, t, api) {
@@ -664,8 +672,9 @@ const TK_CANTEEN = tkMap("canteen", 16, 10, {
         if (v && e < M.gone) {
           // lift まで机の上。lift〜tilt できーの口もとへ上がり、tilt〜gone で傾けて飲みほす(消える)
           const k = Math.max(0, Math.min(1, (e - M.lift) / (M.tilt - M.lift)));
-          const gx = sx + 8 + (TK_SEAT.x - 9 - (this.x + 8)) * k;
-          const gy = sy - 9 + (TK_SEAT.y - 26 - (this.y - 9)) * k;
+          // 口もと: 東を向いたきーの、くちばしの少し上
+          const gx = sx + 8 + (TK_SEAT.x + 8 - (this.x + 8)) * k;
+          const gy = sy - 9 + (TK_SEAT.y - 22 - (this.y - 9)) * k;
           const tilt = e > M.tilt ? -Math.min(1, (e - M.tilt) / 0.4) * 1.6 : 0;
           ctx.save();
           ctx.translate(Math.round(gx + 3), Math.round(gy + 4));
