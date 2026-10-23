@@ -11,12 +11,18 @@
 //   → きーが列のうしろにならぶと、先頭から一つずつ空へのぼって消える(昇天)→ きーの番で、ぴーが突然来て押しのけ、先に昇天
 //   → ぱーでれも昇天 → 空き地にきーだけ残る。ふんばる、水あめのわりばし。西から帰る。このあと、富士山の峠のぴーもいない
 // きーはついていけない(結末 A ワンネスは、なくした D425)
+// D438: ぱーでれに話しかけると、みんなが紙芝居の前に 3 列で座る(きーも最後の席)→ 紙芝居 → きー以外が列をつくり、待たずにのぼりはじめる
+//   → きーが自分で最後尾にならぶと列についていき、きーの番でぴーが押しのける。ならばなければ、最後にぴーがそのままのぼる
 // 下絵(docs/assets/padre/d425/)。本番の絵はあとで PixelLab に(費用を先に相談)
-const P_SEAT = { x: 11.5 * T, y: 6.6 * T }; // 空いた席
+// 紙芝居の観客席(D438): ぱーでれの前に、3 列 × 6 に行儀よくならぶ。前の列から順に、元気なぼぎ、壊れたぼぎだぢ、いちばん最後(17 番目)がきー
+const pSeat = (k) => [13.8 * T - (k % 6) * 30, 6.0 * T + Math.floor(k / 6) * 32];
+const P_SEAT = { x: pSeat(16)[0], y: pSeat(16)[1] }; // きーの席
 const P_CART = { x: 16 * T, y: 6.6 * T }; // ぱーでれの足もと
 const P_HEAD = { x: 15 * T - 8, y: 8.3 * T }; // 列の先頭。ここで空へのぼる
 const P_GAP = 26; // 列のあいだ
-const P_UP_SEC = 1.2; // 一つのぼって、次がのぼるまで(16 になったので短く D436)
+const P_UP_SEC = 2.0; // 一つのぼりはじめて、次がのぼりはじめるまで(D437 ゆっくり)
+const P_RISE_SEC = 4.0; // 一つが空へのぼって消えるまで(D437、前は 2.2)
+const P_LEAVE_SEC = 7.0; // ぱーでれがのぼって消えるまで(D437、前は 4.5)
 const pS = { phase: "wait", t0: 0, joined: false, lastUp: 0, pi: null }; // wait → show → gather → queue → ascend → pi → leave → done
 const pNow = () => performance.now() / 1000;
 // 霧と夕暮れ: 全体に夕暮れの色、東(右)ほど霧が濃い。霧のかたまりがゆっくり流れる
@@ -50,7 +56,7 @@ const pPadreDraw = (ctx, sx, sy, api, k) => {
   if (!im) return;
   let dy = 0, a = 1;
   if (pS.phase === "leave") {
-    const u = (pNow() - pS.t0) / 4.5;
+    const u = (pNow() - pS.t0) / P_LEAVE_SEC;
     dy = pRise(u) * 1.4; // ぱーでれも、自転車ごと空へ
     a = Math.max(0, 1 - u * 1.05);
   }
@@ -58,7 +64,14 @@ const pPadreDraw = (ctx, sx, sy, api, k) => {
   ctx.drawImage(im, Math.round(sx - 24), Math.round(sy - im.height - dy)); // 光の柱(P_HEAD)にかからないよう、右へ(D425 の本番の絵)
   ctx.globalAlpha = 1;
 };
-// 紙芝居をはじめる: きーは空いた席に座り、拍子木のあと、4 枚が横にすべって変わる(D427、D429)
+// ぱーでれに話しかけると、みんなが紙芝居の前へ歩いてきて、行儀よくならぶ(きーも、いちばんうしろの席へ)。ならび終わったら紙芝居(D438)
+const pStartSeat = (api) => {
+  pS.phase = "seat";
+  pS.t0 = pNow();
+  api.freeze(999);
+  api.bubble("padre", "カチ　カチ", 1400);
+};
+// 紙芝居: 拍子木のあと、4 枚が横にすべって変わる(D427、D429)
 const pStartShow = (api) => {
   pS.phase = "show";
   api.place(P_SEAT.x, P_SEAT.y);
@@ -183,7 +196,7 @@ const P_Q = [
   { key: "b_kobosi", home: [9.5 * T, 6.6 * T] },
   { key: "b_hato", home: [12.5 * T, 6.6 * T] },
   // 壊れたぼぎだぢは巡礼に来て、ぱーでれを囲む半円にならぶ(D431)
-  { key: "pb_1", home: [14.0 * T, 4.7 * T] },
+  { key: "pb_1", home: [14.4 * T, 5.5 * T] }, // 塀に張り付いて見えたので、地面へ下ろした(D438)
   { key: "pb_2", home: [13.2 * T, 6.0 * T] },
   { key: "pb_3", home: [13.4 * T, 8.0 * T] },
   { key: "pb_4", home: [14.8 * T, 9.4 * T] },
@@ -192,7 +205,7 @@ const P_Q = [
   { key: "b_daruma", home: [9.0 * T, 7.7 * T] },
   { key: "b_tora", home: [10.5 * T, 7.9 * T] },
   { key: "b_inu", home: [12.3 * T, 7.8 * T] },
-  { key: "pb_6", home: [12.5 * T, 4.5 * T] },
+  { key: "pb_6", home: [12.6 * T, 5.3 * T] }, // 同じく(D438)
   { key: "pb_7", home: [12.0 * T, 9.1 * T] },
   { key: "pb_8", home: [13.6 * T, 10.4 * T] },
   { key: "pb_9", home: [15.6 * T, 10.6 * T] },
@@ -247,7 +260,7 @@ const P_AKICHI = {
     if (["gather", "queue", "ascend", "pi", "leave"].includes(pS.phase)) {
       let a = 0.5;
       if (pS.phase === "gather") a *= Math.min(1, (pNow() - pS.t0) / 2);
-      if (pS.phase === "leave") a *= Math.max(0, 1 - (pNow() - pS.t0) / 4.5);
+      if (pS.phase === "leave") a *= Math.max(0, 1 - (pNow() - pS.t0) / P_LEAVE_SEC);
       const X = ox + P_HEAD.x, Y = oy + P_HEAD.y;
       const g = ctx.createLinearGradient(X - 20, 0, X + 20, 0);
       g.addColorStop(0, "rgba(255, 246, 214, 0)");
@@ -294,24 +307,31 @@ const P_AKICHI = {
       update(dt, t, api) {
         const now = pNow();
         const p = api.player();
+        if (pS.phase === "seat") {
+          // みんなと、きーが、観客席へ歩く。そろったら(長くても 5 秒で)紙芝居
+          const [sx2, sy2] = pSeat(16);
+          const dx = sx2 - p.x, dy = sy2 - p.y, d = Math.hypot(dx, dy);
+          if (d > 1) api.place(p.x + (dx / d) * Math.min(d, 60 * dt), p.y + (dy / d) * Math.min(d, 60 * dt));
+          const ready = d < 2 && P_Q.every((q) => Math.hypot(q.x - pSeat(q.i)[0], q.y - pSeat(q.i)[1]) < 2);
+          if (ready || now - pS.t0 > 5) pStartShow(api);
+        }
         if (pS.phase === "gather" && now - pS.t0 > 2.6) {
-          pS.phase = "queue";
-          pS.t0 = now;
+          // 紙芝居のあと、きー以外のみんなが列をつくり、きーを待たずにのぼりはじめる(D438)
+          pS.phase = "ascend";
+          pS.kiMoved = false;
+          pS.lastUp = now - P_UP_SEC + 0.8;
           api.bubble("padre", "カチ　カチ", 1400);
         }
-        if (pS.phase === "queue") {
-          // 列のうしろにならぶと、のぼりはじめる(ならばないと、先に進まない)
+        if (!pS.joined && (pS.phase === "ascend" || (pS.phase === "pi" && pS.pi && pS.pi.step === "wait"))) {
+          // きーが自分で列の最後尾にならぶと、そのあとは列についていく(D438)
           const [kx, ky] = pKiSlot();
-          if (Math.hypot(p.x - kx, p.y - ky) < 16) {
+          // 席に座ったままのきーに、短くなった列のうしろが届いても、ならんだことにはしない(自分で動いてからだけ)
+          if (Math.hypot(p.x - P_SEAT.x, p.y - P_SEAT.y) > 8) pS.kiMoved = true;
+          if (pS.phase === "ascend" && pS.kiMoved && Math.hypot(p.x - kx, p.y - ky) < 16) {
             pS.joined = true;
-            pS.phase = "ascend";
-            pS.lastUp = now - P_UP_SEC + 0.8;
             api.freeze(999);
             api.face("east");
             api.setFlag("taken");
-          } else if (now - pS.t0 > 6) {
-            pS.t0 = now;
-            api.bubble("padre", "カチ　カチ", 1400);
           }
         }
         if (pS.phase === "ascend" && now - pS.lastUp > P_UP_SEC) {
@@ -322,7 +342,7 @@ const P_AKICHI = {
             const v = P_VOICES[left[0].key];
             if (v) api.bubble(left[0].key, v, 1200);
           } else {
-            // きーの番。少しして、ぴーが突然かけこんでくる
+            // きーの番(ならんでいなければ、みんながのぼったあと)。少しして、ぴーが突然かけこんでくる
             pS.phase = "pi";
             pS.t0 = now;
             pS.pi = { x: -1 * T, y: P_HEAD.y, step: "run", t0: now, up: null };
@@ -340,7 +360,14 @@ const P_AKICHI = {
           if (pi.step === "run" && now - pi.t0 > 1.4) {
             // 西から、まっすぐ、きーへ
             pi.x += 230 * dt;
-            if (pi.x > p.x - 20) {
+            if (!pS.joined) {
+              // きーが列にいないときは、押しのけずに、そのまま光の柱へ(D438)
+              if (pi.x >= P_HEAD.x) {
+                pi.x = P_HEAD.x;
+                pi.step = "up";
+                pi.up = now;
+              }
+            } else if (pi.x > p.x - 20) {
               pi.step = "shove";
               pi.t0 = now;
               api.freeze(0);
@@ -355,13 +382,13 @@ const P_AKICHI = {
               pi.step = "up";
               pi.up = now;
             }
-          } else if (pi.step === "up" && now - pi.up > 2.4) {
+          } else if (pi.step === "up" && now - pi.up > P_RISE_SEC + 0.2) {
             pS.phase = "leave";
             pS.t0 = now;
             api.bubble("padre", "カチ　カチ", 1400);
           }
         }
-        if (pS.phase === "leave" && now - pS.t0 > 4.5) {
+        if (pS.phase === "leave" && now - pS.t0 > P_LEAVE_SEC) {
           api.setFlag("gone");
           pS.phase = "done";
           pS.ameT0 = now; // 水あめのわりばしが、上から落ちてくる(D429)
@@ -390,7 +417,7 @@ const P_AKICHI = {
         if (!im || !pi) return;
         let dy = 0, a = 1;
         if (pi.step === "up") {
-          const u = (pNow() - pi.up) / 2.2;
+          const u = (pNow() - pi.up) / P_RISE_SEC;
           dy = pRise(u);
           a = Math.max(0, 1 - u);
         }
@@ -409,7 +436,7 @@ const P_AKICHI = {
       draw(ctx, sx, sy, t, api) {
         pPadreDraw(ctx, sx, sy, api, 1);
       },
-      interact: (api) => pStartShow(api), // 紙芝居は、ぱーでれを調べるとはじまる(D429)
+      interact: (api) => pStartSeat(api), // ぱーでれに話しかけると、みんながならんで、紙芝居がはじまる(D429、D438)
       canInteract: () => pS.phase === "wait",
     }),
     // ぼぎと、壊れたぼぎだぢ
@@ -421,11 +448,12 @@ const P_AKICHI = {
       h: 1,
       headY: 40,
       range: 40,
-      hidden: (api) => api.flag("gone") || (q.up != null && pNow() - q.up > 2.4),
+      hidden: (api) => api.flag("gone") || (q.up != null && pNow() - q.up > P_RISE_SEC + 0.2),
       update(dt) {
         if (q.up != null) return;
         const lining = ["gather", "queue", "ascend", "pi", "leave"].includes(pS.phase);
-        const [tx, ty] = lining ? pSlot(pLeft().indexOf(q)) : q.home;
+        const seated = pS.phase === "seat" || pS.phase === "show";
+        const [tx, ty] = lining ? pSlot(pLeft().indexOf(q)) : seated ? pSeat(q.i) : q.home;
         const dx = tx - q.x, dy = ty - q.y, d = Math.hypot(dx, dy);
         if (d > 0.5) {
           q.x += (dx / d) * Math.min(d, 46 * dt);
@@ -439,11 +467,11 @@ const P_AKICHI = {
         if (!im) return;
         let dy = 0, a = 1;
         if (q.up != null) {
-          const u = (pNow() - q.up) / 2.2;
+          const u = (pNow() - q.up) / P_RISE_SEC;
           dy = pRise(u);
           a = Math.max(0, 1 - u);
         }
-        const moving = pS.phase === "gather" && q.up == null;
+        const moving = (pS.phase === "gather" || pS.phase === "seat") && q.up == null;
         const bob = moving ? Math.abs(Math.sin(t * 9 + q.i)) * 2 : 0;
         ctx.globalAlpha = a;
         // 巡礼の壊れたぼぎだぢ: 待つあいだ、ときどき、ぱーでれの方へ小さくおじぎする(D431)
@@ -461,21 +489,6 @@ const P_AKICHI = {
       interact: (api) => api.bubble(q.key, P_VOICES[q.key] || "……", 1400),
       canInteract: () => pS.phase === "wait" && !!P_VOICES[q.key],
     })),
-    // 空いた席: 座布団。ぱーでれを調べると、きーはここへ座って紙芝居を見る(D429)
-    {
-      id: "seat",
-      x: P_SEAT.x,
-      y: P_SEAT.y,
-      w: 1,
-      h: 1,
-      draw(ctx, sx, sy) {
-        if (pS.phase !== "wait") return;
-        ctx.fillStyle = "#7a3c34";
-        ctx.fillRect(Math.round(sx - 11), Math.round(sy - 7), 22, 7);
-        ctx.fillStyle = "#9a5444";
-        ctx.fillRect(Math.round(sx - 10), Math.round(sy - 7), 20, 2);
-      },
-    },
     // 列のうしろの、きーのならぶ所(かすかに光る)
     {
       id: "kiSpot",
@@ -483,7 +496,7 @@ const P_AKICHI = {
       y: 0,
       w: 1,
       h: 1,
-      hidden: () => pS.phase !== "queue",
+      hidden: () => !(pS.phase === "ascend" && !pS.joined),
       update() {
         [this.x, this.y] = pKiSlot();
       },
