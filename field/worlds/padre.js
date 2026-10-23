@@ -6,17 +6,18 @@
 // 霧の夕暮れ、昭和の町はずれの空き地。紙芝居屋の自転車をまねた機械「ぱーでれ」が、紙芝居「だいにち」でぼぎをおびき寄せ、荷台の下の引き出しに入れて連れ去る
 // 連れ去られたぼぎは戻らない(正典)。怖さは物悲しさと不穏さまで(紙芝居は楽しそう、ぱーでれはどこか滑稽)
 // 向き(D148): きーは左(西 = 過去)から来て、ぱーでれは右(東 = 未来)の霧の中にいて、右へ去る
-// 条件: 空いた席に座る → 紙芝居(4 枚、絵だけ)→ 引き出しがあき、でんでん太鼓が入っていく → きーも引き寄せられる(歩いて離れる)
-//       → ぱーでれは霧の東へ去る → でんでん太鼓の席に残った水あめのわりばし → 帰る条件。西から帰る
-// 下絵(docs/assets/padre/blockout.py)のまま。絵はあとでまとめて作る(D156)。座っているぼぎ、紙芝居の絵、道具、声は仮
+// 流れ(D425、作者とのまとめ todo 143): 空き地に入ると、針金の姿のぱーでれの一枚絵 → 空いた席に座る → 紙芝居「だいにち」4 枚
+//   (下手で素朴な絵で、戦いと死、ぼぎだぢが消えたことを暗示)→ 座っていたぼぎと、集まっていた壊れたぼぎだぢが列になる
+//   → きーが列のうしろにならぶと、先頭から一つずつ空へのぼって消える(昇天)→ きーの番で、ぴーが突然来て押しのけ、先に昇天
+//   → ぱーでれも昇天 → 空き地にきーだけ残る。ふんばる、水あめのわりばし。西から帰る。このあと、富士山の峠のぴーもいない
+// きーはついていけない(結末 A ワンネスは、なくした D425)
+// 下絵(docs/assets/padre/d425/)。本番の絵はあとで PixelLab に(費用を先に相談)
 const P_SEAT = { x: 11.5 * T, y: 6.6 * T }; // 空いた席
 const P_CART = { x: 16 * T, y: 6.6 * T }; // ぱーでれの足もと
-const P_DRAWER = { x: 16 * T - 46, y: 6.6 * T - 10 }; // 引き出しの口
-const P_PULL = 24; // 引き寄せる速さ(px/秒)。きーの歩き(150)よりずっと遅いので、歩けば離れられる。何もしなければ、ゆっくり引き出しの口へ
-const P_PULL_SEC = 7;
-// ワンネスの結末(D159、D160、D164 の A): 引き出しに入ると、きーの思い出(終えた断片の一枚絵)が順に光にとけ、白くなって終わる。観測する者が消える
-const P_MEMORIES = [["lake", "m_lake"], ["haihei", "m_haihei"], ["kasumi", "m_kasumi"], ["banana", "m_banana"], ["suzuki", "m_suzuki"], ["takarabune", "m_takarabune"], ["noroi", "m_noroi"]];
-const pS = { phase: "wait", t0: 0 }; // wait → show → capture → pull → leave → done(引き出しに入れば pull → oneness)
+const P_HEAD = { x: 15 * T - 8, y: 8.3 * T }; // 列の先頭。ここで空へのぼる
+const P_GAP = 26; // 列のあいだ
+const P_UP_SEC = 1.9; // 一つのぼって、次がのぼるまで
+const pS = { phase: "wait", t0: 0, joined: false, lastUp: 0, pi: null }; // wait → show → gather → queue → ascend → pi → leave → done
 const pNow = () => performance.now() / 1000;
 // 霧と夕暮れ: 全体に夕暮れの色、東(右)ほど霧が濃い。霧のかたまりがゆっくり流れる
 const pFog = (ctx, ox, oy, mapW, t, base) => {
@@ -26,7 +27,14 @@ const pFog = (ctx, ox, oy, mapW, t, base) => {
   g.addColorStop(0, `rgba(226, 222, 216, ${base})`);
   g.addColorStop(1, `rgba(226, 222, 216, ${Math.min(0.85, base + 0.5)})`);
   ctx.fillStyle = g;
-  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  // 手前(画面の下)ほど霧をうすく(todo 41 の 4)。上 6 割はそのまま、下へ 3 段でうすくする
+  const H = ctx.canvas.height;
+  ctx.fillRect(0, 0, ctx.canvas.width, H * 0.6);
+  for (const [y0, y1, a] of [[0.6, 0.73, 0.7], [0.73, 0.86, 0.45], [0.86, 1, 0.25]]) {
+    ctx.globalAlpha = a;
+    ctx.fillRect(0, H * y0, ctx.canvas.width, H * (y1 - y0) + 1);
+  }
+  ctx.globalAlpha = 1;
   for (let k = 0; k < 9; k++) {
     const x = ox + ((k * 173 + t * (8 + k)) % (mapW + 200)) - 100;
     const y = oy + 60 + ((k * 97) % 260);
@@ -109,6 +117,22 @@ const P_MICHI = {
   ],
 };
 const pDone = (api) => api.flag("gone");
+// 列にならぶもの: 座っていたぼぎ 3 つと、集まっていた壊れたぼぎだぢ 5 つ(D425)。order の順に先頭から空へのぼる
+const P_Q = [
+  { key: "b_denden", home: [10.5 * T, 6.6 * T] },
+  { key: "b_kobosi", home: [9.5 * T, 6.6 * T] },
+  { key: "b_hato", home: [12.5 * T, 6.6 * T] },
+  { key: "pb_1", home: [7.6 * T, 8.9 * T] },
+  { key: "pb_2", home: [13.8 * T, 5.1 * T] },
+  { key: "pb_3", home: [8.8 * T, 10.1 * T] },
+  { key: "pb_4", home: [14.2 * T, 9.8 * T] },
+  { key: "pb_5", home: [6.4 * T, 5.2 * T] },
+].map((q, i) => Object.assign(q, { i, x: q.home[0], y: q.home[1], up: null }));
+const P_VOICES = { b_denden: "デン　デン", b_kobosi: "コロン", b_hato: "ポー" };
+const pLeft = () => P_Q.filter((q) => q.up == null);
+const pSlot = (k) => [P_HEAD.x - k * P_GAP, P_HEAD.y];
+const pKiSlot = () => pSlot(pLeft().length);
+const pRise = (u) => Math.min(1, u) ** 2 * 170; // のぼる高さ
 const P_AKICHI = {
   tile: T,
   bg: "#848c68",
@@ -125,14 +149,21 @@ const P_AKICHI = {
       pS.recut = false; // 紙芝居のあとで、席に戻しただけ
       return;
     }
-    // 途中で出ていたら、そのあいだに、ぱーでれは霧の東へ去っている
+    // 途中で出ていたら、そのあいだに、みんな空へのぼっている(ぴーも)
     if (pS.phase !== "wait" && pS.phase !== "done" && !api.flag("gone")) {
       api.setFlag("taken");
       api.setFlag("gone");
     }
     pS.phase = api.flag("gone") ? "done" : "wait";
+    pS.joined = false;
+    for (const q of P_Q) Object.assign(q, { x: q.home[0], y: q.home[1], up: null });
+    // はじめて空き地に入ったとき、ぱーでれの一枚絵(針金の姿が紙芝居の自転車を引く)
+    if (!api.flag("gone") && !api.flag("sawPadre")) {
+      api.setFlag("sawPadre");
+      api.later(700, () => api.show("v_padre"));
+    }
   },
-  debug: () => Object.assign({ now: pNow() }, pS),
+  debug: () => Object.assign({ now: pNow(), left: pLeft().length }, pS),
   // ぱーでれが去ったあと、東へ行くほど霧が暗い(てらす D201)
   dark(api) {
     if (pS.phase !== "done") return 0;
@@ -147,22 +178,21 @@ const P_AKICHI = {
     ctx.fillStyle = lg;
     ctx.fillRect(ox + 10 * T - 70, oy + 1.35 * T - 70, 140, 140);
     pFog(ctx, ox, oy, 20 * T, t, 0.08);
-    // 引き寄せられているあいだ、引き出しに近づくほど色がうすれる(きーの輪郭がほどけていく)
-    if (pS.phase === "pull" || pS.phase === "oneness") {
-      const p = api.player();
-      const c = pS.phase === "oneness" ? 1 : Math.max(0, Math.min(1, 1 - (Math.hypot(P_DRAWER.x - p.x, P_DRAWER.y - p.y) - 26) / (5 * T)));
-      if (c > 0) {
-        ctx.save();
-        ctx.globalCompositeOperation = "saturation";
-        ctx.fillStyle = `rgba(128, 128, 128, ${c})`;
-        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-        ctx.restore();
-        ctx.fillStyle = `rgba(250, 246, 236, ${0.35 * c})`;
-        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-      }
+    // 列の先頭に、空へのびる光の柱(列ができてから、ぱーでれがのぼりきるまで)
+    if (["gather", "queue", "ascend", "pi", "leave"].includes(pS.phase)) {
+      let a = 0.5;
+      if (pS.phase === "gather") a *= Math.min(1, (pNow() - pS.t0) / 2);
+      if (pS.phase === "leave") a *= Math.max(0, 1 - (pNow() - pS.t0) / 4.5);
+      const X = ox + P_HEAD.x, Y = oy + P_HEAD.y;
+      const g = ctx.createLinearGradient(X - 20, 0, X + 20, 0);
+      g.addColorStop(0, "rgba(255, 246, 214, 0)");
+      g.addColorStop(0.5, `rgba(255, 246, 214, ${a * (0.85 + 0.15 * Math.sin(t * 3))})`);
+      g.addColorStop(1, "rgba(255, 246, 214, 0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(X - 20, 0, 40, Y + 4);
     }
   },
-  // 紙芝居のあと、ぱーでれが去るまでは、道へ出られない(見届ける)
+  // 紙芝居のあと、みんながのぼりきるまでは、道へ出られない(見届ける)
   triggers: [{ id: "toMichi", x: -T, y: 7.8 * T, w: 1.4 * T, h: 3.2 * T, enabled: () => pS.phase === "wait" || pS.phase === "done", warp: { map: "michi", spawn: "east" } }],
   objects: [
     pFg("fg_akichi_pole", 183, 2, 205, { w: 12, h: 6, dx: 26, dy: -3 }),
@@ -182,7 +212,7 @@ const P_AKICHI = {
         if (p < 0.9 && (t * (1.6 - p)) % 1 < 0.6) kWord(ctx, "カチ　カチ", sx + 1.6 * T + p * 2 * T, sy - 2.2 * T, (1 - p) * 1.3);
       },
     }),
-    // 紙芝居の進み具合(見えない係)。引き寄せと、去っていくのを動かす
+    // 進み具合(見えない係): 列をつくる → きーを待つ → 一つずつのぼる → ぴー → ぱーでれがのぼる
     {
       id: "pctl",
       x: -100,
@@ -192,98 +222,175 @@ const P_AKICHI = {
       draw() {},
       update(dt, t, api) {
         const now = pNow();
-        if (pS.phase === "capture" && now - pS.t0 > 2.8) {
-          api.setFlag("taken");
-          pS.phase = "pull";
+        const p = api.player();
+        if (pS.phase === "gather" && now - pS.t0 > 2.6) {
+          pS.phase = "queue";
           pS.t0 = now;
-          api.mutter("……", 1600);
+          api.bubble("padre", "カチ　カチ", 1400);
         }
-        if (pS.phase === "pull") {
-          const p = api.player();
-          const dx = P_DRAWER.x - p.x;
-          const dy = P_DRAWER.y - p.y;
-          const d = Math.hypot(dx, dy);
-          if (d < 26) {
-            // 引き出しの口に入った: ワンネスの結末
-            pS.phase = "oneness";
-            api.place(P_DRAWER.x, P_DRAWER.y);
-            api.freeze(1.6);
-            api.later(1400, () => {
-              const keys = P_MEMORIES.filter(([id]) => api.cleared(id)).map(([, k]) => k).concat(["v_oneness"]);
-              api.showSeq(keys, 2.4, () => {
-                // 見た結末は記録する。世界は座る前に戻る(遊び直せる)
-                api.setFlag("ending_oneness");
-                api.setFlag("taken", false);
-                pS.phase = "wait";
-                pS.recut = true;
-                api.cut("akichi", "west");
-              });
-            });
-            return;
+        if (pS.phase === "queue") {
+          // 列のうしろにならぶと、のぼりはじめる(ならばないと、先に進まない)
+          const [kx, ky] = pKiSlot();
+          if (Math.hypot(p.x - kx, p.y - ky) < 16) {
+            pS.joined = true;
+            pS.phase = "ascend";
+            pS.lastUp = now - P_UP_SEC + 0.8;
+            api.freeze(999);
+            api.face("east");
+            api.setFlag("taken");
+          } else if (now - pS.t0 > 6) {
+            pS.t0 = now;
+            api.bubble("padre", "カチ　カチ", 1400);
           }
-          api.place(p.x + (dx / d) * P_PULL * dt, p.y + (dy / d) * P_PULL * dt);
-          if (now - pS.t0 > P_PULL_SEC || (now - pS.t0 > 2 && d > 7 * T)) {
+        }
+        if (pS.phase === "ascend" && now - pS.lastUp > P_UP_SEC) {
+          const left = pLeft();
+          if (left.length) {
+            left[0].up = now;
+            pS.lastUp = now;
+            const v = P_VOICES[left[0].key];
+            if (v) api.bubble(left[0].key, v, 1200);
+          } else {
+            // きーの番。少しして、ぴーが突然かけこんでくる
+            pS.phase = "pi";
+            pS.t0 = now;
+            pS.pi = { x: -1 * T, y: P_HEAD.y, step: "run", t0: now, up: null };
+            api.mutter("……", 1400);
+          }
+        }
+        // ならんでいるあいだ、きーは列といっしょに前へ進む
+        if (pS.joined && (pS.phase === "ascend" || (pS.phase === "pi" && pS.pi.step === "run"))) {
+          const [kx, ky] = pKiSlot();
+          const dx = kx - p.x, dy = ky - p.y, d = Math.hypot(dx, dy);
+          if (d > 1) api.place(p.x + (dx / d) * Math.min(d, 50 * dt), p.y + (dy / d) * Math.min(d, 50 * dt));
+        }
+        if (pS.phase === "pi") {
+          const pi = pS.pi;
+          if (pi.step === "run" && now - pi.t0 > 1.4) {
+            // 西から、まっすぐ、きーへ
+            pi.x += 230 * dt;
+            if (pi.x > p.x - 20) {
+              pi.step = "shove";
+              pi.t0 = now;
+              api.freeze(0);
+              api.knock(-320, 360); // 押しのけられて、南西へよろける(東の暗い霧の外へ)
+              api.sfx("knock");
+              api.bubble("pi", "どけ", 1400);
+              pS.joined = false;
+            }
+          } else if (pi.step === "shove" && now - pi.t0 > 0.5) {
+            pi.x += Math.min(P_HEAD.x - pi.x, 90 * dt);
+            if (P_HEAD.x - pi.x < 1) {
+              pi.step = "up";
+              pi.up = now;
+            }
+          } else if (pi.step === "up" && now - pi.up > 2.4) {
             pS.phase = "leave";
             pS.t0 = now;
             api.bubble("padre", "カチ　カチ", 1400);
-            api.later(1800, () => kLearn(api, "funbaru", "ふんばる")); // 引き寄せられても、歩いて離れた(D201)
           }
         }
         if (pS.phase === "leave" && now - pS.t0 > 4.5) {
           api.setFlag("gone");
           pS.phase = "done";
+          api.later(800, () => kLearn(api, "funbaru", "ふんばる")); // 押しのけられても、ここに残った(D201、D425)
         }
       },
     },
+    // ぴー(D425): きーの番に突然来て、押しのけ、先にのぼる。富士山の峠道のぴーは、このあと、いない
+    {
+      id: "pi",
+      x: -100,
+      y: -100,
+      w: 1,
+      h: 1,
+      headY: 40,
+      hidden: () => !(pS.phase === "pi" && pS.pi),
+      update() {
+        if (pS.phase === "pi" && pS.pi) {
+          this.x = pS.pi.x;
+          this.y = pS.pi.y;
+        }
+      },
+      draw(ctx, sx, sy, t, api) {
+        const im = api.image("pi");
+        const pi = pS.pi;
+        if (!im || !pi) return;
+        let dy = 0, a = 1;
+        if (pi.step === "up") {
+          const u = (pNow() - pi.up) / 2.2;
+          dy = pRise(u);
+          a = Math.max(0, 1 - u);
+        }
+        const fr = pi.step === "up" ? 0 : 1 + (Math.floor(t * (pi.step === "run" ? 18 : 10)) % 6);
+        ctx.globalAlpha = a;
+        ctx.drawImage(im, fr * 64, 2 * 64, 64, 64, Math.round(sx - 32), Math.round(sy - 64 + 17 - dy), 64, 64);
+        ctx.globalAlpha = 1;
+      },
+    },
     pImg("padre", P_CART.x, P_CART.y, {
-      headY: 96,
+      headY: 118,
       solid: { w: 96, h: 18, dy: -8 },
       range: 70,
       hidden: (api) => api.flag("gone"),
-      img: () => (pS.phase === "capture" || pS.phase === "pull" ? "padre_open" : "padre"),
+      img: () => (["gather", "queue", "ascend", "pi"].includes(pS.phase) ? "padre_fig_open" : "padre_fig"),
       draw(ctx, sx, sy, t, api) {
         const im = api.image(this.img(api));
         if (!im) return;
-        let x = sx;
-        let a = 1;
+        let dy = 0, a = 1;
         if (pS.phase === "leave") {
           const u = (pNow() - pS.t0) / 4.5;
-          x = sx + u * u * 260; // 霧の東へ、だんだん速く
-          a = Math.max(0, 1 - u * 1.1);
+          dy = pRise(u) * 1.4; // ぱーでれも、自転車ごと空へ
+          a = Math.max(0, 1 - u * 1.05);
         }
         ctx.globalAlpha = a;
-        ctx.drawImage(im, Math.round(x - im.width / 2), Math.round(sy - im.height));
+        ctx.drawImage(im, Math.round(sx - 56), Math.round(sy - im.height - dy)); // 自転車の位置は前のまま(針金の姿が右に立つ)
         ctx.globalAlpha = 1;
       },
       interact: (api) => api.bubble("padre", "カチ　カチ", 1400),
       canInteract: () => pS.phase === "wait",
     }),
-    pImg("b_kobosi", 9.5 * T, 6.6 * T, { range: 40, interact: (api) => api.bubble("b_kobosi", P_VOICE.kobosi, 1400), canInteract: () => pS.phase === "wait" || pS.phase === "done" }),
-    pImg("b_denden", 10.5 * T, 6.6 * T, {
+    // ぼぎと、壊れたぼぎだぢ
+    ...P_Q.map((q) => ({
+      id: q.key,
+      x: q.home[0],
+      y: q.home[1],
+      w: 1,
+      h: 1,
+      headY: 40,
       range: 40,
-      hidden: (api) => api.flag("taken") && pS.phase !== "capture",
-      draw(ctx, sx, sy, t, api) {
-        const im = api.image("b_denden");
-        if (!im) return;
-        let x = sx;
-        let y = sy;
-        let a = 1;
-        if (pS.phase === "capture") {
-          // 立ち上がって、引き出しの口へ歩いていき、中へ消える
-          const u = Math.min(1, (pNow() - pS.t0) / 2.6);
-          x = sx + (P_DRAWER.x - this.x) * u + Math.sin(u * 30) * 1.5;
-          y = sy + (P_DRAWER.y - this.y) * u;
-          a = u > 0.85 ? (1 - u) / 0.15 : 1;
+      hidden: (api) => api.flag("gone") || (q.up != null && pNow() - q.up > 2.4),
+      update(dt) {
+        if (q.up != null) return;
+        const lining = ["gather", "queue", "ascend", "pi", "leave"].includes(pS.phase);
+        const [tx, ty] = lining ? pSlot(pLeft().indexOf(q)) : q.home;
+        const dx = tx - q.x, dy = ty - q.y, d = Math.hypot(dx, dy);
+        if (d > 0.5) {
+          q.x += (dx / d) * Math.min(d, 46 * dt);
+          q.y += (dy / d) * Math.min(d, 46 * dt);
         }
+        this.x = q.x;
+        this.y = q.y;
+      },
+      draw(ctx, sx, sy, t, api) {
+        const im = api.image(q.key);
+        if (!im) return;
+        let dy = 0, a = 1;
+        if (q.up != null) {
+          const u = (pNow() - q.up) / 2.2;
+          dy = pRise(u);
+          a = Math.max(0, 1 - u);
+        }
+        const moving = pS.phase === "gather" && q.up == null;
+        const bob = moving ? Math.abs(Math.sin(t * 9 + q.i)) * 2 : 0;
         ctx.globalAlpha = a;
-        ctx.drawImage(im, Math.round(x - im.width / 2), Math.round(y - im.height));
+        ctx.drawImage(im, Math.round(sx - im.width / 2), Math.round(sy - im.height - dy - bob));
         ctx.globalAlpha = 1;
       },
-      interact: (api) => api.bubble("b_denden", P_VOICE.denden, 1400),
-      canInteract: () => pS.phase === "wait",
-    }),
-    pImg("b_hato", 12.5 * T, 6.6 * T, { range: 40, interact: (api) => api.bubble("b_hato", P_VOICE.hato, 1400), canInteract: () => pS.phase === "wait" || pS.phase === "done" }),
-    // 空いた席: 座ると紙芝居がはじまる
+      interact: (api) => api.bubble(q.key, P_VOICES[q.key] || "……", 1400),
+      canInteract: () => pS.phase === "wait" && !!P_VOICES[q.key],
+    })),
+    // 空いた席: 座布団。座ると紙芝居がはじまる(todo 41 の 1)
     {
       id: "seat",
       x: P_SEAT.x,
@@ -291,7 +398,17 @@ const P_AKICHI = {
       w: 1,
       h: 1,
       range: 30,
-      draw() {},
+      draw(ctx, sx, sy, t) {
+        if (pS.phase !== "wait") return;
+        ctx.fillStyle = "#7a3c34";
+        ctx.fillRect(Math.round(sx - 11), Math.round(sy - 7), 22, 7);
+        ctx.fillStyle = "#9a5444";
+        ctx.fillRect(Math.round(sx - 10), Math.round(sy - 7), 20, 2);
+        // かすかに呼ぶ光
+        const a = 0.18 + 0.12 * Math.sin(t * 2.4);
+        ctx.fillStyle = `rgba(255, 236, 190, ${a})`;
+        ctx.fillRect(Math.round(sx - 13), Math.round(sy - 10), 26, 12);
+      },
       canInteract: (api) => pS.phase === "wait" && !api.flag("gone"),
       interact(api) {
         pS.phase = "show";
@@ -299,15 +416,33 @@ const P_AKICHI = {
         api.freeze(1.2);
         api.bubble("padre", "カチ　カチ", 1200);
         api.later(1200, () =>
-          api.showSeq(["kami1", "kami2", "kami3", "kami4"], 2.6, () => {
-            // 紙芝居は黒く終わる。暗転のまま空き地に戻し(席から)、引き出しがあく
+          api.showSeq(["kami1", "kami2", "kami3", "kami4"], 2.8, () => {
+            // 紙芝居は黒く終わる。暗転のまま空き地に戻し(席から)、みんなが列になる
             pS.recut = true;
             api.cut("akichi", "seat");
-            pS.phase = "capture";
+            pS.phase = "gather";
             pS.t0 = pNow();
-            api.shake(0.3, 1);
           })
         );
+      },
+    },
+    // 列のうしろの、きーのならぶ所(かすかに光る)
+    {
+      id: "kiSpot",
+      x: 0,
+      y: 0,
+      w: 1,
+      h: 1,
+      hidden: () => pS.phase !== "queue",
+      update() {
+        [this.x, this.y] = pKiSlot();
+      },
+      draw(ctx, sx, sy, t) {
+        const a = 0.25 + 0.15 * Math.sin(t * 3);
+        ctx.fillStyle = `rgba(255, 240, 200, ${a})`;
+        ctx.beginPath();
+        ctx.ellipse(Math.round(sx), Math.round(sy), 12, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
       },
     },
     // でんでん太鼓の席に残った、水あめのわりばし(道具は仮)

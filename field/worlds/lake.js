@@ -230,9 +230,9 @@ function piSled() {
     w: 1,
     h: 1,
     phase: null,
-    hidden: (api) => !homeward(api),
+    hidden: (api) => !homeward(api) || api.flagOf("padre.gone"), // ぱーでれの断片で昇天したあとは、いない(D425)
     update(dt, t, api) {
-      if (!homeward(api)) {
+      if (!homeward(api) || api.flagOf("padre.gone")) {
         this.phase = null;
         return;
       }
@@ -508,7 +508,7 @@ const ROAD = {
         solid: { w: 18, h: 8, dy: 9 },
         range: 36,
         nearRange: 56,
-        hidden: (api) => homeward(api), // 帰り道は古タイヤで遊んでいる(piSled)
+        hidden: (api) => homeward(api) || api.flagOf("padre.gone"), // 帰り道は古タイヤで遊んでいる(piSled)。ぱーでれの断片で昇天したあとは、いない(D425)
         near(api) {
           api.bubble("pi", "どけ");
         },

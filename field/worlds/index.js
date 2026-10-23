@@ -299,18 +299,11 @@ window.BOGI_WORLDS = {
     name: "ぱーでれとだいにち",
     assetBase: "./assets/worlds/padre/",
     images: Object.fromEntries(
-      ["bg_michi", "bg_akichi", "padre", "padre_open", "b_kobosi", "b_denden", "b_hato", "i_ame", "kami1", "kami2", "kami3", "kami4", "v_oneness", "t_zori", "fg_akichi_pole", "fg_akichi_pipes", "fg_michi_pole1", "fg_michi_pole2"]
+      ["bg_michi", "bg_akichi", "padre", "padre_open", "padre_fig", "padre_fig_open", "v_padre", "b_kobosi", "b_denden", "b_hato", "pb_1", "pb_2", "pb_3", "pb_4", "pb_5", "i_ame", "kami1", "kami2", "kami3", "kami4", "t_zori", "fg_akichi_pole", "fg_akichi_pipes", "fg_michi_pole1", "fg_michi_pole2"]
         .map((k) => [k, `${k}.png`])
         .concat([
           ["ki", "./assets/worlds/lake/ki_walk.png"],
-          // ワンネスの結末で光にとける、きーの思い出(終えた断片の一枚絵)
-          ["m_lake", "./assets/worlds/lake/v_window.png"],
-          ["m_haihei", "./assets/worlds/haihei/v_family.png"],
-          ["m_kasumi", "./assets/worlds/kasumi/v_flight.png"],
-          ["m_banana", "./assets/worlds/banana/v_final.png"],
-          ["m_suzuki", "./assets/worlds/suzuki/v_fall.png"],
-          ["m_takarabune", "./assets/worlds/takarabune/v_glow.png"],
-          ["m_noroi", "./assets/worlds/noroi/v_finish.png"],
+          ["pi", "./assets/worlds/lake/pi_walk.png"], // きーの番を横取りするぴー(D425)
         ])
     ),
     playerSprite: { img: "ki", cell: 64, frames: 7, footY: 17 },
@@ -318,8 +311,8 @@ window.BOGI_WORLDS = {
     startSpawn: "start",
     maps: { michi: P_MICHI, akichi: P_AKICHI },
     onEnterWorld(api) {
-      // 紙芝居のあとで出ていたら、そのあいだに、ぱーでれは霧の東へ去っている
-      if (["capture", "pull", "leave", "oneness"].includes(pS.phase)) {
+      // 紙芝居のあとで出ていたら、そのあいだに、みんな空へのぼっている(ぴーも D425)
+      if (!["wait", "done"].includes(pS.phase)) {
         api.setFlag("taken");
         api.setFlag("gone");
       }
