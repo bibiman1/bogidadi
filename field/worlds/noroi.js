@@ -675,6 +675,24 @@ const N_DINER = nMap("diner", 20, 12, {
     { id: "pinball", x: 1.25 * T, y: 9.3 * T, iy: 1.6 * T, w: 1, h: 1, headY: 2.4 * T, range: 30, // 台の正面(下)に立って調べる(D328)
        interact: (api) => { nPinT0 = nNow(); api.later(500, () => api.warp("pinball", "view")); } }, // ピンボール: 灯りがまたたいてから、台の画面へ(D327。pinball.js)
     {
+      // カウンターの新聞(D424): 断片を終えたら置かれる。見出し「卑怯なり無慣性粘着駆動」「地元レーサー憤慨」、
+      // 写真は差しかえる前のゴールの絵(赤べこ)、「きーは無期限出場停止」(絵は docs/assets/noroi/news/make.py)。リプレイ券の競争はそのまま
+      id: "news",
+      x: 140, // 砂糖入れとコーヒーカップのあいだ(左のはしは、床の『走れメロス』の調べる所に近すぎる)
+      y: 103,
+      iy: 1.6 * T, // 調べる点は、カウンターの手前(きーはカウンターの中へは入れない)
+      w: 1,
+      h: 1,
+      range: 40,
+      headY: 0.5 * T,
+      hidden: (api) => !api.cleared("noroi"),
+      draw(ctx, sx, sy, t, api) {
+        const im = api.image("np_counter");
+        if (im) ctx.drawImage(im, Math.round(sx - 9), Math.round(sy - 10));
+      },
+      interact: (api) => api.show("v_news"),
+    },
+    {
       // ボックス席のテーブルの雑誌「BOGICAR GRAPHIC」(D320): 表紙から、A でめくって 6 台を 1 台ずつ(絵は docs/assets/noroi/magazine/make.py)
       id: "magazine",
       x: 17.2 * T, // 調味料のびんの右
