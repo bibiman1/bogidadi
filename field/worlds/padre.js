@@ -58,6 +58,23 @@ const pPadreDraw = (ctx, sx, sy, api, k) => {
   ctx.drawImage(im, Math.round(sx - 24), Math.round(sy - im.height - dy)); // 光の柱(P_HEAD)にかからないよう、右へ(D425 の本番の絵)
   ctx.globalAlpha = 1;
 };
+// 紙芝居をはじめる: きーは空いた席に座り、拍子木のあと、4 枚が横にすべって変わる(D427、D429)
+const pStartShow = (api) => {
+  pS.phase = "show";
+  api.place(P_SEAT.x, P_SEAT.y);
+  api.face("east");
+  api.freeze(1.2);
+  api.bubble("padre", "カチ　カチ", 1200);
+  api.later(1200, () =>
+    api.showSeq(["kami1", "kami2", "kami3", "kami4"], 2.8, () => {
+      // 紙芝居は黒く終わる。暗転のまま空き地に戻し(席から)、みんなが列になる
+      pS.recut = true;
+      api.cut("akichi", "seat");
+      pS.phase = "gather";
+      pS.t0 = pNow();
+    }, { slide: true })
+  );
+};
 const pImg = (key, x, y, extra) =>
   Object.assign(
     {
@@ -178,12 +195,6 @@ const P_AKICHI = {
     }
   },
   debug: () => Object.assign({ now: pNow(), left: pLeft().length }, pS),
-  // ぱーでれが去ったあと、東へ行くほど霧が暗い(てらす D201)
-  dark(api) {
-    if (pS.phase !== "done") return 0;
-    return Math.max(0, Math.min(1, (api.player().x - 12.5 * T) / (2.5 * T))) * 0.93;
-  },
-  darkColor: "rgb(28, 24, 34)",
   drawOverlay(ctx, ox, oy, t, api) {
     // 裸電球の街灯(夕暮れにともる)
     const lg = ctx.createRadialGradient(ox + 10 * T, oy + 1.35 * T, 2, ox + 10 * T, oy + 1.35 * T, 70);
@@ -213,18 +224,24 @@ const P_AKICHI = {
     pFg("fg_akichi_pole", 183, 2, 205, { w: 12, h: 6, dx: 26, dy: -3 }),
     pFg("fg_akichi_pipes", 44, 148, 250),
     kTrace("t_zori", "t_zori", 12.8 * T, 7.3 * T), // 空いた席の横に、子供のゴム草履が片方(ちゃんもこの紙芝居を見ていた)
-    // 霧の奥(D201): ぱーでれが去ったあと、東の霧は暗くて、道が見えない。てらす(宝舟で覚える)がないと、霧に押し戻される
-    kGate({ id: "fogGate", x: 18.6 * T, y: 6.6 * T, r: 2.8 * T, when: () => pS.phase === "done", ok: (api) => api.can("terasu") }),
-    // 見届け: ぱーでれが去ったあと、霧の奥で、拍子木の音が止むまで待つ(D189)
+    // 見届け(D189、D429): みんながのぼっていった光の柱の跡で、空に残った細い光の筋が消えるまで見る
     kWatch({
       id: "w_hyoshigi",
-      x: 18.2 * T,
-      y: 6.6 * T,
-      r: 1.8 * T,
+      x: P_HEAD.x,
+      y: P_HEAD.y,
+      r: 1.6 * T,
       sec: 5.5, lure: "255, 230, 180",
       when: () => pS.phase === "done",
       fx(ctx, sx, sy, p, t) {
-        if (p < 0.9 && (t * (1.6 - p)) % 1 < 0.6) kWord(ctx, "カチ　カチ", sx + 1.6 * T + p * 2 * T, sy - 2.2 * T, (1 - p) * 1.3);
+        if (p >= 1) return;
+        const a = (1 - p) * (0.5 + 0.12 * Math.sin(t * 3));
+        const top = sy - 2 * T - p * 3 * T; // 筋は上へ縮んで消えていく
+        const g = ctx.createLinearGradient(0, top - 4 * T, 0, sy);
+        g.addColorStop(0, "rgba(255, 246, 214, 0)");
+        g.addColorStop(0.6, `rgba(255, 246, 214, ${a})`);
+        g.addColorStop(1, "rgba(255, 246, 214, 0)");
+        ctx.fillStyle = g;
+        ctx.fillRect(Math.round(sx - 2), Math.round(top - 4 * T), 4, Math.round(sy - top + 4 * T));
       },
     }),
     // 進み具合(見えない係): 列をつくる → きーを待つ → 一つずつのぼる → ぴー → ぱーでれがのぼる
@@ -308,6 +325,7 @@ const P_AKICHI = {
         if (pS.phase === "leave" && now - pS.t0 > 4.5) {
           api.setFlag("gone");
           pS.phase = "done";
+          pS.ameT0 = now; // 水あめのわりばしが、上から落ちてくる(D429)
           api.later(800, () => kLearn(api, "funbaru", "ふんばる")); // 押しのけられても、ここに残った(D201、D425)
         }
       },
@@ -352,7 +370,7 @@ const P_AKICHI = {
       draw(ctx, sx, sy, t, api) {
         pPadreDraw(ctx, sx, sy, api, 1);
       },
-      interact: (api) => api.bubble("padre", "カチ　カチ", 1400),
+      interact: (api) => pStartShow(api), // 紙芝居は、ぱーでれを調べるとはじまる(D429)
       canInteract: () => pS.phase === "wait",
     }),
     // ぼぎと、壊れたぼぎだぢ
@@ -395,40 +413,19 @@ const P_AKICHI = {
       interact: (api) => api.bubble(q.key, P_VOICES[q.key] || "……", 1400),
       canInteract: () => pS.phase === "wait" && !!P_VOICES[q.key],
     })),
-    // 空いた席: 座布団。座ると紙芝居がはじまる(todo 41 の 1)
+    // 空いた席: 座布団。ぱーでれを調べると、きーはここへ座って紙芝居を見る(D429)
     {
       id: "seat",
       x: P_SEAT.x,
       y: P_SEAT.y,
       w: 1,
       h: 1,
-      range: 30,
-      draw(ctx, sx, sy, t) {
+      draw(ctx, sx, sy) {
         if (pS.phase !== "wait") return;
         ctx.fillStyle = "#7a3c34";
         ctx.fillRect(Math.round(sx - 11), Math.round(sy - 7), 22, 7);
         ctx.fillStyle = "#9a5444";
         ctx.fillRect(Math.round(sx - 10), Math.round(sy - 7), 20, 2);
-        // かすかに呼ぶ光
-        const a = 0.18 + 0.12 * Math.sin(t * 2.4);
-        ctx.fillStyle = `rgba(255, 236, 190, ${a})`;
-        ctx.fillRect(Math.round(sx - 13), Math.round(sy - 10), 26, 12);
-      },
-      canInteract: (api) => pS.phase === "wait" && !api.flag("gone"),
-      interact(api) {
-        pS.phase = "show";
-        api.place(P_SEAT.x, P_SEAT.y);
-        api.freeze(1.2);
-        api.bubble("padre", "カチ　カチ", 1200);
-        api.later(1200, () =>
-          api.showSeq(["kami1", "kami2", "kami3", "kami4"], 2.8, () => {
-            // 紙芝居は黒く終わる。暗転のまま空き地に戻し(席から)、みんなが列になる
-            pS.recut = true;
-            api.cut("akichi", "seat");
-            pS.phase = "gather";
-            pS.t0 = pNow();
-          }, { slide: true })
-        );
       },
     },
     // 列のうしろの、きーのならぶ所(かすかに光る)
@@ -450,9 +447,22 @@ const P_AKICHI = {
         ctx.fill();
       },
     },
-    // でんでん太鼓の席に残った、水あめのわりばし(道具は仮)
-    pImg("i_ame", 10.5 * T, 6.7 * T, {
+    // 水あめのわりばし: ぱーでれが空へ消えたあと、光の柱の跡へ上から落ちてくる(D429)
+    pImg("i_ame", P_HEAD.x, P_HEAD.y, {
       range: 36,
+      draw(ctx, sx, sy, t, api) {
+        const im = api.image("i_ame");
+        if (!im) return;
+        let dy = 0;
+        if (pS.ameT0) {
+          const u = pNow() - pS.ameT0 - 0.6; // 消えてから少しして
+          if (u < 0) return;
+          const fall = 0.9; // 落ちるまで(秒)
+          if (u < fall) dy = -(1 - (u / fall) ** 2) * 6 * T;
+          else if (u < fall + 0.35) { const v = (u - fall) / 0.35; dy = -Math.sin(v * Math.PI) * 6; } // 小さくはねる
+        }
+        ctx.drawImage(im, Math.round(sx - im.width / 2), Math.round(sy - im.height + dy));
+      },
       hidden: (api) => !api.flag("gone") || api.hasItem("水あめのわりばし"),
       interact(api) {
         api.hold("ic_ame", 1.8, () => {
