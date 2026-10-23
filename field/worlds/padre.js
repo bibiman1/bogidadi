@@ -16,7 +16,7 @@ const P_SEAT = { x: 11.5 * T, y: 6.6 * T }; // 空いた席
 const P_CART = { x: 16 * T, y: 6.6 * T }; // ぱーでれの足もと
 const P_HEAD = { x: 15 * T - 8, y: 8.3 * T }; // 列の先頭。ここで空へのぼる
 const P_GAP = 26; // 列のあいだ
-const P_UP_SEC = 1.9; // 一つのぼって、次がのぼるまで
+const P_UP_SEC = 1.2; // 一つのぼって、次がのぼるまで(16 になったので短く D436)
 const pS = { phase: "wait", t0: 0, joined: false, lastUp: 0, pi: null }; // wait → show → gather → queue → ascend → pi → leave → done
 const pNow = () => performance.now() / 1000;
 // 霧と夕暮れ: 全体に夕暮れの色、東(右)ほど霧が濃い。霧のかたまりがゆっくり流れる
@@ -128,9 +128,9 @@ const P_MICHI = {
     pFg("fg_michi_pole1", 200, 0, 172, { w: 12, h: 6, dx: 10, dy: -3 }),
     pFg("fg_michi_pole2", 520, 0, 172, { w: 12, h: 6, dx: 10, dy: -3 }),
     // 巡礼(D431): 壊れたぼぎだぢが一列になって、ゆっくり東の空き地へ歩いていく。足どりは不ぞろい。空き地に着いたら、もういない
-    ...["pb_5", "pb_3", "pb_1", "pb_4", "pb_2"].map((key, i) => ({
+    ...["pb_5", "pb_8", "pb_3", "pb_1", "pb_9", "pb_4", "pb_6", "pb_2", "pb_10", "pb_7"].map((key, i) => ({
       id: "pil_" + key,
-      x: (4 + i * 4.2) * T,
+      x: (3 + i * 2.3) * T,
       y: (5.6 + (i % 2) * 0.8) * T,
       w: 1,
       h: 1,
@@ -188,6 +188,15 @@ const P_Q = [
   { key: "pb_3", home: [13.4 * T, 8.0 * T] },
   { key: "pb_4", home: [14.8 * T, 9.4 * T] },
   { key: "pb_5", home: [16.6 * T, 9.8 * T] },
+  // 観客と巡礼を増やす(D436): だるま、張り子の虎、犬張り子は席のうしろで見ている。壊れたぼぎだぢは半円の外がわに
+  { key: "b_daruma", home: [9.0 * T, 7.7 * T] },
+  { key: "b_tora", home: [10.5 * T, 7.9 * T] },
+  { key: "b_inu", home: [12.3 * T, 7.8 * T] },
+  { key: "pb_6", home: [12.5 * T, 4.5 * T] },
+  { key: "pb_7", home: [12.0 * T, 9.1 * T] },
+  { key: "pb_8", home: [13.6 * T, 10.4 * T] },
+  { key: "pb_9", home: [15.6 * T, 10.6 * T] },
+  { key: "pb_10", home: [17.6 * T, 10.3 * T] },
 ].map((q, i) => Object.assign(q, { i, x: q.home[0], y: q.home[1], up: null }));
 const P_VOICES = { b_denden: "デン　デン", b_kobosi: "コロン", b_hato: "ポー" };
 const pLeft = () => P_Q.filter((q) => q.up == null);
