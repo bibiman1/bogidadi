@@ -337,8 +337,8 @@ window.BOGI_WORLDS = {
     startSpawn: "start",
     maps: { pass: N_PASS, drivein: N_DRIVEIN, diner: N_DINER, strip: N_STRIP, race: N_RACE, pinball: N_PIN },
     onEnterWorld(api) {
-      if (!api.flag("ponponGone") && nFuelT0 >= 0) api.setFlag("ponponGone");
-      nFuelT0 = -1;
+      if (!api.flag("ponponGone") && nS.fuelT0 >= 0) api.setFlag("ponponGone");
+      nS.fuelT0 = -1;
     },
   },
 };

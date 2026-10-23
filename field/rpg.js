@@ -29,6 +29,7 @@ const ASSET_V = (() => {
     let vh = VH / ZOOM;
     const images = {};
     let world = null;
+    let enterGen = 0; // 世界に入った回数(api.later の予約を、その入場の間だけ有効にする)
     let map = null;
     let player = null;
     let nearObj = null;
@@ -38,6 +39,7 @@ const ASSET_V = (() => {
     let flash = null; // { t0, sec } 白い光が引いていく(マップが切りかわっても残る)
     let shake = null; // { t0, sec, amp } 画面のゆれ
     let freezeUntil = 0; // この時刻まで、きーを動かせない(演出の途中)
+    let autoWalk = null; // 演出で、きーを決まった道ぞいに歩かせている間 { pts, i, speed, onDone }
     let held = null; // { img, t0, sec, onDone } 手に入れた物を、きーの頭の上に掲げて見せる
     let observeFx = null; // { t0 } 見届けたしるし: 小さな光が、きーに降りてくる(D189)
     let toast = null; // { text, until }
@@ -179,8 +181,11 @@ const ASSET_V = (() => {
           host.say(pages, onDone);
         },
         later(ms, fn) {
+          // 予約したときと同じ「入場」の間だけ動く。同じ世界に入りなおしたら、前の入場の予約は捨てる
+          // (テストやスマホの復帰で入りなおしたとき、古い予約が別の世界へ移してしまわないように)
+          const gen = enterGen;
           setTimeout(() => {
-            if (world === w) fn();
+            if (world === w && enterGen === gen) fn();
           }, ms);
         },
         flag(name) {
@@ -261,6 +266,10 @@ const ASSET_V = (() => {
           player.vx = 0;
           player.vy = 0;
         },
+        // きーを、決まった道(点の並び [[x, y], ...])ぞいに歩かせる(ワープさせない)。歩く間は動かせない。着いたら onDone
+        walk(pts, speed, onDone) {
+          autoWalk = { pts: pts.map(([x, y]) => ({ x, y })), i: 0, speed: speed || SPEED * 0.6, onDone };
+        },
         // ジャンプを演出として跳ばせる(教わる場面など)
         hop() {
           jumpT0 = clock;
@@ -313,6 +322,7 @@ const ASSET_V = (() => {
     }
 
     function enter(def, spawnName) {
+      enterGen++;
       world = def;
       world.api = makeApi();
       for (const [k, src] of Object.entries(def.images)) {
@@ -341,6 +351,7 @@ const ASSET_V = (() => {
       // BGM: マップに bgm があればそれ、なければ世界の bgm、なければ世界の id(D195)
       if (window.bogiAudio) window.bogiAudio.bgm(map.bgm || world.bgm || world.id);
       player = { x: sp.x, y: sp.y, vx: 0, vy: 0, facing: sp.facing || "south", moving: false };
+      autoWalk = null;
       bubbles = [];
       nearObj = null;
       lastCamY = null;
@@ -659,7 +670,7 @@ const ASSET_V = (() => {
     }
 
     function busy() {
-      return !!(cutscene || pan || camPath || clock < freezeUntil);
+      return !!(cutscene || pan || camPath || autoWalk || clock < freezeUntil);
     }
     // camPath のいまの中心と寄り(終わっていれば null)。base はふつうのカメラの中心
     const CAM_BACK = 1.2;
@@ -726,6 +737,33 @@ const ASSET_V = (() => {
       }
       if (cutscene) return;
       if (map.input) map.input(world.api, dt, { a: aHeld, b: bHeld, x: input.x, y: input.y }); // 押し続け(ピンボール)
+      if (autoWalk) {
+        // 演出の歩き: 点から点へ、まっすぐ同じ速さで。向きは進む方へ
+        const w = autoWalk;
+        let step = w.speed * dt;
+        while (step > 0 && w.i < w.pts.length) {
+          const q = w.pts[w.i];
+          const dx = q.x - player.x, dy = q.y - player.y, d = Math.hypot(dx, dy);
+          if (d > 0.01) player.facing = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "east" : "west") : dy > 0 ? "south" : "north";
+          if (d <= step) {
+            player.x = q.x;
+            player.y = q.y;
+            step -= d;
+            w.i++;
+          } else {
+            player.x += (dx / d) * step;
+            player.y += (dy / d) * step;
+            step = 0;
+          }
+        }
+        player.vx = player.vy = 0;
+        player.moving = w.i < w.pts.length;
+        if (!player.moving) {
+          autoWalk = null;
+          if (w.onDone) w.onDone();
+        }
+        return;
+      }
       if (clock < freezeUntil) return;
 
       // すべる床: 氷のタイル、または map.slippery(true か、追従の強さの数値。小さいほどつるつる)

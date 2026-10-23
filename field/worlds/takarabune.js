@@ -11,15 +11,16 @@
 const TK_GRIDS = {
   // 港湾ぼぎ(マトリョシカ)の食堂兼休憩所(D441)。北に調理場とカウンター、長い机 4 つとベンチ、東にだるまストーブ、南に戸口
   canteen: [
+    // 外まわりだけマスで決め、中の家具は TK_CANTEEN_SOLID(ドット単位)でふさぐ(机のあいだを、絵のとおりに通れるように)
     "################",
     "################",
     "################",
     "################",
-    "#########.######",
-    "######......####",
-    "#..#..###...##.#",
-    "#..#..###...##.#",
-    "#..#........##.#",
+    "#..............#",
+    "#..............#",
+    "#..............#",
+    "#..............#",
+    "#..............#",
     "#########..#####",
   ],
   port: [
@@ -188,20 +189,32 @@ const tkDrawPuffs = (ctx, ox, oy) => {
 const TK_PRESS = 2.6;
 const TK_SPIN = 4;
 const TK_OMEGA = 2 * Math.PI * 1.1; // 全速(1 秒に 1.1 回転)
-let tkFireT0 = -1; // ペレットを火室に入れた時刻(読みこみ直したあとは、すでに全速として扱う)
-const tkFireAge = (api) => (!api.flag("running") ? -1 : tkFireT0 < 0 ? 999 : tkNow() - tkFireT0);
+// この断片の「今どうなっているか」(遊ぶ間に変わる値)。ここに全部まとめる。入場のたびに戻すものは worlds/index.js の onEnterWorld
+const tkS = {
+  fireT0: -1, // ペレットを火室に入れた時刻(読みこみ直したあとは、すでに全速として扱う)
+  lastHalf: -1,
+  forgeT0: -1,
+  mealT0: -1, // 料理が机に置かれた時刻(小さい子が運んでくる、todo 145)
+  serveT0: -1, // きーが座った時刻。ここから小さい子が運びはじめる
+  alarmT: -99,
+  doorT0: -1, // 二重扉が開きはじめた時刻(一度開いたら、開いたまま)
+  diveT0: -1,
+  diveFrom: [8 * T, 10.4 * T], // 飛び込んだ場所(ふちのどこからでも)
+  throwT0: -1,
+  ordering: false, // 食堂: 注文して、席へ歩いている間
+};
+const tkFireAge = (api) => (!api.flag("running") ? -1 : tkS.fireT0 < 0 ? 999 : tkNow() - tkS.fireT0);
 const tkCrank = (api) => {
   const a = tkFireAge(api) - TK_PRESS;
   if (a <= 0) return 0;
   return a < TK_SPIN ? (TK_OMEGA * a * a) / (2 * TK_SPIN) : TK_OMEGA * (a - TK_SPIN / 2);
 };
 // 死点をまたいだら蒸気を吐く(甲板の煙突、機関室のシリンダーの口)
-let tkLastHalf = -1;
 const tkExhaust = (api) => {
   const h = Math.floor(tkCrank(api) / Math.PI);
-  if (h !== tkLastHalf) {
-    const fire = tkLastHalf >= 0 && h > tkLastHalf;
-    tkLastHalf = h;
+  if (h !== tkS.lastHalf) {
+    const fire = tkS.lastHalf >= 0 && h > tkS.lastHalf;
+    tkS.lastHalf = h;
     return fire;
   }
   return false;
@@ -349,14 +362,13 @@ const TK_PORT = tkMap("port", 28, 14, {
 
 // 鋳造工房(鋳物小屋の中)。るつぼ炉、トングとシャンク、二つ割の木の鋳枠と砂型、込め台、鋳物砂の山、型ばらしの格子、仕上げ台
 // ぼぎ(仮の絵、D70)にペレットを渡すと、炉が青白く燃え、るつぼの中の金属くずが溶ける → 鋳造の一枚絵 → コンロッド(D95)
-let tkForgeT0 = -1;
 const TK_WORKSHOP = tkMap("workshop", 16, 12, {
   bg: "#14121a",
   spawns: { door: { x: 7.9 * T, y: 10.4 * T, facing: "north" } },
   drawOverlay(ctx, ox, oy, t, api) {
     const fx = ox + 3 * T;
     const fy = oy + 4 * T;
-    const e = tkForgeT0 < 0 ? (api.flag("cast") ? 99 : -1) : tkNow() - tkForgeT0;
+    const e = tkS.forgeT0 < 0 ? (api.flag("cast") ? 99 : -1) : tkNow() - tkS.forgeT0;
     if (e < 0) return;
     // ペレットの熱で、炉が青白く燃える(鋳造のあとは、ゆっくり冷めていく)
     const heat = api.flag("cast") && e > 6 ? 0.35 : Math.min(1, e / 1.2);
@@ -385,7 +397,7 @@ const TK_WORKSHOP = tkMap("workshop", 16, 12, {
       range: 56,
       interact(api) {
         if (api.flag("cast") || !api.hasItem("ペレット")) return api.bubble("bogi", "……", 1200); // 仮
-        tkForgeT0 = tkNow();
+        tkS.forgeT0 = tkNow();
         api.bubble("bogi", "……！", 1400); // 仮
         api.later(3000, () =>
           api.show("v_cast", () => {
@@ -402,13 +414,40 @@ const TK_WORKSHOP = tkMap("workshop", 16, 12, {
 // 港湾ぼぎの食堂兼休憩所(D441、作者「港湾ぼぎの食堂兼休憩所」「マトリョシカにして。わたしのスケッチ参考に。きーも飲食する。」「もつ煮とウォッカ」)
 // 食堂の人たちはマトリョシカ(作者のイメージボードのとおり、頭巾、丸い顔にほお紅、前かけの花。大きさがばらばら)。客は港湾ぼぎ(ヘルメット、手ぬぐい、ゴム長)。下絵(docs/assets/takarabune/canteen/)
 // おかみに話しかけると、きーは空いた席に座り、もつ煮とウォッカが出て、食べて飲む
-let tkMealT0 = -1; // 料理が机に置かれた時刻(小さい子が運んでくる、todo 145)
-let tkServeT0 = -1; // きーが座った時刻。ここから小さい子が運びはじめる
-const TK_SERVE_SEC = 4.0; // 座ってから料理が届くまで
+// 食堂で食べる流れの時間表(秒)。おかみ・小さい子・料理の 3 か所は、ここだけを見て動く(数字を書き散らさない)
+// serve の前は「座ってから」、うしろは「料理が机に置かれてから」の時刻
+const TK_MEAL = {
+  toPick: 1.4, // 座ってから: 小さい子がカウンターの右はしに着く
+  picked: 1.8, //             受け取って歩きだす
+  serve: 4.0, //              きーの机に置く(ここから下は、置いてからの時刻)
+  steam: 3.5, // もつ煮の湯気が立つあいだ
+  chew: [0.4, 2.1], // 食べる: こくこくうなずきはじめる時刻(2 回)
+  chewN: 6, //        うなずく数(1 回ぶん)
+  chewStep: 0.17, //  うなずきの間
+  lift: 4.0, //  グラスが口もとへ上がりはじめる
+  tilt: 4.4, //  傾けはじめる
+  gone: 4.9, //  飲みほして消える
+  hop: 4.5, //   飲むときのひと跳ね
+  sigh: 5.6, //  手前を向いて白い息
+  done: 6.2, //  きーが動けるようになる
+  clear: 7.0, // 料理が消える(このあと、また頼める)
+};
+const TK_SERVE_SEC = TK_MEAL.serve; // 座ってから料理が届くまで
+// おかみの前から席までの道(机と長いすの上は通らない): 上の通りへ出て、カウンターの右はし → 左の通り → 下の通り → 席
+function tkSeatRoute(p) {
+  const tail = [[5.8 * T, 7.8 * T], [TK_SEAT.x, 7.8 * T], [TK_SEAT.x, TK_SEAT.y]];
+  // 手前の左の机の西(壁とのあいだ)にいるときは、机の下の手前を回る(机の上を横切らない)
+  if (p.x < 100) return [[p.x, 266], [164, 266], ...tail];
+  const pts = [];
+  if (p.x < 5.8 * T && p.y > 6.15 * T) pts.push([p.x, 6.15 * T]);
+  pts.push([5.8 * T, 6.15 * T], ...tail);
+  return pts;
+}
 // 小さい子(給仕)が歩き回る床の道(マス単位。机と長いすの上は通らない)
-const TK_SMALL_PATH = [[5.8, 6.15], [5.6, 8.7], [9.4, 8.7], [9.4, 6.15]]; // 上の通りは、長いすの足もとより手前(6.15)を歩く
+// 上の通り(6.15)は奥の長いすの足もとより手前、下の通り(7.8)はまん中の机と長いすのあいだ。南の壁ぎわは歩かない
+const TK_SMALL_PATH = [[5.8, 6.15], [5.8, 7.8], [9.35, 7.8], [9.35, 6.15]];
 const TK_SMALL_PICK = [5.8, 6.15]; // カウンターの右はしで受け取る
-const TK_SMALL_SERVE = [9.35, 7.3]; // きーの机の右から置く
+const TK_SMALL_SERVE = [9.45, 7.3]; // きーの机の右から置く
 const tkLerp = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
 // 折れ線 pts の上を、全体の k(0〜1)だけ進んだ点
 function tkAlong(pts, k) {
@@ -425,7 +464,7 @@ function tkAlong(pts, k) {
 // 見回りの道(まん中の机をかこむ四角)の上の点から、カウンターの右はし(角 0)までの道。机の上は通らない
 function tkSmallToPick(pos) {
   const [A, B, C, D] = TK_SMALL_PATH;
-  if (pos[1] > 8.4) return [pos, B, A]; // 下の通り(角 1→2)にいる
+  if (pos[1] > 7.5) return [pos, B, A]; // 下の通り(角 1→2)にいる
   if (pos[0] > 9.0) return [pos, D, A]; // 右の通り(角 2→3)にいる
   return [pos, A];
 }
@@ -473,9 +512,28 @@ const tkMatry = (id, img, x, y, voice, extra) =>
     },
     extra
   );
+// 食堂の家具と壁(背景の絵から、ドットではかった。x0, y0, x1, y1)。長いすは低いので、ふさがない(またいで歩ける)
+// 机・カウンター・たる・ストーブはふさぐ。下の段の机は、脚の手前を通れるよう、絵の下はしより少し上までにする
+const TK_CANTEEN_SOLID = [
+  [32, 128, 46, 288], // 西の壁
+  [468, 128, 480, 288], // 東の壁
+  [46, 128, 172, 158], // カウンターの天板だけ(手前の板の前には立てる。作者「天板だけ当たり判定でいい」)
+  [172, 128, 202, 164], // たる
+  [202, 128, 290, 166], // 奥の左の机
+  [308, 128, 397, 166], // 奥の右の机
+  [428, 128, 468, 186], // ストーブ
+  [88, 196, 139, 256], // 手前の左の机
+  [200, 200, 291, 240], // まん中の机(きーの席の机)
+  [379, 196, 431, 256], // 手前の右の机
+  [46, 275, 292, 288], // 南の壁(戸の西)
+  [356, 275, 468, 288], // 南の壁(戸の東)
+].map(([x0, y0, x1, y1]) => tkWall(x0, y0, x1, y1));
 const TK_CANTEEN = tkMap("canteen", 16, 10, {
   bg: "#1c140e",
   spawns: { door: { x: 10 * T, y: 8.5 * T, facing: "north" } },
+  onEnter() {
+    tkS.ordering = false; // 歩いている途中で出ていたら、注文はなかったことに
+  },
   drawOverlay(ctx, ox, oy, t) {
     // 天井の電灯と、ストーブのあたたかい灯り(絵の電灯の位置に合わせる)
     tkLight(ctx, ox + 3.4 * T, oy + 3 * T, 150, "255, 200, 120", 0.16 + 0.02 * Math.sin(t * 3));
@@ -488,42 +546,46 @@ const TK_CANTEEN = tkMap("canteen", 16, 10, {
   },
   triggers: [{ id: "out", x: 9 * T, y: 9.6 * T, w: 2 * T, h: T, warp: { map: "port", spawn: "canteen" } }],
   objects: [
+    ...TK_CANTEEN_SOLID,
     // 食堂のおかみ(大きなマトリョシカ)。話しかけると、もつ煮とウォッカ
     tkMatry("okami", "m_okami", 3.9 * T, 4.5 * T, "……", {
       behind: 3.97 * T, // カウンターの奥。天板より下は隠れる
       headY: 64,
       range: 100,
       interact(api) {
-        if (tkMealT0 > 0 && tkNow() - tkMealT0 < 7) return;
+        if (tkS.ordering || (tkS.mealT0 > 0 && tkNow() - tkS.mealT0 < TK_MEAL.clear)) return;
+        tkS.ordering = true;
         api.bubble("okami", "……", 1000);
-        api.later(900, () => {
-          api.place(TK_SEAT.x, TK_SEAT.y);
+        // 注文したら、きーは自分で席まで歩く(ワープしない。作者「女将に話しかけるときーがワープするのおかしい」→ B)
+        api.later(700, () => api.walk(tkSeatRoute(api.player()), 90, () => {
+          tkS.ordering = false;
           api.face("north");
-          api.freeze(6.2 + TK_SERVE_SEC);
-          tkServeT0 = tkNow();
-          tkMealT0 = tkServeT0 + TK_SERVE_SEC; // 小さい子が運んできて、机に置く(todo 145)
+          api.freeze(TK_MEAL.done + TK_SERVE_SEC);
+          tkS.serveT0 = tkNow();
+          tkS.mealT0 = tkS.serveT0 + TK_SERVE_SEC; // 小さい子が運んできて、机に置く(todo 145)
           const w = TK_SERVE_SEC * 1000;
           // 字は出さず、動きで見せる(作者「もぐもぐ　くぃっ　はいらないかな。動きでわかるようにして」)
           // 食べる: 机に向いて、こくこくと小さくうなずく(2 回に分けて)
-          for (const [t0, n] of [[400, 6], [2100, 6]]) {
-            for (let i = 0; i < n; i++) api.later(w + t0 + i * 170, () => api.place(TK_SEAT.x, TK_SEAT.y + (i % 2 ? 0 : 1.5)));
-            api.later(w + t0 + n * 170, () => api.place(TK_SEAT.x, TK_SEAT.y));
+          const ms = (sec) => w + sec * 1000;
+          for (const c of TK_MEAL.chew) {
+            for (let i = 0; i < TK_MEAL.chewN; i++) api.later(ms(c + i * TK_MEAL.chewStep), () => api.place(TK_SEAT.x, TK_SEAT.y + (i % 2 ? 0 : 1.5)));
+            api.later(ms(c + TK_MEAL.chewN * TK_MEAL.chewStep), () => api.place(TK_SEAT.x, TK_SEAT.y));
           }
           // 飲む: グラスが口もとへ上がって傾く(絵は meal の側)。そのとき、ひと跳ね
-          api.later(w + 4500, () => api.hop());
+          api.later(ms(TK_MEAL.hop), () => api.hop());
           // ひと息: 手前を向いて、白い息
-          api.later(w + 5600, () => {
+          api.later(ms(TK_MEAL.sigh), () => {
             api.face("south");
             tkPuff(TK_SEAT.x - 6, TK_SEAT.y - 14, -6, -10, 1.4, 5);
           });
-        });
+        }));
       },
     }),
     // 食堂の人たち(マトリョシカ): 手伝いは大鍋のそば、いちばん小さい子はカウンターの西のはし(D441)
-    tkMatry("mt_help", "m_mid2", 12.85 * T, 5.4 * T, "……"), // ストーブのそば(床)
+    tkMatry("mt_help", "m_mid2", 12.85 * T, 5.4 * T, "……", { solid: { w: 20, h: 8 } }), // ストーブのそば(床)。きーは重ならない
     // いちばん小さい子は給仕(todo 145): ふだんは床を歩き回り、きーが座ると、カウンターで料理と酒を受け取って運ぶ
     tkMatry("mt_small", "m_small2", 5.8 * T, 6.0 * T, "……", {
-      range: 26, // おかみへの話しかけをじゃましない近さ
+      canInteract: () => false, // 給仕で歩き回るので、話しかけない(おかみへの話しかけをじゃましない)
       pt: 0, // 見回りの時計(運んでいるあいだは止まる)
       last: -1,
       pos: [5.8, 6.15],
@@ -533,15 +595,16 @@ const TK_CANTEEN = tkMap("canteen", 16, 10, {
         const dt = this.last < 0 ? 0 : Math.min(0.1, Math.max(0, now - this.last));
         this.last = now;
         let carry = false;
-        const e = tkServeT0 < 0 ? -1 : now - tkServeT0;
+        const e = tkS.serveT0 < 0 ? -1 : now - tkS.serveT0;
         if (e >= 0 && e < TK_SERVE_SEC) {
-          // 0〜1.4 秒: カウンターの右はしへ / 1.4〜1.8 秒: 受け取る / 1.8〜4.0 秒: きーの机へ
+          // カウンターの右はしへ → 受け取る → きーの机へ(時刻は TK_MEAL)
           // 机の上は通らない: 行きは道ぞいにカウンターへ、運ぶのは机の北の通りから右の通りへ回る
           if (!this.from) this.from = tkSmallToPick(this.pos.slice());
-          if (e < 1.4) this.pos = tkAlong(this.from, e / 1.4);
-          else if (e < 1.8) this.pos = TK_SMALL_PICK.slice();
-          else this.pos = tkAlong([TK_SMALL_PICK, TK_SMALL_PATH[3], TK_SMALL_SERVE], (e - 1.8) / (TK_SERVE_SEC - 1.8));
-          carry = e >= 1.4;
+          const M = TK_MEAL;
+          if (e < M.toPick) this.pos = tkAlong(this.from, e / M.toPick);
+          else if (e < M.picked) this.pos = TK_SMALL_PICK.slice();
+          else this.pos = tkAlong([TK_SMALL_PICK, TK_SMALL_PATH[3], TK_SMALL_SERVE], (e - M.picked) / (M.serve - M.picked));
+          carry = e >= M.toPick;
           this.back = null;
         } else {
           if (this.from) {
@@ -593,23 +656,24 @@ const TK_CANTEEN = tkMap("canteen", 16, 10, {
       w: 1,
       h: 1,
       draw(ctx, sx, sy, t, api) {
-        if (tkMealT0 < 0 || tkNow() < tkMealT0 || tkNow() - tkMealT0 > 7) return;
-        const e = tkNow() - tkMealT0;
+        if (tkS.mealT0 < 0 || tkNow() < tkS.mealT0 || tkNow() - tkS.mealT0 > TK_MEAL.clear) return;
+        const e = tkNow() - tkS.mealT0;
         const b = api.image("c_motsu"), v = api.image("c_vodka");
         if (b) ctx.drawImage(b, Math.round(sx - 12), Math.round(sy - 12));
-        if (v && e < 4.9) {
-          // 4.0 秒まで机の上。4.0〜4.4 秒できーの口もとへ上がり、4.4〜4.9 秒で傾けて飲みほす(消える)
-          const k = Math.max(0, Math.min(1, (e - 4.0) / 0.4));
+        const M = TK_MEAL;
+        if (v && e < M.gone) {
+          // lift まで机の上。lift〜tilt できーの口もとへ上がり、tilt〜gone で傾けて飲みほす(消える)
+          const k = Math.max(0, Math.min(1, (e - M.lift) / (M.tilt - M.lift)));
           const gx = sx + 8 + (TK_SEAT.x - 9 - (this.x + 8)) * k;
           const gy = sy - 9 + (TK_SEAT.y - 26 - (this.y - 9)) * k;
-          const tilt = e > 4.4 ? -Math.min(1, (e - 4.4) / 0.4) * 1.6 : 0;
+          const tilt = e > M.tilt ? -Math.min(1, (e - M.tilt) / 0.4) * 1.6 : 0;
           ctx.save();
           ctx.translate(Math.round(gx + 3), Math.round(gy + 4));
           ctx.rotate(tilt);
           ctx.drawImage(v, -3, -4);
           ctx.restore();
         }
-        if (e < 3.5 && Math.random() < 0.15) tkPuff(this.x - 4, this.y - 12, 0, -14, 1.2, 4);
+        if (e < M.steam && Math.random() < 0.15) tkPuff(this.x - 4, this.y - 12, 0, -14, 1.2, 4);
       },
     },
   ],
@@ -678,8 +742,6 @@ const TK_TURBINE = tkMap("turbine", 28, 12, {
 });
 
 // E 原子炉建屋(西から入る。北の二重扉の先が炉心)。赤い回転灯が回り、警報が鳴りっぱなし
-let tkAlarmT = -99;
-let tkDoorT0 = -1; // 二重扉が開きはじめた時刻(一度開いたら、開いたまま)
 const tkDoorOpen = (api) => api.flag("airlock");
 const TK_DOOR = { x0: 279, y0: 3, x1: 361, y1: 68, fx0: 262, fx1: 380 }; // 扉の板と、それが引きこまれる枠(背景の絵のドット)
 // 床に立つものは、きーとの前後を足もとの y で決める(fg_reactor。docs/assets/takarabune/fg_reactor.py)。
@@ -727,8 +789,8 @@ const TK_REACTOR = tkMap("reactor", 20, 16, {
     }
     ctx.fillStyle = `rgba(255, 30, 20, ${0.06 + 0.06 * Math.max(0, Math.sin(t * 6.4))})`;
     ctx.fillRect(ox, oy, 20 * T, 16 * T);
-    if (t - tkAlarmT > 3.2) {
-      tkAlarmT = t;
+    if (t - tkS.alarmT > 3.2) {
+      tkS.alarmT = t;
       api.bubble("alarm", "ウーー　ウーー", 2400); // 仮
     }
   },
@@ -753,13 +815,13 @@ const TK_REACTOR = tkMap("reactor", 20, 16, {
       headY: 0,
       interact(api) {
         if (tkDoorOpen(api)) return api.warp("core", "south");
-        tkDoorT0 = tkNow();
+        tkS.doorT0 = tkNow();
         api.setFlag("airlock");
         api.bubble("airlock", "ゴゴゴ……", 1200); // 仮
         api.freeze(0.9);
       },
       update(dt, t, api) {
-        if (!tkDoorOpen(api) || tkNow() - tkDoorT0 < 0.9) return;
+        if (!tkDoorOpen(api) || tkNow() - tkS.doorT0 < 0.9) return;
         const pl = api.player();
         const at = Math.abs(pl.x - this.x) < 0.9 * T && pl.y < 2.5 * T && pl.facing === "north";
         const still = this._ly === pl.y;
@@ -777,7 +839,7 @@ const TK_REACTOR = tkMap("reactor", 20, 16, {
         const ox = sx - this.x;
         const oy = sy - this.y;
         const D = TK_DOOR;
-        const u = tkDoorT0 < 0 ? 1 : Math.min(1, (tkNow() - tkDoorT0) / 0.9);
+        const u = tkS.doorT0 < 0 ? 1 : Math.min(1, (tkNow() - tkS.doorT0) / 0.9);
         const k = u * u * (3 - 2 * u);
         // 開いた奥: 暗がりと、炉心の青い光
         ctx.fillStyle = "#06080e";
@@ -797,8 +859,6 @@ const TK_REACTOR = tkMap("reactor", 20, 16, {
 });
 
 // F 格納容器の中(炉心)。行き止まり。ふたの開いた炉はプール。ふちで調べると飛び込んで、ペレットを抱えて上がってくる → 暗転して港へ(D88)
-let tkDiveT0 = -1;
-let tkDiveFrom = [8 * T, 10.4 * T]; // 飛び込んだ場所(ふちのどこからでも)
 const TK_DIVE = 2.4;
 // プールのふち(だ円)。きーにいちばん近いふちの点
 const TK_POOL = { cx: 8 * T, cy: 6 * T + 5, rx: 5 * T + 10, ry: 4 * T + 16 };
@@ -807,14 +867,14 @@ const tkRim = (x, y) => {
   return [TK_POOL.cx + TK_POOL.rx * Math.cos(a), TK_POOL.cy + TK_POOL.ry * Math.sin(a)];
 };
 const tkDive = (api) => {
-  if (tkDiveT0 >= 0) return;
+  if (tkS.diveT0 >= 0) return;
   const pl = api.player();
-  tkDiveFrom = [pl.x, pl.y];
-  tkDiveT0 = tkNow();
+  tkS.diveFrom = [pl.x, pl.y];
+  tkS.diveT0 = tkNow();
   TK_CORE._ki = api.image("ki");
   api.freeze(TK_DIVE + 0.2);
   api.later(TK_DIVE * 1000, () => {
-    tkDiveT0 = -1;
+    tkS.diveT0 = -1;
     // 上がってきたきーが、ペレットを頭の上に掲げる(D92)→ 名前 → 暗転して港へ
     api.hold("pellet", 1.8, () => {
       api.giveItem("ペレット");
@@ -826,10 +886,10 @@ const TK_CORE = tkMap("core", 16, 14, {
   spawns: { south: { x: 8 * T, y: 12.3 * T, facing: "north" } },
   drawOverlay(ctx, ox, oy, t) {
     tkLight(ctx, ox + 8 * T, oy + 6 * T, 7 * T, "120, 210, 255", 0.14 + 0.06 * Math.sin(t * 2.1));
-    if (tkDiveT0 < 0) return;
-    const e = tkNow() - tkDiveT0;
+    if (tkS.diveT0 < 0) return;
+    const e = tkNow() - tkS.diveT0;
     // 跳びこむ先: ふちから、プールの水の上へ 3 マス
-    const [fx, fy] = tkDiveFrom;
+    const [fx, fy] = tkS.diveFrom;
     const dx = TK_POOL.cx - fx;
     const dy = TK_POOL.cy - fy;
     const dl = Math.hypot(dx, dy) || 1;
@@ -875,7 +935,7 @@ const TK_CORE = tkMap("core", 16, 14, {
       h: 1,
       range: 54,
       headY: 30,
-      canInteract: (api) => !api.hasItem("ペレット") && !api.flag("cast") && tkDiveT0 < 0,
+      canInteract: (api) => !api.hasItem("ペレット") && !api.flag("cast") && tkS.diveT0 < 0,
       interact: (api) => tkDive(api),
       update(dt, t, api) {
         // ▼ と調べる場所を、きーにいちばん近いふちに置く
@@ -883,7 +943,7 @@ const TK_CORE = tkMap("core", 16, 14, {
         const [rx, ry] = tkRim(pl.x, pl.y);
         this.x = rx;
         this.y = ry;
-        if (api.hasItem("ペレット") || api.flag("cast") || tkDiveT0 >= 0) return;
+        if (api.hasItem("ペレット") || api.flag("cast") || tkS.diveT0 >= 0) return;
         // ふちで、水のほうを向いて立ち止まったまま(壁を押している)なら飛び込む
         const near = Math.hypot(pl.x - rx, pl.y - ry) < 26;
         const fx = { east: 1, west: -1 }[pl.facing] || 0;
@@ -904,7 +964,7 @@ const TK_CORE = tkMap("core", 16, 14, {
   ],
 });
 // 飛び込んでいるあいだは、きーを消す(水の中)
-Object.defineProperty(TK_CORE, "hidePlayer", { get: () => tkDiveT0 >= 0 });
+Object.defineProperty(TK_CORE, "hidePlayer", { get: () => tkS.diveT0 >= 0 });
 
 // 宝舟の機関室(舳先は東)。西にボイラー、まんなかに首振りエンジンの台、東にはしご(甲板へ)
 // 首振りエンジンは最初から据わっていて、コンロッドだけが欠けている(D92、D95)。コンロッドを取り付け、火室にペレットを入れると、圧力計の針が上がり、安全弁が鳴り、エンジンが動きだす
@@ -954,8 +1014,8 @@ const TK_ENGINE = tkMap("engineroom", 16, 10, {
       2.4 * T,
       6.6 * T,
       (api) => {
-        tkFireT0 = tkNow();
-        tkLastHalf = -1;
+        tkS.fireT0 = tkNow();
+        tkS.lastHalf = -1;
         api.setFlag("running");
         api.later(TK_PRESS * 1000 - 400, () => api.bubble("valve", "シューッ", 1600)); // 仮
       },
@@ -978,7 +1038,6 @@ const TK_ENGINE = tkMap("engineroom", 16, 10, {
 
 // G 宝舟の甲板。海が西へ流れる(舳先は東)。煙突から、エンジンが蒸気を吐くたびに湯気。外輪がかく水しぶき
 // 舳先で調べると、きーがペレットを海に投げ込む → 沈んで、底から青い光が広がる → 一枚絵(D88)
-let tkThrowT0 = -1;
 const tkDeckBob = () => Math.round(Math.sin(tkNow() * 1.3) * 1); // 甲板のゆれ
 const TK_DECK = {
   tile: T,
@@ -994,8 +1053,8 @@ const TK_DECK = {
       for (let x = -off - sea.width; x < 20 * T + sea.width; x += sea.width) ctx.drawImage(sea, Math.round(ox + x), oy, sea.width, 10 * T);
     }
     // ペレットが沈んだところから、青い光が広がる
-    if (tkThrowT0 > 0) {
-      const e = t - tkThrowT0 - 1.0;
+    if (tkS.throwT0 > 0) {
+      const e = t - tkS.throwT0 - 1.0;
       if (e > 0) {
         const r = 30 + 300 * Math.min(1, e / 3.2);
         tkLight(ctx, ox + 19.6 * T, oy + 5 * T, r, "60, 200, 255", Math.min(0.85, e / 1.4));
@@ -1017,8 +1076,8 @@ const TK_DECK = {
   },
   drawOverlay(ctx, ox, oy) {
     // ペレットを投げる(弧を描いて舳先の先の海へ)→ しぶき
-    if (tkThrowT0 < 0) return;
-    const e = tkNow() - tkThrowT0;
+    if (tkS.throwT0 < 0) return;
+    const e = tkNow() - tkS.throwT0;
     const x0 = ox + 17.4 * T;
     const y0 = oy + 4.4 * T;
     const x1 = ox + 19.6 * T;
@@ -1038,7 +1097,7 @@ const TK_DECK = {
   },
   spawns: { stern: { x: 4.8 * T, y: 6.5 * T, facing: "east" } },
   onEnter() {
-    tkThrowT0 = -1;
+    tkS.throwT0 = -1;
   },
   triggers: [],
   objects: [
@@ -1073,7 +1132,7 @@ const TK_DECK = {
       (api) => {
         api.setFlag("sowing");
         api.takeItem("ペレット");
-        tkThrowT0 = tkNow();
+        tkS.throwT0 = tkNow();
         TK_DECK._pel = api.image("pellet");
         // しぶきのあと、水の中へ。光りながら沈んでいくペレットを、水面から追いかけて最後の絵へ(D92)
         // 水面から寄ってきた絵が、そのままキメの一枚絵になる(A で閉じる)。一枚絵を出しなおさない(2026-10-03、作者「最後の絵の出方が2回でる」)
