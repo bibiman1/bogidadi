@@ -9,6 +9,19 @@
 // → 宝舟の機関室で部品を取り付け → ボイラーの火室にペレット → 首振りエンジンが動く → 甲板で沖へ → ペレットを海に投げ込む → 青く光る海(一枚絵)
 // → 港で「白紙の海図」。ペレットは一つで、鋳造・エンジン・海に使いまわす。西の坂道からいつでも帰れる。きーは警告に反応しない(D84)
 const TK_GRIDS = {
+  // 港湾ぼぎ(マトリョシカ)の食堂兼休憩所(D441)。北に調理場とカウンター、長い机 4 つとベンチ、東にだるまストーブ、南に戸口
+  canteen: [
+    "################",
+    "################",
+    "################",
+    "################",
+    "#########.######",
+    "######.......###",
+    "#..#..###...#..#",
+    "#..#..###...#..#",
+    "#..#........#..#",
+    "#########..#####",
+  ],
   port: [
     "############################",
     "############################",
@@ -276,6 +289,7 @@ const TK_PORT = tkMap("port", 28, 14, {
     east: { x: 26.4 * T, y: 4 * T, facing: "west" },
     boat: { x: 11.2 * T, y: 9.2 * T, facing: "south" },
     shop: { x: 5.6 * T, y: 7.9 * T, facing: "south" },
+    canteen: { x: 19 * T, y: 6.6 * T, facing: "south" },
   },
   drawOverlay(ctx, ox, oy, t, api) {
     // 宝舟のボイラーが焚けているあいだ、煙突から湯気(エンジンと同じ調子で)
@@ -311,6 +325,8 @@ const TK_PORT = tkMap("port", 28, 14, {
     tkFg("fg_port", 316, 318, 24, 64, 11.6 * T), // 煙突
     // 鋳物小屋(鋳造工房)の大戸
     tkSpot("shopDoor", 5.6 * T, 7.2 * T, (api) => api.warp("workshop", "door"), { range: 44 }),
+    // 灯りのついた小屋の戸口: 港湾ぼぎ(マトリョシカ)の食堂兼休憩所(D441)
+    tkSpot("canteenDoor", 19 * T, 6.2 * T, (api) => api.warp("canteen", "door"), { range: 44 }),
     // 宝舟: 乗りこむと機関室。沖から帰ってきたら、舵のそばに白紙の海図
     tkSpot(
       "boat",
@@ -378,6 +394,91 @@ const TK_WORKSHOP = tkMap("workshop", 16, 12, {
             api.hold("conrod", 1.8, () => api.giveItem("コンロッド"), { rot: -0.7 });
           }, { full: true })
         );
+      },
+    },
+  ],
+});
+
+// 港湾ぼぎの食堂兼休憩所(D441、作者「港湾ぼぎの食堂兼休憩所」「マトリョシカにして。わたしのスケッチ参考に。きーも飲食する。」「もつ煮とウォッカ」)
+// 食堂の人たちはマトリョシカ(作者のイメージボードのとおり、頭巾、丸い顔にほお紅、前かけの花。大きさがばらばら)。客は港湾ぼぎ(ヘルメット、手ぬぐい、ゴム長)。下絵(docs/assets/takarabune/canteen/)
+// おかみに話しかけると、きーは空いた席に座り、もつ煮とウォッカが出て、食べて飲む
+let tkMealT0 = -1;
+const TK_SEAT = { x: 8.2 * T, y: 8.4 * T }; // きーの席(まん中の机の手前のベンチ)。本番の絵(PixelLab)に合わせた
+const tkMatry = (id, img, x, y, voice, extra) =>
+  Object.assign(
+    {
+      id,
+      x,
+      y,
+      w: 1,
+      h: 1,
+      headY: 46,
+      range: 44,
+      draw(ctx, sx, sy, t, api) {
+        const im = api.image(img);
+        if (!im) return;
+        const sway = Math.sin(t * 1.4 + x) * 0.6; // 人形がかすかにゆれる
+        ctx.drawImage(im, Math.round(sx - im.width / 2 + sway), Math.round(sy - im.height));
+      },
+      interact: (api) => api.bubble(id, voice, 1400),
+    },
+    extra
+  );
+const TK_CANTEEN = tkMap("canteen", 16, 10, {
+  bg: "#1c140e",
+  spawns: { door: { x: 10 * T, y: 8.5 * T, facing: "north" } },
+  drawOverlay(ctx, ox, oy, t) {
+    // 天井の電灯と、ストーブのあたたかい灯り(絵の電灯の位置に合わせる)
+    tkLight(ctx, ox + 3.4 * T, oy + 3 * T, 150, "255, 200, 120", 0.16 + 0.02 * Math.sin(t * 3));
+    tkLight(ctx, ox + 7.6 * T, oy + 3.5 * T, 170, "255, 200, 120", 0.16);
+    tkLight(ctx, ox + 11.5 * T, oy + 3 * T, 150, "255, 200, 120", 0.14);
+    tkLight(ctx, ox + 14.3 * T, oy + 4.8 * T, 60, "255, 140, 60", 0.22 + 0.06 * Math.sin(t * 7));
+    // もつ煮の大鍋から湯気
+    if (Math.random() < 0.05) tkPuff(2.4 * T, 3.6 * T, (Math.random() - 0.5) * 6, -18, 1.6, 6);
+    tkDrawPuffs(ctx, ox, oy);
+  },
+  triggers: [{ id: "out", x: 9 * T, y: 9.6 * T, w: 2 * T, h: T, warp: { map: "port", spawn: "canteen" } }],
+  objects: [
+    // 食堂のおかみ(大きなマトリョシカ)。話しかけると、もつ煮とウォッカ
+    tkMatry("okami", "m_okami", 4.2 * T, 3.75 * T, "……", {
+      headY: 64,
+      range: 100,
+      interact(api) {
+        if (tkMealT0 > 0 && tkNow() - tkMealT0 < 7) return;
+        api.bubble("okami", "……", 1000);
+        api.later(900, () => {
+          api.place(TK_SEAT.x, TK_SEAT.y);
+          api.face("north");
+          api.freeze(6.2);
+          tkMealT0 = tkNow();
+          api.later(1200, () => api.mutter("もぐもぐ", 1300));
+          api.later(2900, () => api.mutter("もぐもぐ", 1100));
+          api.later(4400, () => api.mutter("くいっ", 1100)); // ウォッカ
+          api.later(5600, () => api.mutter("ふう", 1000));
+        });
+      },
+    }),
+    // 食堂の人たち(マトリョシカ): 手伝いは大鍋のそば、いちばん小さい子はカウンターの西のはし(D441)
+    tkMatry("mt_help", "m_mid2", 1.4 * T, 3.7 * T, "……"),
+    tkMatry("mt_small", "m_small2", 5.2 * T, 3.75 * T, "……"),
+    // 港湾ぼぎ(仕事帰りの客。ヘルメット、手ぬぐい、ゴム長): もつ煮を食べる / 湯のみで休む / 居眠り(D441)
+    tkMatry("w1", "w_eat", 6.9 * T, 8.4 * T, "もぐもぐ", { headY: 40 }),
+    tkMatry("w2", "w_tea", 11 * T, 5.6 * T, "ずず……", { headY: 40 }),
+    tkMatry("w3", "w_sleep", 13.7 * T, 7.6 * T, "Zzzzzzzz…", { headY: 40 }),
+    // きーの前に出る、もつ煮とウォッカ
+    {
+      id: "meal",
+      x: TK_SEAT.x,
+      y: 7.4 * T,
+      w: 1,
+      h: 1,
+      draw(ctx, sx, sy, t, api) {
+        if (tkMealT0 < 0 || tkNow() - tkMealT0 > 7) return;
+        const e = tkNow() - tkMealT0;
+        const b = api.image("c_motsu"), v = api.image("c_vodka");
+        if (b) ctx.drawImage(b, Math.round(sx - 12), Math.round(sy - 12));
+        if (v && e < 4.4) ctx.drawImage(v, Math.round(sx + 8), Math.round(sy - 9));
+        if (e < 3.5 && Math.random() < 0.15) tkPuff(this.x - 4, this.y - 12, 0, -14, 1.2, 4);
       },
     },
   ],
