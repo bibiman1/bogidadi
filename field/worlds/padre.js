@@ -79,13 +79,13 @@ const pStartShow = (api) => {
   api.freeze(1.2);
   api.bubble("padre", "カチ　カチ", 1200);
   api.later(1200, () =>
-    api.showSeq(["kami1", "kami2", "kami3", "kami4"], 2.8, () => {
+    api.showSeq(["kami1", "kami2", "kami3", "kami4"], 5.0, () => {
       // 紙芝居は黒く終わる。暗転のまま空き地に戻し(席から)、みんなが列になる
       pS.recut = true;
       api.cut("akichi", "seat");
       pS.phase = "gather";
       pS.t0 = pNow();
-    }, { slide: true })
+    }, { slide: true, slideSec: 1.4 }) // もっとゆっくり(D439): 1 枚 5 秒、抜くのに 1.4 秒
   );
 };
 const pImg = (key, x, y, extra) =>
@@ -267,7 +267,14 @@ const P_AKICHI = {
       g.addColorStop(0.5, `rgba(255, 246, 214, ${a * (0.85 + 0.15 * Math.sin(t * 3))})`);
       g.addColorStop(1, "rgba(255, 246, 214, 0)");
       ctx.fillStyle = g;
-      ctx.fillRect(X - 20, 0, 40, Y + 4);
+      // 地面との境は、まっすぐでなく円弧(地面に落ちた光の輪のふち。D439)
+      ctx.beginPath();
+      ctx.moveTo(X - 20, 0);
+      ctx.lineTo(X - 20, Y);
+      ctx.ellipse(X, Y, 20, 7, 0, Math.PI, 0, true);
+      ctx.lineTo(X + 20, 0);
+      ctx.closePath();
+      ctx.fill();
     }
   },
   // 紙芝居のあと、みんながのぼりきるまでは、道へ出られない(見届ける)

@@ -153,7 +153,7 @@ const ASSET_V = (() => {
         // 一枚絵を何枚か、ボタンを待たずに、ゆっくり重ねて移り変わらせる(最後の絵のあとで onDone)
         // opts.slide: 重ねずに、今の絵を右へすべらせて抜き、下の次の絵を見せる(紙芝居 D428)
         showSeq(keys, holdSec, onDone, opts) {
-          cutscene = { img: keys[0], seq: keys, hold: holdSec, t0: clock, onDone: onDone || null, full: true, slide: !!(opts && opts.slide) };
+          cutscene = { img: keys[0], seq: keys, hold: holdSec, t0: clock, onDone: onDone || null, full: true, slide: !!(opts && opts.slide), slideSec: (opts && opts.slideSec) || 0.6 };
         },
         // 見せ場のカメラワーク: keys は時刻(秒)ごとの中心 x, y と寄り z(1 がふつう、小さいほど引き)。
         // 最後の点のあと 1.2 秒でふつうのカメラに戻る。そのあいだ、きーは動かない。A で飛ばせる
@@ -1382,9 +1382,9 @@ const ASSET_V = (() => {
         ctx.globalAlpha = 1;
       };
       if (cutscene.slide) {
-        // 紙芝居: 終わりの 0.6 秒で、今の絵を右へ抜く(はじめゆっくり、だんだん速く)。下には次の絵
+        // 紙芝居: 終わりの slideSec 秒(ふつう 0.6 秒)で、今の絵を右へ抜く(はじめゆっくり、だんだん速く)。下には次の絵
         const left = cutscene.hold - into;
-        const sl = Math.min(0.6, cutscene.hold * 0.4);
+        const sl = Math.min(cutscene.slideSec, cutscene.hold * 0.4);
         if (left < sl && i + 1 < n) {
           const u = 1 - left / sl;
           put(cutscene.seq[i + 1], 1);

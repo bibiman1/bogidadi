@@ -1,7 +1,7 @@
 // 古い版が残らないように(ホーム画面に置いたとき、ページそのものが手元に残る)。index.html の中から、このファイルに出した(D301。ページの中に直接書いた script を禁止するため)
 // version.json(毎回取りにいく)の版がこのページとちがえば、URL を変えて読みなおす。版を上げるときは、下の数と version.json と ?v= をそろえる
 (function () {
-  var V = "404";
+  var V = "405";
   var key = "bogidachi.reloadedFor";
   function check(onlyIfSafe) {
     fetch("./version.json?t=" + Date.now(), { cache: "no-store" })
