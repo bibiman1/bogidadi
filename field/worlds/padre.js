@@ -330,7 +330,7 @@ const P_AKICHI = {
     },
     pImg("padre", P_CART.x, P_CART.y, {
       headY: 118,
-      solid: { w: 96, h: 18, dy: -8 },
+      solid: { w: 100, h: 18, dy: -8, dx: 34 }, // 絵の位置に合わせる(sx - 24 から 115 幅)
       range: 70,
       hidden: (api) => api.flag("gone"),
       img: () => (["gather", "queue", "ascend", "pi"].includes(pS.phase) ? "padre_fig_open" : "padre_fig"),
@@ -344,7 +344,7 @@ const P_AKICHI = {
           a = Math.max(0, 1 - u * 1.05);
         }
         ctx.globalAlpha = a;
-        ctx.drawImage(im, Math.round(sx - 56), Math.round(sy - im.height - dy)); // 自転車の位置は前のまま(針金の姿が右に立つ)
+        ctx.drawImage(im, Math.round(sx - 24), Math.round(sy - im.height - dy)); // 光の柱(P_HEAD)にかからないよう、右へ(D425 の本番の絵)
         ctx.globalAlpha = 1;
       },
       interact: (api) => api.bubble("padre", "カチ　カチ", 1400),
