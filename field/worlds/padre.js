@@ -233,7 +233,7 @@ const P_AKICHI = {
     ctx.fillStyle = lg;
     ctx.fillRect(ox + 10 * T - 70, oy + 1.35 * T - 70, 140, 140);
     pFog(ctx, ox, oy, 20 * T, t, 0.08);
-    if (!api.flag("gone")) pPadreDraw(ctx, ox + P_CART.x, oy + P_CART.y, api, 0.55);
+    if (!api.flag("gone")) pPadreDraw(ctx, ox + P_CART.x, oy + P_CART.y, api, 0.2);
     // 列の先頭に、空へのびる光の柱(列ができてから、ぱーでれがのぼりきるまで)
     if (["gather", "queue", "ascend", "pi", "leave"].includes(pS.phase)) {
       let a = 0.5;
