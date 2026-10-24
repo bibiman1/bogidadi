@@ -29,8 +29,8 @@ const TK_GRIDS = {
     "########################....",
     "########################....",
     "########################....",
-    "..#######..#####..#####.....",
-    "..#######...................",
+    "..#######..#####............",
+    "............................",
     "...##.......................",
     "............................",
     "............................",
@@ -308,6 +308,7 @@ const tkFg = (img, x0, y0, w, h, base, bob) => ({
     if (im) ctx.drawImage(im, x0, y0, w, h, sx - this.x + x0, sy - this.y + y0 + dy, w, h);
   },
 });
+const tkNorth = (api) => api.player().facing === "north";
 const tkWall = (x0, y0, x1, y1) => ({ id: `wall${x0}`, x: (x0 + x1) / 2, y: (y0 + y1) / 2, w: 1, h: 1, solid: { w: x1 - x0, h: y1 - y0 } });
 const TK_PORT = tkMap("port", 28, 14, {
   spawns: {
@@ -326,6 +327,9 @@ const TK_PORT = tkMap("port", 28, 14, {
     { id: "toGate", x: 27.6 * T, y: 2 * T, w: 1.4 * T, h: 4.6 * T, warp: { map: "gate", spawn: "west" } },
     // 西の坂道から、いつでも帰れる(D88)
     { id: "leave", x: -T, y: 5 * T, w: 1.45 * T, h: 3 * T, run: (api) => api.exit() },
+    // 戸のない黒い入口は、上を向いて歩いて重なれば入る(▼ と A はなし。前を横切っただけでは入らない。todo 154)
+    { id: "shopDoor", x: 145, y: 192, w: 63, h: 14, enabled: tkNorth, warp: { map: "workshop", spawn: "door" } }, // 鋳物小屋の大戸
+    { id: "canteenDoor", x: 598, y: 160, w: 24, h: 14, enabled: tkNorth, warp: { map: "canteen", spawn: "door" } }, // 食堂の戸口(D441)
   ],
   objects: [
     // 見届け: 青い光漁の光が沖へ消えるまで見ている(D189)
@@ -349,10 +353,15 @@ const TK_PORT = tkMap("port", 28, 14, {
     tkFg("fg_port", 472, 248, 13, 149, 11.6 * T), // 帆柱
     tkFg("fg_port", 602, 245, 140, 135, 11.6 * T), // 竜頭と首
     tkFg("fg_port", 316, 318, 24, 64, 11.6 * T), // 煙突
-    // 鋳物小屋(鋳造工房)の大戸
-    tkSpot("shopDoor", 5.6 * T, 7.2 * T, (api) => api.warp("workshop", "door"), { range: 44 }),
-    // 灯りのついた小屋の戸口: 港湾ぼぎ(マトリョシカ)の食堂兼休憩所(D441)
-    tkSpot("canteenDoor", 19 * T, 6.2 * T, (api) => api.warp("canteen", "door"), { range: 44 }),
+    // 建物の前は、絵の壁のふちに合わせてドット単位でふさぐ(マスのままだと、黒い入口の手前で止まった。todo 154)
+    // 鋳物小屋: 大戸の左右の壁、右の木箱、たらいの上半分
+    tkWall(64, 192, 141, 200),
+    tkWall(212, 192, 288, 200),
+    tkWall(221, 192, 250, 208),
+    tkWall(96, 208, 172, 224),
+    // 食堂: 戸口の左右の壁
+    tkWall(576, 160, 596, 170),
+    tkWall(624, 160, 736, 170),
     // 宝舟: 乗りこむと機関室。沖から帰ってきたら、舵のそばに白紙の海図
     tkSpot(
       "boat",
