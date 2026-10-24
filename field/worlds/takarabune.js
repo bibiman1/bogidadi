@@ -51,6 +51,19 @@ const TK_GRIDS = {
     "............................",
     "############################",
   ],
+  // 構内(正門と管理棟のあいだ。todo 152、作者「別な画面にして」): 北に管理棟の正面と扉、南は正門の裏(門のすきまだけ通れる)
+  yard: [
+    "####################",
+    "####################",
+    "####################",
+    "####################",
+    "#..................#",
+    "#..................#",
+    "#..................#",
+    "#..................#",
+    "#..................#",
+    "#########..#########",
+  ],
   admin: [
     "########################",
     "########################",
@@ -703,10 +716,30 @@ const TK_GATE = tkMap("gate", 28, 10, {
   },
   triggers: [
     { id: "toPort", x: -T, y: 6 * T, w: 1.45 * T, h: 3 * T, warp: { map: "port", spawn: "east" } },
-    { id: "toAdmin", x: 11 * T, y: -T, w: 4 * T, h: 1.45 * T, warp: { map: "admin", spawn: "south" } },
+    { id: "toYard", x: 11 * T, y: -T, w: 4 * T, h: 1.45 * T, warp: { map: "yard", spawn: "south" } },
   ],
   // 門の通り道(x 404〜432)の左右: 扉の足もとの線より奥を、段々にふさぐ
   objects: [...TK_GATE_FG, tkWall(352, 0, 378, 180), tkWall(378, 0, 404, 200), tkWall(432, 0, 455, 192), tkWall(455, 0, 480, 175)],
+});
+
+// B2 構内(todo 152): 正門を北へ抜けると、夜の発電所の敷地。北の管理棟の扉(緑の非常灯)から中へ。南の門のすきまから正門へ
+const TK_YARD = tkMap("yard", 20, 10, {
+  spawns: {
+    south: { x: 10 * T, y: 8.6 * T, facing: "north" },
+    door: { x: 10 * T, y: 4.5 * T, facing: "south" },
+  },
+  drawOverlay(ctx, ox, oy, t) {
+    tkLight(ctx, ox + 10 * T, oy + 2 * T + 11, 70, "90, 255, 140", 0.18 + 0.08 * Math.sin(t * 1.7)); // 扉の上の非常灯
+  },
+  triggers: [
+    { id: "toAdmin", x: 9 * T, y: 3 * T, w: 2 * T, h: 1.4 * T, warp: { map: "admin", spawn: "south" } },
+    { id: "toGate", x: 9 * T, y: 9.6 * T, w: 2 * T, h: T, warp: { map: "gate", spawn: "north" } },
+  ],
+  // 左右のフェンス(絵では奥ほど内側へ寄る)。絵のフェンスの線に合わせて、段々にふさぐ
+  objects: [
+    tkWall(0, 116, 52, 222), tkWall(0, 222, 46, 252), tkWall(0, 252, 34, 290),
+    tkWall(588, 116, 640, 222), tkWall(594, 222, 640, 252), tkWall(606, 252, 640, 290),
+  ],
 });
 
 // C 管理棟(南の玄関から入り、東の扉から出る)。非常灯の緑だけが、ゆっくり明滅する
@@ -720,7 +753,7 @@ const TK_ADMIN = tkMap("admin", 24, 12, {
     for (const [x, y] of [[23 * T, 7.2 * T], [5 * T, 10.7 * T], [9 * T, 1.2 * T]]) tkLight(ctx, ox + x, oy + y, 90, "90, 255, 140", a);
   },
   triggers: [
-    { id: "toGate", x: 4 * T, y: 11.5 * T, w: 2 * T, h: T, warp: { map: "gate", spawn: "north" } },
+    { id: "toYard", x: 4 * T, y: 11.5 * T, w: 2 * T, h: T, warp: { map: "yard", spawn: "door" } },
     { id: "toTurbine", x: 23.55 * T, y: 8 * T, w: 1.45 * T, h: 2 * T, warp: { map: "turbine", spawn: "west" } },
   ],
   objects: [],
