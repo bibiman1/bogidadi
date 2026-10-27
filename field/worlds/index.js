@@ -174,14 +174,14 @@ window.BOGI_WORLDS = {
     name: "宝舟と首振りエンジン",
     assetBase: "./assets/worlds/takarabune/",
     images: Object.fromEntries(
-      ["bg_port", "fg_port", "bg_workshop", "bg_gate", "fg_gate", "bg_admin", "bg_turbine", "fg_turbine", "bg_reactor", "fg_reactor", "bg_core", "bg_engineroom", "bg_deck", "fg_deck", "sea", "cyl", "fly", "bogi", "pellet", "conrod", "v_cast", "v_glow", "v_kaizu", "bg_canteen", "bg_yard", "m_okami", "m_mid1", "m_mid2", "m_small1", "m_small2", "c_motsu", "c_vodka", "w_eat", "w_tea", "w_sleep"]
+      ["bg_port", "fg_port", "bg_workshop", "bg_gate", "fg_gate", "bg_admin", "bg_turbine", "fg_turbine", "bg_reactor", "fg_reactor", "bg_core", "bg_engineroom", "bg_deck", "fg_deck", "sea", "cyl", "fly", "bogi", "pellet", "conrod", "v_cast", "v_glow", "v_kaizu", "bg_canteen", "bg_yard", "bg_amigoya", "m_okami", "m_mid1", "m_mid2", "m_small1", "m_small2", "c_motsu", "c_vodka", "w_eat", "w_tea", "w_sleep"]
         .map((k) => [k, `${k}.png`])
         .concat([["ki", "./assets/worlds/lake/ki_walk.png"]])
     ),
     playerSprite: { img: "ki", cell: 64, frames: 7, footY: 17 },
     start: "port",
     startSpawn: "start",
-    maps: { port: TK_PORT, workshop: TK_WORKSHOP, canteen: TK_CANTEEN, yard: TK_YARD, gate: TK_GATE, admin: TK_ADMIN, turbine: TK_TURBINE, reactor: TK_REACTOR, core: TK_CORE, engineroom: TK_ENGINE, deck: TK_DECK },
+    maps: { port: TK_PORT, workshop: TK_WORKSHOP, canteen: TK_CANTEEN, amigoya: TK_AMIGOYA, yard: TK_YARD, gate: TK_GATE, admin: TK_ADMIN, turbine: TK_TURBINE, reactor: TK_REACTOR, core: TK_CORE, engineroom: TK_ENGINE, deck: TK_DECK },
     onEnterWorld(api) {
       // 作り直し(D88)の前に遊んだ記録は、最初から遊び直せるように消す(古い道具「燃料」と、その流れのフラグ)
       if (!api.flag("v2")) {

@@ -95,7 +95,7 @@ const kLearn = (api, id, label) => {
   if (api.hasAbility(id)) return;
   api.learnAbility(id);
   api.sfx("chime");
-  api.toast(label, 3.2);
+  api.toast(`${label}　を　おぼえた`, 4); // 何を覚えたかを文字で(todo 156)
 };
 // 能力がないと入れない所(D201): 円(x, y, r)の中に入ると、何も言わずに外へはじき返す。
 // ok(api) が真なら通れる。when(api) が偽のあいだは、ふさがない
