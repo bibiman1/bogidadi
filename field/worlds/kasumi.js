@@ -214,7 +214,7 @@ function learnedJump(api) {
     crewHop(0); // クルーも一緒に跳ぶ
     api.setFlag("jumpLearned");
     api.learnAbility("jump"); // ここで習得。ほかのフィールドでも跳べるようになる
-    api.toast(`ジャンプ　を　おぼえた（${jumpKey()}）`, 4); // todo 156
+    api.bubble("player", `ジャンプ　を　おぼえた（${jumpKey()}）`, 4000); // きーの吹き出しで(todo 156、todo 161)
   });
 }
 const K_HANGAR = {

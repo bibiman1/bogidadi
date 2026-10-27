@@ -768,7 +768,7 @@ const TK_AMIGOYA = tkMap("amigoya", 14, 9, {
   dark: 1, // てらすがないと、きーのまわりのほかは何も見えない
   triggers: [{ id: "out", x: 6 * T, y: 8.55 * T, w: 2 * T, h: T, warp: { map: "port", spawn: "net" } }],
   objects: [
-    tkWall(14, 120, 108, 210), // 左の網の山(下の段)
+    tkWall(14, 96, 108, 210), // 左の網の山(上の丸い所まで。乗れないように)
     tkWall(372, 96, 432, 120), // 右の網の山
     tkWall(382, 150, 432, 200), // 浮き玉の棚
     tkWall(334, 226, 366, 238), // 長靴
