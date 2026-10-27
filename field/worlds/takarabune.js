@@ -346,19 +346,31 @@ const TK_PORT = tkMap("port", 28, 14, {
     { id: "netDoor", x: 423, y: 160, w: 22, h: 14, enabled: tkNorth, warp: { map: "amigoya", spawn: "door" } }, // 網小屋の戸口(D457)
   ],
   objects: [
-    // 見届け: 青い光漁の光が沖へ消えるまで見ている(D189)
-    kWatch({
-      id: "w_bluelight",
-      x: 11.2 * T,
-      y: 9.2 * T,
-      r: 2.6 * T,
-      sec: 6, lure: "120, 220, 255",
-      when: (api) => api.flag("glowed"),
-      fx(ctx, sx, sy, p, t) {
-        kGlowAt(ctx, sx + 1.5 * T + p * 7 * T, sy + 2.6 * T - p * 0.6 * T, 140 * (1 - p) + 14, "150, 230, 255", (1 - p) * 1);
-        kGlowAt(ctx, sx + 1.5 * T + p * 7 * T, sy + 2.6 * T - p * 0.6 * T, 40 * (1 - p) + 6, "235, 252, 255", (1 - p) * 0.9);
-      },
-    }),
+    // 青い光漁の光が沖へ消えていく(前の見届け。D462 で見届けは網小屋の大漁旗へ移した。景色として残す。呼ぶ光はなし)
+    Object.assign(
+      kWatch({
+        id: "s_bluelight",
+        keep: true, // 見届けたあとも景色として描く
+        x: 11.2 * T,
+        y: 9.2 * T,
+        r: 2.6 * T,
+        sec: 6,
+        when: (api) => api.flag("glowed"),
+        fx(ctx, sx, sy, p, t) {
+          kGlowAt(ctx, sx + 1.5 * T + p * 7 * T, sy + 2.6 * T - p * 0.6 * T, 140 * (1 - p) + 14, "150, 230, 255", (1 - p) * 1);
+          kGlowAt(ctx, sx + 1.5 * T + p * 7 * T, sy + 2.6 * T - p * 0.6 * T, 40 * (1 - p) + 6, "235, 252, 255", (1 - p) * 0.9);
+        },
+      }),
+      {
+        update(dt, t, api) {
+          const pl = api.player();
+          if (this.p >= 1) return; // 一度消えたら、そのまま
+          if (api.flag("glowed") && Math.hypot(pl.x - this.x, pl.y - this.y) < this.r) this.p = Math.min(1, this.p + dt / 6);
+          else this.p = Math.max(0, this.p - dt / 18);
+        },
+        r: 2.6 * T,
+      }
+    ),
     // 宝舟は岸壁より手前(水の上)。帆・帆柱・竜頭・煙突は、岸壁を歩くきーより手前に描く(fg_port。docs/assets/takarabune/fg_port.py)
     // 帆のうしろの岸壁は通れる。うしろに入ると、きーは帆に隠れる(2026-10-03、作者「帆の後ろは通り抜けるが、きーが隠れるはできる？」)
     // 竜頭と首のうしろの岸壁も通れて、うしろに入ると竜頭と首に隠れる(2026-10-03、作者「通りぬけるようにして」→「首と竜頭のうしろに隠れる」)
@@ -750,7 +762,7 @@ const TK_GATE = tkMap("gate", 28, 10, {
 
 // B2 構内(todo 152): 正門を北へ抜けると、夜の発電所の敷地。北の管理棟の扉(緑の非常灯)から中へ。南の門のすきまから正門へ
 // 網小屋の中(D457、todo 155): 宝舟の港の網小屋。真っ暗で、てらすがないと、きーのまわりしか見えない
-// 絵は PixelLab の案を手で直し、大漁旗(PixelLab の絵に手描きの字)を掛けた(docs/assets/takarabune/amigoya/finish.py)。持ち帰るものはない
+// 絵は PixelLab の案を手で直し、大漁旗(PixelLab の絵に手描きの字、赤白の放射。D461、flag_rays.py)を掛けた(docs/assets/takarabune/amigoya/finish.py)。持ち帰るものはない
 const TK_AMIGOYA = tkMap("amigoya", 14, 9, {
   spawns: { door: { x: 7 * T, y: 8.1 * T, facing: "north" } },
   dark: 1, // てらすがないと、きーのまわりのほかは何も見えない
@@ -760,6 +772,51 @@ const TK_AMIGOYA = tkMap("amigoya", 14, 9, {
     tkWall(372, 96, 432, 120), // 右の網の山
     tkWall(382, 150, 432, 200), // 浮き玉の棚
     tkWall(334, 226, 366, 238), // 長靴
+    // 見届け(D462): 大漁旗の前にいると、祝の丸から放射にそって、ほのかな光が旗いっぱいに広がり、ゆっくり消える(ちゃんの祝いの名残)
+    // 部屋は真っ暗なので、てらすがないと見届けられない(D201)。光は闇の上に描く(lit)
+    kWatch({
+      id: "w_flag",
+      x: 226,
+      y: 104,
+      r: 1.6 * T,
+      sec: 6,
+      lure: "255, 226, 170",
+      lit: true,
+      ly: 19 - 104, // 祝の丸
+      when: (api) => api.hasAbility("terasu") || api.flag("terasu"), // rpg.js の can("terasu") と同じ
+      fx(ctx, sx, sy, p) {
+        if (p <= 0) return;
+        const fx0 = sx - 66, fy0 = sy - 98; // 旗の左上(網小屋の絵の 160, 6)
+        const show = Math.min(1, p / 0.3) * (p < 0.6 ? 1 : 1 - (p - 0.6) / 0.4); // 光が強まり、また消える
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(fx0, fy0, 132, 88);
+        ctx.clip();
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = 1;
+        const cx = sx, cy = sy - 85; // 祝の丸
+        const R = 6 + Math.min(1, p / 0.7) * 110; // 光の輪が、放射にそって外へ走る
+        const a = 0.42 * show;
+        const out = R + 10;
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, out);
+        g.addColorStop(0, `rgba(255, 210, 140, ${a * 0.1})`);
+        g.addColorStop(Math.max(0, (R - 12) / out), `rgba(255, 210, 140, ${a * 0.08})`);
+        g.addColorStop(R / out, `rgba(255, 190, 90, ${a})`);
+        g.addColorStop(1, "rgba(255, 190, 90, 0)");
+        ctx.fillStyle = g;
+        for (let i = 0; i < 16; i++) {
+          // 放射の赤い筋(16 本)の向きだけ光らせる
+          const a0 = (2 * Math.PI * i) / 16 + Math.PI / 32;
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.arc(cx, cy, out, a0 - Math.PI / 32, a0 + Math.PI / 32);
+          ctx.closePath();
+          ctx.fill();
+        }
+        kGlowAt(ctx, cx, cy, 16, "255, 236, 200", a * 0.8); // 祝の丸のまわり
+        ctx.restore();
+      },
+    }),
   ],
 });
 const TK_YARD = tkMap("yard", 20, 10, {

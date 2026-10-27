@@ -1077,6 +1077,8 @@ const ASSET_V = (() => {
 
       if (map.drawOverlay) map.drawOverlay(ctx, ox, oy, t, world.api);
       if (map.dark) drawDark(ox, oy);
+      // 闇の上に描くもの(drawLit。暗い部屋で光る見届けなど)
+      if (map.dark) for (const d of drawables) if (d.o && d.o.drawLit) d.o.drawLit(ctx, Math.round(d.o.x + ox), Math.round(d.o.y + oy), t, world.api);
       if (map.wind) drawWind(ox, oy);
       // 夕方などの色: tintMul は掛け合わせ(暗く、色をのせる)、tint は上から薄く重ねる
       if (map.tintMul) {

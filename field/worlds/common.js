@@ -22,7 +22,13 @@ const kSparkle = (ctx, x, y, s, a, rgb) => {
   ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
 };
 // keep: 見届けたあとも呼ぶ光を残す(見届けとは別のしかけ。凍った湖のちゃんの座布団)
-const kWatch = ({ id, x, y, r, sec, when, fx, follow, lure, lx = 0, ly = -1.2 * T, keep, big }) => ({
+// lit: 暗いマップで、呼ぶ光と fx を闇の上に描く(宝舟の網小屋の大漁旗 D462)
+const kWatch = (o) => {
+  const w = kWatch0(o);
+  if (o.lit) [w.drawLit, w.drawOver] = [w.drawOver, undefined];
+  return w;
+};
+const kWatch0 = ({ id, x, y, r, sec, when, fx, follow, lure, lx = 0, ly = -1.2 * T, keep, big }) => ({
   id,
   x,
   y,
