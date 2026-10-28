@@ -9,6 +9,12 @@
 // 分が変わった瞬間は、時計を見上げて 2 回跳ぶ。絵は歩きの絵だけで、ほかはコードで動かす(rpg.js と同じやり方)
 const watchKi = new Image();
 watchKi.src = "./assets/worlds/lake/ki_walk.png";
+// ぴー(todo 163 の A): ときどき走ってきて、きーを押しのけ、きーのいた所で跳ぶかまわって、来た側へ去る。
+// 順番待ちのきーを押しのけるぱーでれのぴー(D425)と同じ性格
+const watchPi = new Image();
+watchPi.src = "./assets/worlds/lake/pi_walk.png";
+const wpi = { on: false, x: 0, y: 0, dir: 1, phase: "", t: 0, act: "hop", hops: 2, facing: "east", next: 30 };
+const W_PI = { first: [20, 40], again: [90, 180], speed: 230, push: 110 };
 const watch = { on: false, x: 0, y: 0, tx: 0, ty: 0, act: "rest", t: 0, dur: 0, hops: 0, facing: "south", moving: false, min: -1 };
 const W_ROW = { south: 0, north: 1, east: 2, west: 3 };
 const W_SPIN = ["south", "west", "north", "east"];
@@ -71,9 +77,63 @@ function toggleWatch(open = !watch.on) {
   if (open) {
     Object.assign(watch, { x: VW * 0.3, y: VH - 85, facing: "south", min: new Date().getMinutes() });
     watchSet("rest", 0.6);
+    wpi.on = false;
+    wpi.next = W_PI.first[0] + Math.random() * (W_PI.first[1] - W_PI.first[0]);
+  }
+}
+// ぴー: 来る → 押しのける → きーのいた所で跳ぶかまわる → 来た側へ去る
+function updateWatchPi(dt) {
+  if (!wpi.on) {
+    wpi.next -= dt;
+    if (wpi.next > 0 || (watch.act === "hop" && watch.facing === "north")) return; // 分の変わり目に跳んでいるあいだは来ない
+    wpi.dir = watch.x < VW / 2 ? -1 : 1; // きーから遠いほうのはしから来る(dir: 来る向き。-1 は右から左へ)
+    Object.assign(wpi, { on: true, x: wpi.dir > 0 ? -40 : VW + 40, y: watch.y, phase: "come", t: 0 });
+    return;
+  }
+  wpi.t += dt;
+  if (wpi.phase === "come") {
+    const dx = watch.x - wpi.x;
+    const dy = watch.y - wpi.y;
+    const d = Math.hypot(dx, dy);
+    wpi.facing = wpi.dir > 0 ? "east" : "west";
+    if (d < 34) {
+      // 押しのける: きーは進む向きへ飛ばされて、くるっと回る
+      const ox = watch.x;
+      const oy = watch.y;
+      watch.x = Math.max(60, Math.min(VW - 60, watch.x + wpi.dir * W_PI.push));
+      watch.tx = watch.x;
+      watch.ty = watch.y;
+      watchSet("spin", 0.6);
+      wpi.act = Math.random() < 0.6 ? "hop" : "spin";
+      wpi.hops = 2;
+      Object.assign(wpi, { x: ox, y: oy, phase: "act", t: 0, facing: "south" });
+      return;
+    }
+    const v = W_PI.speed * dt;
+    wpi.x += (dx / d) * Math.min(d, v);
+    wpi.y += (dy / d) * Math.min(d, v);
+    return;
+  }
+  // 押しのけられたあと(回り終えたら)、きーは、ぴーが見えなくなるまでぴーのほうを見ている
+  if (watch.act !== "spin") {
+    if (watch.act !== "look") watchSet("look", 9);
+    watch.facing = wpi.x < watch.x ? "west" : "east";
+  }
+  if (wpi.phase === "act") {
+    const dur = wpi.act === "hop" ? wpi.hops * W_HOP + 0.3 : 1.0;
+    if (wpi.t >= dur) Object.assign(wpi, { phase: "go", t: 0, facing: wpi.dir > 0 ? "west" : "east" });
+    return;
+  }
+  // 去る(来た側へ戻る。押しのけたきーの体を通り抜けないように)
+  wpi.x -= wpi.dir * W_PI.speed * dt;
+  if (wpi.x < -60 || wpi.x > VW + 60) {
+    wpi.on = false;
+    watchSet("look", 0.8); // 見送ったら、ふだんの動きに戻る
+    wpi.next = W_PI.again[0] + Math.random() * (W_PI.again[1] - W_PI.again[0]);
   }
 }
 function updateWatch(dt) {
+  updateWatchPi(dt);
   // 分が変わったら、時計を見上げて 2 回跳ぶ
   const m = new Date().getMinutes();
   if (m !== watch.min) {
@@ -116,6 +176,36 @@ function watchPose() {
   if (watch.act === "hop" && watch.t < watch.hops * W_HOP) jz = Math.sin(((watch.t % W_HOP) / W_HOP) * Math.PI) * 20;
   return { facing, jz, squash: watch.act === "squash" };
 }
+function watchPiPose() {
+  let facing = wpi.facing;
+  let jz = 0;
+  if (wpi.phase === "act" && wpi.act === "spin") facing = W_SPIN[Math.floor(wpi.t * 14) % 4];
+  if (wpi.phase === "act" && wpi.act === "hop" && wpi.t < wpi.hops * W_HOP) jz = Math.sin(((wpi.t % W_HOP) / W_HOP) * Math.PI) * 20;
+  return { facing, jz, squash: false };
+}
+// 影、体(歩きの絵の向きとこま)、浮き、つぶれ
+function drawWatchChar(c, t) {
+  const cell = 64;
+  const Z = 2;
+  ctx.fillStyle = "rgba(40, 50, 70, 0.25)";
+  ctx.beginPath();
+  ctx.ellipse(c.x, c.y + 2, 18, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  if (!c.img.complete || !c.img.naturalWidth) return;
+  const frame = c.moving ? 1 + (Math.floor(t * (c.run ? 18 : 10)) % 6) : 0;
+  const sx = frame * cell;
+  const sy = W_ROW[c.pose.facing] * cell;
+  ctx.imageSmoothingEnabled = false;
+  if (c.pose.squash) {
+    // ふんばる: つぶれて床に張りつく(ゲームと同じ。横に 1.35 倍、高さは半分)
+    const w = Math.round(cell * Z * 1.35);
+    const h = Math.round(cell * Z * 0.5);
+    ctx.drawImage(c.img, sx, sy, cell, cell, Math.round(c.x - w / 2), Math.round(c.y - (cell - 17) * Z * 0.5), w, h);
+  } else {
+    const jz = Math.round(c.pose.jz * Z); // 跳んでいる間は体だけ浮く(影は床に残る)
+    ctx.drawImage(c.img, sx, sy, cell, cell, Math.round(c.x - (cell * Z) / 2), Math.round(c.y - (cell - 17) * Z) - jz, cell * Z, cell * Z);
+  }
+}
 function drawWatch(t) {
   const P = window.bogiPix;
   ctx.save();
@@ -148,28 +238,11 @@ function drawWatch(t) {
   // AM / PM(ゲームウォッチのように、時刻の左上に小さく)
   const S2 = 3;
   P.text(ctx, h24 < 12 ? "AM" : "PM", Math.round((VW - total) / 2 / S2) * S2, y - 16 * S2 - 6, S2, ink);
-  // きー(ゲームと同じ 2 倍)
-  const cell = 64;
-  const Z = 2;
-  ctx.fillStyle = "rgba(40, 50, 70, 0.25)";
-  ctx.beginPath();
-  ctx.ellipse(watch.x, watch.y + 2, 18, 6, 0, 0, Math.PI * 2);
-  ctx.fill();
-  if (watchKi.complete && watchKi.naturalWidth) {
-    const pose = watchPose();
-    const frame = watch.moving ? 1 + (Math.floor(t * (watch.act === "run" ? 18 : 10)) % 6) : 0;
-    const sx = frame * cell;
-    const sy = W_ROW[pose.facing] * cell;
-    ctx.imageSmoothingEnabled = false;
-    if (pose.squash) {
-      // ふんばる: つぶれて床に張りつく(ゲームと同じ。横に 1.35 倍、高さは半分)
-      const w = Math.round(cell * Z * 1.35);
-      const h = Math.round(cell * Z * 0.5);
-      ctx.drawImage(watchKi, sx, sy, cell, cell, Math.round(watch.x - w / 2), Math.round(watch.y - (cell - 17) * Z * 0.5), w, h);
-    } else {
-      const jz = Math.round(pose.jz * Z); // 跳んでいる間は体だけ浮く(影は床に残る)
-      ctx.drawImage(watchKi, sx, sy, cell, cell, Math.round(watch.x - (cell * Z) / 2), Math.round(watch.y - (cell - 17) * Z) - jz, cell * Z, cell * Z);
-    }
-  }
+  // きーとぴー(ゲームと同じ 2 倍)。手前(下)にいるほうをあとに描く
+  const kiPose = watchPose();
+  const chars = [{ img: watchKi, x: watch.x, y: watch.y, pose: kiPose, moving: watch.moving, run: watch.act === "run" }];
+  if (wpi.on) chars.push({ img: watchPi, x: wpi.x, y: wpi.y, pose: watchPiPose(), moving: wpi.phase !== "act", run: true });
+  chars.sort((a, b) => a.y - b.y);
+  for (const c of chars) drawWatchChar(c, t);
   ctx.restore();
 }
