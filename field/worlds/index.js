@@ -61,6 +61,7 @@ window.BOGI_WORLDS = {
       wang_ice: "wang_ice.png",
       wang_floor: "wang_floor.png",
       fuji: "fuji.png",
+      fuji_wide: "fuji_wide.png",
       ki: "ki_walk.png",
       pi: "pi_walk.png",
       pi_tire: "pi_tire.png",
