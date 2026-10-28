@@ -168,8 +168,8 @@ const WANG16 = {"1101":[[0,0]],"1010":[[1,0]],"0100":[[2,0]],"1100":[[3,0]],"011
 const SPRITES = {
   pine: { img: "s_pine", w: 64, h: 96, top: 5, bottom: 88, solid: [14, 8] },
   bare: { img: "s_pine2", w: 64, h: 96, top: 17, bottom: 77, solid: [12, 8] },
-  car: { img: "s_car", w: 112, h: 80, top: 4, bottom: 74, solid: [90, 30] },
-  houtou: { img: "s_houtou", w: 224, h: 176, top: 6, bottom: 170, solid: [200, 60] },
+  car: { img: "s_car", w: 96, h: 64, top: 10, bottom: 57, solid: [64, 22] },
+  houtou: { img: "s_houtou", w: 160, h: 128, top: 10, bottom: 118, solid: [118, 44] },
   tires: { img: "s_tires", w: 64, h: 48, top: 8, bottom: 40, solid: [44, 12] },
   irori: { img: "k_irori", w: 128, h: 176, top: 0, bottom: 174, solid: [96, 84] },
   sign: { img: "s_sign_r", w: 32, h: 64, top: 1, bottom: 62, solid: [8, 6] },

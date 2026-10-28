@@ -524,37 +524,33 @@ const ROAD = {
 };
 
 // ---- 湖畔: 凍った湖、ちゃんの車、ほうとう屋 ----
-// 横 25 マス。車は湖と富士を真正面に向き(車の窓の一枚絵の見え方)、ほうとう屋は道の山側の兜造りの古民家(D466)
 const LAKE_GRID = [
-  "#########################",
-  "#########################",
-  "#########################",
-  "#########################",
-  "#########################",
-  "#########################",
-  "#########################",
-  "#########################",
-  ".........................",
-  "....iiiiiiiiiiiiiiii.....",
-  "..iiiiiiiiiiiiiiiiiiiii..",
-  ".iiiiiiiiiiiiiiiiiiiiiii.",
-  "iiiiiiiiiiiiiiiiiiiiiiiii",
-  ".iiiiiiiiiiiiiiiiiiiiiii.",
-  "...iiiiiiiiiiiiiiiiiiii..",
-  ".........................",
-  ".........................",
-  "=========================",
-  "=========================",
-  ".........................",
-  ".........................",
-  ".........................",
-  ".........................",
-  ".........................",
-  ".........................",
+  "###############",
+  "###############",
+  "###############",
+  "###############",
+  "###############",
+  "###############",
+  "###############",
+  "###############",
+  "...............",
+  ".iiiiiiiii.....",
+  "iiiiiiiiiii....",
+  "iiiiiiiiiii....",
+  "iiiiiiiiii.....",
+  ".iiiiiiii......",
+  "..iiiiii.......",
+  "...............",
+  "...............",
+  "===============",
+  "===============",
+  "...............",
+  "...............",
+  "...............",
 ];
 
-const houtou = at("houtou", 18 * T, 23.6 * T, { id: "houtou" });
-const GATE_X = 23.6 * T; // ほうとう屋の先の冬期通行止ゲート
+const houtou = at("houtou", 12 * T, 16.4 * T, { id: "houtou" });
+const GATE_X = 13.6 * T; // ほうとう屋の先の冬期通行止ゲート
 
 const LAKE = {
   tile: T,
@@ -571,12 +567,12 @@ const LAKE = {
     road: { img: "wang_road", size: 32, lookup: WANG16 },
     ice: { img: "wang_ice", size: 32, lookup: WANG16 },
   },
-  backdrop: { img: "fuji_wide", x: 0, y: 16, scale: 2 }, // 湖のまうえの横長の富士山(D466)
+  backdrop: { img: "fuji", x: 0, y: 16, scale: 2 },
   slippery(api, x, y) {
     return homeward(api) && y > 17 * T && y < 19 * T ? HOMEWARD_SLIP : false;
   },
   // ほうとう屋の先は冬期通行止: ゲートで行けない(ぶつかるとはじかれる)
-  rails: [[[GATE_X, 8 * T], [GATE_X, 25 * T]]],
+  rails: [[[GATE_X, 8 * T], [GATE_X, 22 * T]]],
   drawGround(ctx, ox, oy, img, api) {
     // 道の舗装は峠道と同じ粒のアスファルト(D282)。マス目の絵の格子の舗装の上から、土手のふちと舗装を敷く
     const asphalt = typeof img === "function" && img("road_asphalt");
@@ -585,14 +581,14 @@ const LAKE = {
       ctx.save();
       ctx.translate(ox, oy);
       ctx.fillStyle = "#c4dae6";
-      ctx.fillRect(0, 17 * T - 4, 25 * T, 2 * T + 8);
+      ctx.fillRect(0, 17 * T - 4, 16 * T, 2 * T + 8);
       ctx.fillStyle = this.pattern;
-      ctx.fillRect(0, 17 * T, 25 * T, 2 * T);
+      ctx.fillRect(0, 17 * T, 16 * T, 2 * T);
       ctx.restore();
     }
     if (api && homeward(api)) {
       ctx.fillStyle = "rgba(243, 246, 249, 0.88)";
-      ctx.fillRect(ox, 17 * T + oy, 25 * T, 2 * T);
+      ctx.fillRect(ox, 17 * T + oy, 16 * T, 2 * T);
     } else {
       centerLine(ctx, ox, oy, [[-T, 18 * T], [GATE_X - 6, 18 * T]]);
     }
@@ -602,7 +598,7 @@ const LAKE = {
     g.addColorStop(0, "rgba(244, 247, 250, 0.7)");
     g.addColorStop(1, "rgba(244, 247, 250, 1)");
     ctx.fillStyle = g;
-    ctx.fillRect(gx, 16.8 * T + oy, 25 * T - GATE_X, 2.4 * T);
+    ctx.fillRect(gx, 16.8 * T + oy, 16 * T - GATE_X, 2.4 * T);
     // ゲートバー(道を横切る、黄と黒のしま)と支柱
     const y0 = 16.6 * T + oy;
     const y1 = 19.4 * T + oy;
@@ -626,12 +622,12 @@ const LAKE = {
   },
   spawns: {
     west: { x: 0.9 * T, y: 18 * T, facing: "east" },
-    door: { x: 16 * T, y: 24.2 * T, facing: "south" },
+    door: { x: 9.3 * T, y: 17 * T, facing: "south" },
   },
   // 左の端から、ワインディングロードへ戻る
   triggers: [{ id: "toRoad", x: -T, y: 16.5 * T, w: 1.6 * T, h: 3 * T, warp: { map: "road", spawn: "pass" } }],
   objects: [
-    at("car", 12.5 * T, 16.6 * T, {
+    at("car", 2.6 * T, 16.7 * T, {
       id: "car",
       range: 44,
       interact(api) {
@@ -693,8 +689,8 @@ const LAKE = {
     // 見届け: 湖畔で、富士山に日が沈むまで待つ(D189)
     kWatch({
       id: "w_sunset",
-      x: 22.5 * T,
-      y: 9.2 * T,
+      x: 12.5 * T,
+      y: 11.5 * T,
       r: 2.4 * T,
       sec: 6, lure: "255, 170, 90",
       when: () => true,
@@ -707,8 +703,8 @@ const LAKE = {
     // のれんの前
     {
       id: "door",
-      x: 16 * T,
-      y: 23.4 * T,
+      x: 9.7 * T,
+      y: 16 * T,
       w: 1,
       h: 1,
       headY: 30,
@@ -724,21 +720,21 @@ const LAKE = {
       },
     },
     // 冬期通行止の看板(道ばた)
-    at("closed", 22.8 * T, 20.3 * T, {
+    at("closed", 12.6 * T, 20.3 * T, {
       id: "closed",
       range: 40,
       interact(api) {
         api.mutter("……");
       },
     }),
-    at("pine", 23.6 * T, 9 * T),
-    at("pine", 1.2 * T, 8.8 * T),
-    at("bare", 24.4 * T, 10 * T),
-    at("pine", 0.4 * T, 22 * T),
-    at("pine", 3.1 * T, 23.2 * T),
-    at("bare", 6.5 * T, 22 * T),
-    at("pine", 10.2 * T, 23.1 * T),
-    at("pine", 24 * T, 23.3 * T),
+    at("pine", 13.6 * T, 9 * T),
+    at("pine", 12.2 * T, 8.8 * T),
+    at("bare", 14.4 * T, 11 * T),
+    at("pine", 0.4 * T, 21 * T),
+    at("pine", 3.1 * T, 21.2 * T),
+    at("bare", 6.5 * T, 21 * T),
+    at("pine", 10.2 * T, 21.1 * T),
+    at("pine", 13.8 * T, 21.3 * T),
   ],
 };
 
