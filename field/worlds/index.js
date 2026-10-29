@@ -299,7 +299,7 @@ window.BOGI_WORLDS = {
     name: "ぱーでれとだいにち",
     assetBase: "./assets/worlds/padre/",
     images: Object.fromEntries(
-      ["bg_michi", "bg_akichi", "padre", "padre_open", "padre_fig", "padre_fig_open", "v_padre", "b_kobosi", "b_denden", "b_hato", "pb_1", "pb_2", "pb_3", "pb_4", "pb_5", "b_daruma", "b_tora", "b_inu", "pb_6", "pb_7", "pb_8", "pb_9", "pb_10", "i_ame", "kami1", "kami2", "kami3", "kami4", "t_zori", "fg_akichi_pole", "fg_akichi_pipes", "fg_michi_pole1", "fg_michi_pole2"]
+      ["bg_michi", "bg_akichi", "padre", "padre_open", "padre_fig", "padre_fig_open", "v_padre", "b_kobosi", "b_denden", "b_hato", "pb_1", "pb_2", "pb_3", "pb_4", "pb_5", "b_daruma", "b_tora", "b_inu", "pb_6", "pb_7", "pb_8", "pb_9", "pb_10", "i_ame", "kami1", "kami2", "kami3", "kami4", "kami_stage", "t_zori", "fg_akichi_pole", "fg_akichi_pipes", "fg_michi_pole1", "fg_michi_pole2"]
         .map((k) => [k, `${k}.png`])
         .concat([
           ["ki", "./assets/worlds/lake/ki_walk.png"],

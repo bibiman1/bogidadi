@@ -153,9 +153,10 @@ const ASSET_V = (() => {
           freezeUntil = clock + sec;
         },
         // 一枚絵を何枚か、ボタンを待たずに、ゆっくり重ねて移り変わらせる(最後の絵のあとで onDone)
-        // opts.slide: 重ねずに、今の絵を右へすべらせて抜き、下の次の絵を見せる(紙芝居 D428)
+        // opts.slide: 重ねずに、今の絵を横へすべらせて抜き、下の次の絵を見せる(紙芝居 D428)
+        // opts.stage: { frame: 舞台の絵, win: [x, y, w, h] }。舞台(木枠)は動かさず、窓の中の絵だけを観客から見て左へ抜く(D475)
         showSeq(keys, holdSec, onDone, opts) {
-          cutscene = { img: keys[0], seq: keys, hold: holdSec, t0: clock, onDone: onDone || null, full: true, slide: !!(opts && opts.slide), slideSec: (opts && opts.slideSec) || 0.6 };
+          cutscene = { img: keys[0], seq: keys, hold: holdSec, t0: clock, onDone: onDone || null, full: true, slide: !!(opts && opts.slide), slideSec: (opts && opts.slideSec) || 0.6, stage: (opts && opts.stage) || null };
         },
         // 見せ場のカメラワーク: keys は時刻(秒)ごとの中心 x, y と寄り z(1 がふつう、小さいほど引き)。
         // 最後の点のあと 1.2 秒でふつうのカメラに戻る。そのあいだ、きーは動かない。A で飛ばせる
@@ -1404,13 +1405,15 @@ const ASSET_V = (() => {
       ctx.fillRect(0, 0, VW, VH);
       const i = Math.floor(el / cutscene.hold);
       const into = el - i * cutscene.hold;
+      // 舞台(紙芝居の木枠)があるときは、木枠が切れないように画面の中におさめる。ふだんは画面いっぱい
+      const stageFit = (im) => (cutscene.stage ? Math.min : Math.max)(VW / im.width, VH / im.height);
       const put = (k, alpha, dx) => {
         // 動く一枚絵: world.anims に名前があれば、そのコマを時間で送る(例: B の最後の旗 D273)
         const an = world.anims && world.anims[k];
         if (an) k = an.frames[Math.floor(clock * an.fps) % an.frames.length];
         const im = img(k);
         if (!im) return;
-        const fit = Math.max(VW / im.width, VH / im.height);
+        const fit = stageFit(im);
         const c = cutBuf(im, Math.max(1, Math.ceil(fit)));
         const w = Math.round(im.width * fit);
         const h = Math.round(im.height * fit);
@@ -1422,13 +1425,34 @@ const ASSET_V = (() => {
         ctx.globalAlpha = 1;
       };
       if (cutscene.slide) {
-        // 紙芝居: 終わりの slideSec 秒(ふつう 0.6 秒)で、今の絵を右へ抜く(はじめゆっくり、だんだん速く)。下には次の絵
+        // 紙芝居: 終わりの slideSec 秒(ふつう 0.6 秒)で、今の絵を抜く(はじめゆっくり、だんだん速く)。下には次の絵
+        // stage があれば窓の中の絵だけを左へ、なければ一枚絵ごと右へ
         const left = cutscene.hold - into;
         const sl = Math.min(cutscene.slideSec, cutscene.hold * 0.4);
         if (left < sl && i + 1 < n) {
           const u = 1 - left / sl;
           put(cutscene.seq[i + 1], 1);
-          put(cutscene.seq[i], 1, u * u * VW);
+          const st = cutscene.stage;
+          const im = st && img(cutscene.seq[i]);
+          if (im) {
+            // 舞台の窓の中だけ、今の絵を左へ抜く。木枠は次の絵のまま動かない
+            const fit = stageFit(im);
+            const ox = (VW - im.width * fit) / 2, oy = (VH - im.height * fit) / 2;
+            const [wx, wy, ww, wh] = st.win;
+            const c = cutBuf(im, Math.max(1, Math.ceil(fit)));
+            const k = c.width / im.width;
+            const X = ox + wx * fit, Y = oy + wy * fit, Wd = ww * fit, Hd = wh * fit;
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(Math.round(X), Math.round(Y), Math.round(Wd), Math.round(Hd));
+            ctx.clip();
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+            ctx.drawImage(c, wx * k, wy * k, ww * k, wh * k, Math.round(X - u * u * Wd), Math.round(Y), Math.round(Wd), Math.round(Hd));
+            ctx.restore();
+            ctx.imageSmoothingEnabled = false;
+            put(st.frame, 1);
+          } else put(cutscene.seq[i], 1, u * u * VW);
         } else {
           put(cutscene.seq[i], 1);
           if (left < sl) {

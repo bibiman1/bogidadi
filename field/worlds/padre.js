@@ -85,7 +85,7 @@ const pStartShow = (api) => {
       api.cut("akichi", "seat");
       pS.phase = "gather";
       pS.t0 = pNow();
-    }, { slide: true, slideSec: 1.4 }) // もっとゆっくり(D439): 1 枚 5 秒、抜くのに 1.4 秒
+    }, { slide: true, slideSec: 1.4, stage: { frame: "kami_stage", win: [10, 23, 460, 244] } }) // もっとゆっくり(D439): 1 枚 5 秒、抜くのに 1.4 秒。木枠は止めて、絵だけを左へ抜く(D475、win は docs/assets/padre/kami_stage.py の WIN)
   );
 };
 const pImg = (key, x, y, extra) =>
