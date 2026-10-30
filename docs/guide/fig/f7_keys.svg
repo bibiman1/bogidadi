@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 610" width="1000" height="610" role="img" aria-label="図5 鍵の置き場所"><title>図5 鍵の置き場所</title><defs><marker id="ah" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#2b2622"/></marker><marker id="ahs" markerWidth="10" markerHeight="10" refX="2" refY="5" orient="auto"><path d="M10,0 L0,5 L10,10 z" fill="#2b2622"/></marker></defs><rect width="1000" height="610" fill="#fbf8f2"/>
+<text x="500" y="36" font-size="22" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">図5 鍵の置き場所。外注の鍵は claude.ai の 1 か所だけ</text>
+<rect x="20" y="130" width="190" height="150" rx="10" fill="#e8a066" stroke="#2b2622" stroke-width="2.5"/>
+<text x="115.0" y="160" font-size="20" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">作者</text>
+<text x="115.0" y="188.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">PixelLab で鍵を作る</text>
+<text x="115.0" y="208.3" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">claude.ai の環境に</text>
+<text x="115.0" y="228.6" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">登録する</text>
+<text x="115.0" y="248.9" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">チャットには貼らない</text>
+<rect x="250" y="95" width="420" height="370" rx="14" fill="#ffffff" stroke="#2b2622" stroke-width="2.5"/>
+<text x="268" y="124" font-size="17" font-weight="bold" text-anchor="start" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">Claude Code(claude.ai)</text>
+<rect x="270" y="150" width="150" height="110" rx="10" fill="#7fa8cf" stroke="#2b2622" stroke-width="2.5"/>
+<text x="345.0" y="180" font-size="20" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">AI(Claude)</text>
+<text x="345.0" y="208.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">鍵なしで頼む</text>
+<text x="345.0" y="228.3" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">鍵の値は見ない</text>
+<rect x="480" y="150" width="170" height="110" rx="10" fill="#f2d27a" stroke="#2b2622" stroke-width="2.5"/>
+<text x="565.0" y="180" font-size="20" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">通信の関所</text>
+<text x="565.0" y="208.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">ネットワークの秘密</text>
+<text x="565.0" y="228.3" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">ここで鍵を付ける</text>
+<line x1="422" y1="205" x2="478" y2="205" stroke="#2b2622" stroke-width="3" marker-end="url(#ah)"/>
+<rect x="750" y="150" width="230" height="110" rx="10" fill="#b99ac9" stroke="#2b2622" stroke-width="2.5"/>
+<text x="865.0" y="180" font-size="20" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">PixelLab</text>
+<text x="865.0" y="208.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">画像生成の API</text>
+<text x="865.0" y="228.3" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">(お金がかかる)</text>
+<line x1="652" y1="205" x2="748" y2="205" stroke="#2b2622" stroke-width="3" marker-end="url(#ah)"/>
+<text x="700.0" y="189.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">鍵つき</text>
+<path d="M 115 128 L 115 72 L 565 72 L 565 148" fill="none" stroke="#2b2622" stroke-width="3" marker-end="url(#ah)"/>
+<text x="338" y="64" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">鍵を登録(作者だけ。環境の設定で)</text>
+<rect x="270" y="290" width="380" height="100" rx="10" fill="#e4ddd2" stroke="#2b2622" stroke-width="2.5"/>
+<text x="460.0" y="320" font-size="17" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">コネクタ(PixelLab、GitHub)</text>
+<text x="460.0" y="348.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">ログインして許可しただけ。鍵の値はない</text>
+<text x="460" y="440" font-size="14" font-weight="normal" text-anchor="middle" fill="#8a8076" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">AI の作業場(使い捨て)に、鍵の値は入らない</text>
+<rect x="750" y="290" width="230" height="175" rx="10" fill="#86b98f" stroke="#2b2622" stroke-width="2.5"/>
+<text x="865.0" y="320" font-size="20" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">GitHub</text>
+<text x="865.0" y="348.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">project(非公開)</text>
+<text x="865.0" y="368.3" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">bogidadi(公開)</text>
+<text x="865.0" y="388.6" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">Secrets: 何も置かない</text>
+<text x="865.0" y="408.9" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">Claude が見るのはこの 2 つ</text>
+<line x1="672" y1="340" x2="748" y2="340" stroke="#2b2622" stroke-width="3" marker-end="url(#ah)" marker-start="url(#ahs)"/>
+<text x="710.0" y="324.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">push</text>
+<rect x="20" y="495" width="960" height="95" rx="10" fill="#e4ddd2" stroke="#2b2622" stroke-width="2"/>
+<text x="500" y="532.0" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">GitHub の Secrets は Actions(GitHub の中の自動処理)のための置き場。セッションからは読めないので、空のまま</text>
+<text x="500" y="553.75" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">公開サイト(Pages)は GitHub が自動で作る使い捨ての鍵で動く。漏れたら、PixelLab で作り直して登録しなおす</text>
+</svg>
