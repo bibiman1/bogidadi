@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 550" width="900" height="550" role="img" aria-label="図5 記録の置き場"><title>図5 記録の置き場</title><defs><marker id="ah" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#2b2622"/></marker><marker id="ahs" markerWidth="10" markerHeight="10" refX="2" refY="5" orient="auto"><path d="M10,0 L0,5 L10,10 z" fill="#2b2622"/></marker></defs><rect width="900" height="550" fill="#fbf8f2"/>
+<text x="450" y="36" font-size="22" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">図5 記録の置き場(AI の記憶をファイルにする)</text>
+<rect x="330" y="60" width="240" height="90" rx="10" fill="#f2d27a" stroke="#2b2622" stroke-width="2.5"/>
+<text x="450.0" y="90" font-size="20" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">CLAUDE.md</text>
+<text x="450.0" y="118.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">AI が最初に読む。短く、道案内</text>
+<rect x="30" y="200" width="190" height="110" rx="10" fill="#e8a066" stroke="#2b2622" stroke-width="2.5"/>
+<text x="125.0" y="230" font-size="18" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">bogidachi.md</text>
+<text x="125.0" y="258.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">世界観(正典)</text>
+<text x="125.0" y="278.3" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">作り方の決まり</text>
+<line x1="450" y1="150" x2="125" y2="198" stroke="#2b2622" stroke-width="3" marker-end="url(#ah)"/>
+<rect x="250" y="200" width="190" height="110" rx="10" fill="#7fa8cf" stroke="#2b2622" stroke-width="2.5"/>
+<text x="345.0" y="230" font-size="18" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">guide/</text>
+<text x="345.0" y="258.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">この指南書</text>
+<line x1="450" y1="150" x2="345" y2="198" stroke="#2b2622" stroke-width="3" marker-end="url(#ah)"/>
+<rect x="470" y="200" width="190" height="110" rx="10" fill="#7fa8cf" stroke="#2b2622" stroke-width="2.5"/>
+<text x="565.0" y="230" font-size="18" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">decisions.md</text>
+<text x="565.0" y="258.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">決定 D1〜</text>
+<text x="565.0" y="278.3" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">作者の言葉の原文</text>
+<line x1="450" y1="150" x2="565" y2="198" stroke="#2b2622" stroke-width="3" marker-end="url(#ah)"/>
+<rect x="690" y="200" width="190" height="110" rx="10" fill="#7fa8cf" stroke="#2b2622" stroke-width="2.5"/>
+<text x="785.0" y="230" font-size="18" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">author.md</text>
+<text x="785.0" y="258.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">作者の判断のくせ</text>
+<text x="785.0" y="278.3" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">(AI の観察)</text>
+<line x1="450" y1="150" x2="785" y2="198" stroke="#2b2622" stroke-width="3" marker-end="url(#ah)"/>
+<rect x="30" y="360" width="190" height="110" rx="10" fill="#e4ddd2" stroke="#2b2622" stroke-width="2.5"/>
+<text x="125.0" y="390" font-size="18" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">todo.md</text>
+<text x="125.0" y="418.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">指示のメモ</text>
+<text x="125.0" y="438.3" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">案と承認の状態</text>
+<rect x="250" y="360" width="190" height="110" rx="10" fill="#e4ddd2" stroke="#2b2622" stroke-width="2.5"/>
+<text x="345.0" y="390" font-size="18" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">diary/log/</text>
+<text x="345.0" y="418.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">作業ログ</text>
+<text x="345.0" y="438.3" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">(その日の原文)</text>
+<rect x="470" y="360" width="190" height="110" rx="10" fill="#e4ddd2" stroke="#2b2622" stroke-width="2.5"/>
+<text x="565.0" y="390" font-size="18" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">diary/</text>
+<text x="565.0" y="418.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">制作日記</text>
+<text x="565.0" y="438.3" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">(毎晩の読み物)</text>
+<rect x="690" y="360" width="190" height="110" rx="10" fill="#e4ddd2" stroke="#2b2622" stroke-width="2.5"/>
+<text x="785.0" y="390" font-size="18" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">record/</text>
+<text x="785.0" y="418.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">没の絵、試し絵</text>
+<text x="785.0" y="438.3" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">確かめた画面</text>
+<line x1="345" y1="495" x2="535" y2="495" stroke="#2b2622" stroke-width="3" marker-end="url(#ah)"/>
+<text x="440" y="530" font-size="14" font-weight="normal" text-anchor="middle" fill="#8a8076" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">毎晩、ログから日記へ</text>
+<text x="450" y="340" font-size="15" font-weight="normal" text-anchor="middle" fill="#8a8076" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">↑ 決まりと決定(長く残る)　　↓ 毎日の材料(たまっていく)</text>
+</svg>

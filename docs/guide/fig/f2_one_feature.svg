@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 640" width="900" height="640" role="img" aria-label="図3 1 つの機能ができるまで"><title>図3 1 つの機能ができるまで</title><defs><marker id="ah" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#2b2622"/></marker><marker id="ahs" markerWidth="10" markerHeight="10" refX="2" refY="5" orient="auto"><path d="M10,0 L0,5 L10,10 z" fill="#2b2622"/></marker></defs><rect width="900" height="640" fill="#fbf8f2"/>
+<text x="450" y="36" font-size="22" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">図3 1 つの機能ができるまで</text>
+<rect x="60" y="64" width="780" height="70" rx="10" fill="#e8a066" stroke="#2b2622" stroke-width="2.5"/>
+<text x="80" y="94" font-size="19" font-weight="bold" text-anchor="start" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">1 思いつきを短く送る</text>
+<text x="80" y="120" font-size="15" font-weight="normal" text-anchor="start" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">「ハンガーの中は畑になっており、爆弾を野菜の様に育てている」</text>
+<line x1="450" y1="134" x2="450" y2="154" stroke="#2b2622" stroke-width="3" marker-end="url(#ah)"/>
+<rect x="60" y="156" width="780" height="70" rx="10" fill="#7fa8cf" stroke="#2b2622" stroke-width="2.5"/>
+<text x="80" y="186" font-size="19" font-weight="bold" text-anchor="start" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">2 メモして、言いかえて返す</text>
+<text x="80" y="212" font-size="15" font-weight="normal" text-anchor="start" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">案 A〜C と、おすすめ。関係する決定の番号</text>
+<line x1="450" y1="226" x2="450" y2="246" stroke="#2b2622" stroke-width="3" marker-end="url(#ah)"/>
+<rect x="60" y="248" width="780" height="70" rx="10" fill="#e8a066" stroke="#2b2622" stroke-width="2.5"/>
+<text x="80" y="278" font-size="19" font-weight="bold" text-anchor="start" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">3 一言で決める</text>
+<text x="80" y="304" font-size="15" font-weight="normal" text-anchor="start" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">「A　きーが引き抜ける　世話は運び手のぼぎだぢ」「よい」</text>
+<line x1="450" y1="318" x2="450" y2="338" stroke="#2b2622" stroke-width="3" marker-end="url(#ah)"/>
+<rect x="60" y="340" width="780" height="70" rx="10" fill="#86b98f" stroke="#2b2622" stroke-width="2.5"/>
+<text x="80" y="370" font-size="19" font-weight="bold" text-anchor="start" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">4 「ここから実装します」</text>
+<text x="80" y="396" font-size="15" font-weight="normal" text-anchor="start" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">下絵 → 試し絵 →「よい」→(外注)→ 組み込み</text>
+<line x1="450" y1="410" x2="450" y2="430" stroke="#2b2622" stroke-width="3" marker-end="url(#ah)"/>
+<rect x="60" y="432" width="780" height="70" rx="10" fill="#86b98f" stroke="#2b2622" stroke-width="2.5"/>
+<text x="80" y="462" font-size="19" font-weight="bold" text-anchor="start" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">5 自分で遊んで確かめる</text>
+<text x="80" y="488" font-size="15" font-weight="normal" text-anchor="start" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">ヘッドレスのブラウザで場面まで進め、写真を見る → PR</text>
+<line x1="450" y1="502" x2="450" y2="522" stroke="#2b2622" stroke-width="3" marker-end="url(#ah)"/>
+<rect x="60" y="524" width="780" height="70" rx="10" fill="#e8a066" stroke="#2b2622" stroke-width="2.5"/>
+<text x="80" y="554" font-size="19" font-weight="bold" text-anchor="start" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">6 スマホで遊んで「マージ」</text>
+<text x="80" y="580" font-size="15" font-weight="normal" text-anchor="start" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">AI が取りこみ、公開版まで更新する</text>
+<rect x="60" y="602" width="14" height="14" rx="3" fill="#e8a066" stroke="#2b2622" stroke-width="1.5"/>
+<text x="80" y="614" font-size="14" font-weight="normal" text-anchor="start" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">作者</text>
+<rect x="140" y="602" width="14" height="14" rx="3" fill="#7fa8cf" stroke="#2b2622" stroke-width="1.5"/>
+<text x="160" y="614" font-size="14" font-weight="normal" text-anchor="start" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">ブリッジ</text>
+<rect x="240" y="602" width="14" height="14" rx="3" fill="#86b98f" stroke="#2b2622" stroke-width="1.5"/>
+<text x="260" y="614" font-size="14" font-weight="normal" text-anchor="start" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">コード</text>
+<text x="840" y="614" font-size="14" font-weight="normal" text-anchor="end" fill="#8a8076" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">実例: ハンガーの畑(10-21)</text>
+</svg>

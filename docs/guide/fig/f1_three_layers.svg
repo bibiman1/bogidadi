@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 480" width="980" height="480" role="img" aria-label="図2 三層の体制"><title>図2 三層の体制</title><defs><marker id="ah" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#2b2622"/></marker><marker id="ahs" markerWidth="10" markerHeight="10" refX="2" refY="5" orient="auto"><path d="M10,0 L0,5 L10,10 z" fill="#2b2622"/></marker></defs><rect width="980" height="480" fill="#fbf8f2"/>
+<text x="490" y="36" font-size="22" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">図2 三層の体制(人間 1 人 + 同じ AI が二役 + 絵の外注)</text>
+<rect x="20" y="80" width="190" height="250" rx="10" fill="#e8a066" stroke="#2b2622" stroke-width="2.5"/>
+<text x="115.0" y="110" font-size="20" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">作者(人間)</text>
+<text x="115.0" y="138.0" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">決める</text>
+<text x="115.0" y="159.75" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">・世界観、名前、文面</text>
+<text x="115.0" y="181.5" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">・良し悪し</text>
+<text x="115.0" y="203.25" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">・お金を使うか</text>
+<text x="115.0" y="225.0" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">・マージの合図</text>
+<text x="115.0" y="246.75" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">・スマホで遊ぶ</text>
+<rect x="285" y="66" width="410" height="270" rx="14" fill="#ffffff" stroke="#2b2622" stroke-width="2" stroke-dasharray="8 6"/>
+<text x="490" y="92" font-size="15" font-weight="normal" text-anchor="middle" fill="#8a8076" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">同じ AI(Claude)が役を切りかえる</text>
+<rect x="305" y="106" width="170" height="215" rx="10" fill="#7fa8cf" stroke="#2b2622" stroke-width="2.5"/>
+<text x="390.0" y="136" font-size="20" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">ブリッジ</text>
+<text x="390.0" y="164.0" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">聞いて言いかえる</text>
+<text x="390.0" y="185.75" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">・メモにためる</text>
+<text x="390.0" y="207.5" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">・案とおすすめ</text>
+<text x="390.0" y="229.25" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">・承認をもらう</text>
+<text x="390.0" y="251.0" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">・記録する</text>
+<rect x="505" y="106" width="170" height="215" rx="10" fill="#86b98f" stroke="#2b2622" stroke-width="2.5"/>
+<text x="590.0" y="136" font-size="20" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">コード</text>
+<text x="590.0" y="164.0" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">作る</text>
+<text x="590.0" y="185.75" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">・仕様どおり</text>
+<text x="590.0" y="207.5" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">・下絵</text>
+<text x="590.0" y="229.25" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">・画面で確かめる</text>
+<text x="590.0" y="251.0" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">・PR を出す</text>
+<rect x="770" y="80" width="190" height="250" rx="10" fill="#b99ac9" stroke="#2b2622" stroke-width="2.5"/>
+<text x="865.0" y="110" font-size="20" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">絵の外注</text>
+<text x="865.0" y="138.0" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">PixelLab</text>
+<text x="865.0" y="159.75" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">(画像生成 AI)</text>
+<text x="865.0" y="181.5" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">・下絵を仕上げる</text>
+<text x="865.0" y="203.25" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">・小物、キャラ</text>
+<text x="865.0" y="225.0" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif"></text>
+<text x="865.0" y="246.75" font-size="15" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">お金がかかる</text>
+<line x1="212" y1="170" x2="303" y2="170" stroke="#2b2622" stroke-width="3" marker-end="url(#ah)"/>
+<text x="257.5" y="158.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">指示</text>
+<line x1="303" y1="260" x2="214" y2="260" stroke="#2b2622" stroke-width="3" marker-end="url(#ah)"/>
+<text x="258.5" y="248.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">案・確認</text>
+<line x1="475" y1="210" x2="503" y2="210" stroke="#2b2622" stroke-width="3" marker-end="url(#ah)"/>
+<line x1="675" y1="170" x2="768" y2="170" stroke="#2b2622" stroke-width="3" marker-end="url(#ah)"/>
+<text x="721.5" y="158.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">下絵</text>
+<line x1="768" y1="260" x2="677" y2="260" stroke="#2b2622" stroke-width="3" marker-end="url(#ah)"/>
+<text x="722.5" y="248.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">絵</text>
+<rect x="20" y="360" width="940" height="95" rx="10" fill="#e4ddd2" stroke="#2b2622" stroke-width="2"/>
+<text x="490" y="393.0" font-size="17" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">いちばん上の決まり: 作者の言葉が正典。AI はつじつま合わせに設定を足さない</text>
+<text x="490" y="417.65" font-size="17" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">決めるのは人間。AI は案を番号で出し、おすすめを 1 つ、理由を添えて示す</text>
+</svg>

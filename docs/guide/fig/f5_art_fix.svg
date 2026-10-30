@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 360" width="900" height="360" role="img" aria-label="図6 絵の直しの手順"><title>図6 絵の直しの手順</title><defs><marker id="ah" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#2b2622"/></marker><marker id="ahs" markerWidth="10" markerHeight="10" refX="2" refY="5" orient="auto"><path d="M10,0 L0,5 L10,10 z" fill="#2b2622"/></marker></defs><rect width="900" height="360" fill="#fbf8f2"/>
+<text x="450" y="36" font-size="21" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">図6 絵の直しの手順(D375)。「よい」の前に、ゲームの絵は変えない</text>
+<rect x="20" y="70" width="150" height="170" rx="10" fill="#7fa8cf" stroke="#2b2622" stroke-width="2.5"/>
+<text x="95.0" y="100" font-size="20" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">受けとる</text>
+<text x="95.0" y="128.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">言いかえて返す</text>
+<text x="95.0" y="148.3" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">直す絵を全部挙げる</text>
+<text x="95.0" y="168.6" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">見本を先に見る</text>
+<line x1="170" y1="155" x2="194" y2="155" stroke="#2b2622" stroke-width="3" marker-end="url(#ah)"/>
+<rect x="196" y="70" width="150" height="170" rx="10" fill="#7fa8cf" stroke="#2b2622" stroke-width="2.5"/>
+<text x="271.0" y="100" font-size="20" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">試し絵</text>
+<text x="271.0" y="128.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">今と案を並べる</text>
+<text x="271.0" y="148.3" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">原寸と拡大</text>
+<text x="271.0" y="168.6" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">置かれる場所ごと</text>
+<line x1="346" y1="155" x2="370" y2="155" stroke="#2b2622" stroke-width="3" marker-end="url(#ah)"/>
+<rect x="372" y="70" width="150" height="170" rx="10" fill="#e8a066" stroke="#2b2622" stroke-width="2.5"/>
+<text x="447.0" y="100" font-size="20" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">承認</text>
+<text x="447.0" y="128.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">作者の</text>
+<text x="447.0" y="148.3" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">「よい」</text>
+<line x1="522" y1="155" x2="546" y2="155" stroke="#2b2622" stroke-width="3" marker-end="url(#ah)"/>
+<rect x="548" y="70" width="150" height="170" rx="10" fill="#86b98f" stroke="#2b2622" stroke-width="2.5"/>
+<text x="623.0" y="100" font-size="20" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">入れる</text>
+<text x="623.0" y="128.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">正の絵を 1 枚</text>
+<text x="623.0" y="148.3" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">足すより消す</text>
+<line x1="698" y1="155" x2="722" y2="155" stroke="#2b2622" stroke-width="3" marker-end="url(#ah)"/>
+<rect x="724" y="70" width="150" height="170" rx="10" fill="#86b98f" stroke="#2b2622" stroke-width="2.5"/>
+<text x="799.0" y="100" font-size="20" font-weight="bold" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">確かめる</text>
+<text x="799.0" y="128.0" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">入れたあとも</text>
+<text x="799.0" y="148.3" font-size="14" font-weight="normal" text-anchor="middle" fill="#2b2622" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">拡大して見る</text>
+<path d="M 447 242 C 447 305, 271 305, 271 246" fill="none" stroke="#d9695c" stroke-width="3" stroke-dasharray="7 5" marker-end="url(#ah)"/>
+<text x="359" y="330" font-size="15" font-weight="normal" text-anchor="middle" fill="#d9695c" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">「ちがう」なら、試し絵へ戻る</text>
+<text x="700" y="300" font-size="15" font-weight="normal" text-anchor="middle" fill="#8a8076" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">きっかけ: 1 日に同じ車の絵で 6 回の手戻り</text>
+<text x="700" y="324" font-size="15" font-weight="normal" text-anchor="middle" fill="#8a8076" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif">作者「一回話を聞いて。」「勝手に進めないで。」</text>
+</svg>
