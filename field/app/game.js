@@ -144,10 +144,20 @@ const rpg = window.createBogiRPG({
     // 懲罰空間の断片から、その断片の世界へ
     enterWorld(id) {
       if (!window.BOGI_WORLDS[id]) return;
-      transition(() => {
-        rpg.enter(window.BOGI_WORLDS[id]);
-        updateStatus();
-      });
+      const go = () =>
+        transition(() => {
+          rpg.enter(window.BOGI_WORLDS[id]);
+          updateStatus();
+        });
+      // 懲罰空間の断片から入るときは、まろうどに見られる(D493)。はじめての断片は長く、2 回目からは短く
+      const frags = window.BOGI_WORLDS[HUB].fragments || [];
+      if (rpg.isHub && frags.includes(id) && typeof maroudoPlay === "function") {
+        const key = `maroudo.${id}`;
+        const first = !gameState.flags[key];
+        gameState.flags[key] = true;
+        saveState();
+        maroudoPlay(first, go);
+      } else go();
     },
     // 断片の世界から、懲罰空間のその断片の前へ
     exit(id) {

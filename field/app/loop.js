@@ -38,6 +38,12 @@ function frame(timestamp) {
     drawWatch(t);
     return;
   }
+  if (maroudo.on) {
+    // まろうど(D493)のあいだは、ゲームを止めて画面の効果だけ描く
+    updateMaroudo(dt);
+    if (maroudo.on) drawMaroudo();
+    return;
+  }
   if (statusOpen) statusJoystick();
   else if (title.on) statusJoystick(titleInput); // タイトルの「つづきから」「さいしょから」も十字キーで選ぶ(スマホで選べなかった)
   if (story) {
