@@ -101,7 +101,7 @@ function titleInput(action) {
 }
 
 // 遊ぶ人に見せるバージョン(版の番号 version.json とは別。作者が決める)。タイトルの右下に小さく(作者「ぼぎだち　Var.1.0　にしておいて。タイトル画面にバージョン表記。」D297)
-const GAME_VERSION = "Ver.1.4"; // 断片を 1 つ更新して公開するたびに点のあとを 1 つ上げ、10 個の断片を一回りしたら Ver.2.0(D335)
+const GAME_VERSION = "Ver.1.5"; // 断片を 1 つ更新して公開するたびに点のあとを 1 つ上げ、10 個の断片を一回りしたら Ver.2.0(D335)
 function drawTitle(t) {
   if (!title.on) return;
   const P = window.bogiPix;

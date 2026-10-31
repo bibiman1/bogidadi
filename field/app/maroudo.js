@@ -1,7 +1,7 @@
-// まろうど(D492、D493): 懲罰空間から断片に入るとき、画面がブラウン管になり、ガラスに見ている人影が映りこみ、
+// まろうど(D492〜D494): 懲罰空間から断片に入るとき、画面がブラウン管になり、ガラスが照り返し、
 // 電源が切れるように横一本の線にしぼんで暗くなる。文字は出さない(D16)。画面の外の観測者は、ほのめかすだけ(D213)。
+// まろうど(客)は画面を見ているプレイヤー自身なので、人影は映さない(D494)。
 // はじめての断片は長く、2 回目からは短く。形と動きは docs/assets/void/maroudo_crt.py の試しと同じ。
-// 人影の形は docs/assets/void/maroudo_mask.py で作った絵(白 = 人影)。
 "use strict";
 
 const MAROUDO_FIRST = { crt: 0.6, zoom: 1.4, refl0: 1.0, refl1: 2.6, off: 2.6, end: 3.4 };
@@ -13,19 +13,6 @@ maroudoOut.width = MW;
 maroudoOut.height = MH;
 const maroudoOutCtx = maroudoOut.getContext("2d");
 const maroudoImg = maroudoOutCtx.createImageData(MW, MH);
-let maroudoFig = null; // 人影のマスク(MW x MH の 0/1)
-const maroudoFigImg = new Image();
-maroudoFigImg.onload = () => {
-  const c = document.createElement("canvas");
-  c.width = MW;
-  c.height = MH;
-  const g = c.getContext("2d");
-  g.drawImage(maroudoFigImg, 0, 0);
-  const d = g.getImageData(0, 0, MW, MH).data;
-  maroudoFig = new Uint8Array(MW * MH);
-  for (let i = 0; i < MW * MH; i++) maroudoFig[i] = d[i * 4 + 3] > 128 ? 1 : 0;
-};
-maroudoFigImg.src = "./assets/worlds/void/maroudo_figure.png";
 
 function maroudoEase(a) {
   a = Math.min(1, Math.max(0, a));
@@ -67,7 +54,7 @@ function updateMaroudo(dt) {
 }
 
 function drawMaroudo() {
-  const T = maroudo.T, t = maroudo.t, src = maroudo.src, fig = maroudoFig;
+  const T = maroudo.T, t = maroudo.t, src = maroudo.src;
   const out = maroudoImg.data;
   const cx = MW / 2, cy = MH / 2;
   const k = maroudoEase(t / T.crt);
@@ -75,7 +62,7 @@ function drawMaroudo() {
   const o = (t - T.off) / (T.end - T.off); // 電源が切れる
   const sqY = o > 0 ? 1 - 0.985 * maroudoEase(o / 0.55) : 1;
   const sqX = o > 0.55 ? 1 - 0.99 * maroudoEase((o - 0.55) / 0.35) : 1;
-  const a = Math.sin(Math.PI * Math.min(1, Math.max(0, (t - T.refl0) / (T.refl1 - T.refl0)))); // 映りこみ
+  const a = Math.sin(Math.PI * Math.min(1, Math.max(0, (t - T.refl0) / (T.refl1 - T.refl0)))); // ガラスの照り返し
   const glow = o > 0 ? Math.min(1, o / 0.4) : 0;
   const fadeOut = o > 0.9 ? Math.max(0, 1 - (o - 0.9) / 0.1) : 1;
   const corner = Math.max(0.18 * k, 1e-3);
@@ -109,19 +96,11 @@ function drawMaroudo() {
         r = src[j] * dark;
         g = src[j + 1] * dark;
         b = src[j + 2] * dark;
-        if (a > 0.01) {
-          const fx = Math.min(MW - 1, Math.max(0, Math.round(su * cx + cx)));
-          if (fig && fig[sy * MW + fx]) {
-            r = r * (1 - 0.3 * a) + 60 * 0.3 * a;
-            g = g * (1 - 0.3 * a) + 62 * 0.3 * a;
-            b = b * (1 - 0.3 * a) + 74 * 0.3 * a;
-          }
-          if (Math.abs(su + sv * 0.6 + 0.55) < 0.05) {
-            // ガラスの照り返し
-            r = r * (1 - 0.12 * a) + 255 * 0.12 * a;
-            g = g * (1 - 0.12 * a) + 255 * 0.12 * a;
-            b = b * (1 - 0.12 * a) + 255 * 0.12 * a;
-          }
+        if (a > 0.01 && Math.abs(su + sv * 0.6 + 0.55) < 0.05) {
+          // ガラスの照り返し
+          r = r * (1 - 0.12 * a) + 255 * 0.12 * a;
+          g = g * (1 - 0.12 * a) + 255 * 0.12 * a;
+          b = b * (1 - 0.12 * a) + 255 * 0.12 * a;
         }
         if (glow > 0) {
           r = (r * (1 - glow) + 236 * glow) * fadeOut;
