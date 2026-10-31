@@ -44,7 +44,7 @@ function fragment(id, title, text, icon, col, row, tier) {
       headY: 86,
       solid: { w: 44, h: 18, dy: -8 },
       range: 46,
-      // 台座は、はじめから 10 並んでいる(空の台座 D229)。断片が現れると模型が置かれ、終えると灯り、見届けるといっそう明るく灯る
+      // 台座は、はじめから 11 並んでいる(空の台座 D229)。断片が現れると模型が置かれ、終えると灯り、見届けるといっそう明るく灯る
       canInteract: (api) => present(api) && found(api),
       interact(api) {
         api.enterWorld(id);
@@ -102,6 +102,7 @@ const VOID_FRAGMENTS = [
   fragment("padre", "ぱーでれとだいにち", "カチ　カチ。", "frag_padre", 12, 8, 4), // 説明の文面は仮
   fragment("kinsei", "きこりと金星", "無風、92気圧、456℃、雲。", "frag_kinsei", 26, 8, 4), // D179
   fragment("bomber", "ぼぎボマーと地上ぼぎクルー", "REMOVE BEFORE FLIGHT", "frag_bomber", 34, 8, 4), // 説明の文面は仮
+  fragment("keiji", "形而アップダウンクイズ", "これは何？", "frag_keiji", 18, 5, 5), // 5 段目に、この断片だけ(D505)。扉の手前。説明の文面は仮
 ];
 
 const VOID_DOOR = { x: 22 * T, y: 4 * T }; // 扉の足もと。いちばん北、まん中の通り道の突き当たり(D257)
@@ -203,7 +204,7 @@ const VOID = {
       },
     },
     {
-      // 閉ざされた扉(D229、D232): いちばん北の奥(D257)。10 の台座がそろうと開き、その先にボタンの部屋がある
+      // 閉ざされた扉(D229、D232): いちばん北の奥(D257)。すべての台座(11。D503)がそろうと開き、その先にボタンの部屋がある
       id: "door",
       x: VOID_DOOR.x,
       y: VOID_DOOR.y,

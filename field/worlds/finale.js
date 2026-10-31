@@ -8,7 +8,7 @@
 // → きーが押せば B。押さずに待つと(D232)、そのあいだにちゃんの痕跡が浮かぶ(執着の誘い D174)
 //   観測がそろっていれば C(懲罰空間の 10 の台座が灯り、白にとける)。そろっていなければ、きこりが突っ込んできて押す(B)
 // → 一枚絵 → スタッフロール(C は作者のイメージボード)→ おわり → 懲罰空間へ
-// 観測(D189): 断片ごとの「見届け」(kWatch、api.observe)。10 の断片すべてで見届けていれば C。?debug&endc で C を見られる
+// 観測(D189): 断片ごとの「見届け」(kWatch、api.observe)。すべての断片(11。D503)で見届けていれば C。?debug&endc で C を見られる
 const fObservedAll = (api) => /[?&]endc\b/.test(location.search) || VOID_FRAGMENTS.every((f) => api.observed(f.id));
 const fS = { phase: "room", t0: 0, ending: "b", touchAt: -9 };
 const fNow = () => performance.now() / 1000;
@@ -167,8 +167,8 @@ const fCab = ([cx, cy], i) => ({
 // 赤い丸を覗く(D240、D249): 赤い丸の中に、分かれ道の絵記号が一つずつ浮かぶ。
 // 上にボタン。そこから二つに分かれ、上の段は電源オン(かりそめの再建 D247)→ 欠けた月→丸い月、こわれた町→元の町、ぼぎ→置物。
 // 下の段は電源オフ(遠い未来の再会)→ 目、砂時計と∞、ちゃんときーの再会。下の段は見届けの数で少しずつ開き、まだのものは「?」
-const F_OFF_NEED = [3, 7, 10]; // 目、砂時計と∞、再会が開く見届けの数
-const fObservedN = (api) => (/[?&]endc\b/.test(location.search) ? 10 : VOID_FRAGMENTS.filter((f) => api.observed(f.id)).length);
+const F_OFF_NEED = [3, 7, VOID_FRAGMENTS.length]; // 目、砂時計と∞、再会が開く見届けの数(再会はすべて。断片が 11 になった D503)
+const fObservedN = (api) => (/[?&]endc\b/.test(location.search) ? VOID_FRAGMENTS.length : VOID_FRAGMENTS.filter((f) => api.observed(f.id)).length);
 const fDrawPeek = (ctx, api) => {
   if (!fS.peek) return;
   const now = fNow();
@@ -587,7 +587,7 @@ const F_HUB = {
 // スタッフロール(D171、D172)
 // B(電源オン): 絵を出さない簡素な字だけのロール。ロールのあいだは操作できない。終わったらタイトルへ(D277)
 // C: 作者のイメージボード(pic/ の手描き)だけを額で流す(D284、D285。docs/assets/finale/roll_sketch.py)
-const F_ROLL_ITEMS = ["凍った湖と富士山", "アンバリッド・ホテル", "霞ヶ浦のエクラノプラン", "南極のバナナ農園", "荒川の鈴木商店", "宝舟と首振りエンジン", "呪いの野犬", "ぱーでれとだいにち", "きこりと金星", "ぼぎボマーと地上ぼぎクルー"];
+const F_ROLL_ITEMS = ["凍った湖と富士山", "アンバリッド・ホテル", "霞ヶ浦のエクラノプラン", "南極のバナナ農園", "荒川の鈴木商店", "宝舟と首振りエンジン", "呪いの野犬", "ぱーでれとだいにち", "きこりと金星", "ぼぎボマーと地上ぼぎクルー", "形而アップダウンクイズ"];
 // C のスタッフロールの文字(D286)。スケッチ 1 枚ごとに 1 組、絵の反対側に出す
 // 作者「人間の作者、あなた、pixelラボ、スペシャルサンクス、GitHubとか、適当に役目を割り当てて」
 const F_CREDITS = [
@@ -680,7 +680,7 @@ const F_ROLL = {
     // C: 作者のイメージボード(手描き)だけを、額に入れて流す。断片の名も、最後の写真も出さない(D284、D285)
     const fw = 160 * S;
     const fh = 112 * S;
-    const items = F_ROLL_ITEMS.map((_, i) => `roll_${String(i).padStart(2, "0")}`);
+    const items = F_ROLL_ITEMS.slice(0, 10).map((_, i) => `roll_${String(i).padStart(2, "0")}`); // 作者のスケッチは 10 枚(11 番目の断片のぶんは、まだない)
     items.forEach((key, i) => {
       const y = y0 + 90 * S + i * (fh + 40 * S);
       if (y < -fh - 40 * S || y > VHc + 10) return;

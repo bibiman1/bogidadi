@@ -59,6 +59,7 @@ const ST_FLAGS = {
   noroi: { custom: "", fudaKept: "", nrRound: "", ponponGone: "", seeOffDone: "", stripSeen: "", won: "", pinHigh: "", observed: "見届けた" },
   padre: { ending_oneness: "", gone: "", taken: "", observed: "見届けた" },
   bomber: { cap: "", loadSeen: "", ribbonBlown: "", observed: "見届けた" },
+  keiji: { lit: "明かりがついた(露出のあと)", observed: "見届けた" },
 };
 const stFlagWorld = () => (rpg.isHub ? stMenu.fw : rpg.worldId);
 function stFlagRows() {

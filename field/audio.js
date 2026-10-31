@@ -22,6 +22,10 @@
   let want = null; // まだ有効になる前に頼まれた BGM
   const buffers = {};
   const level = (v) => (v / 5) ** 2;
+  let warpK = 0; // BGM のくるい(0 はくるわない)。形而アップダウンクイズの不気味さ
+  function bgmWarp(k) {
+    warpK = k || 0;
+  }
   function save() {
     try {
       localStorage.setItem(KEY, JSON.stringify(vol));
@@ -99,6 +103,13 @@
   // 旋律を音の部品で鳴らす(ファイルなし)。ぱーでれの断片の「遠き山に日は落ちて」(ドヴォルザーク「新世界より」第 2 楽章の旋律。D432)
   // 霧の向こうから聞こえるように、やわらかい音、こもった音色、こだま。1 回ごとに間をあけてくり返す
   const MELODIES = {
+    // 形而アップダウンクイズのスタジオ(仮)。番組の、はずむ合いの手。不気味さで、テンポと音程がくるう(bgmWarp)
+    keiji: {
+      beat: 0.22,
+      gap: 1.4,
+      base: 392,
+      notes: [[0, 1], [4, 1], [7, 1], [12, 2], [7, 1], [9, 1], [7, 2], [4, 1], [5, 1], [7, 1], [4, 2], [2, 1], [0, 3]],
+    },
     padre: {
       beat: 0.92,
       gap: 7,
@@ -166,10 +177,12 @@
       while (next < ctx.currentTime + 2) {
         let t = next;
         for (const [semi, b] of m.notes) {
-          note(semi, t, b * m.beat);
-          t += b * m.beat;
+          // 不気味さ(形而アップダウンクイズ D509): 拍がのびちぢみし、音程がずれる。warpK = 0 ならいつもどおり
+          const bt = b * m.beat * (warpK ? 1 + warpK * 0.14 * (Math.random() * 2 - 0.6) : 1);
+          note(semi + (warpK >= 3 ? (Math.random() - 0.5) * warpK * 0.6 : 0), t, bt);
+          t += bt;
         }
-        next += total;
+        next = Math.max(t + m.gap, next + total * (warpK ? 0.5 : 1));
       }
     };
     out.start = () => {
@@ -318,6 +331,10 @@
     s.start(t);
   }
   const SYNTH = {
+    clap: () => {
+      // 空の客席の拍手(こだま)。短い雑音を、ばらばらにいくつも
+      for (let k = 0; k < 14; k++) noise(0.03, 0.18, 2600, k * 0.05 + Math.random() * 0.04);
+    },
     hyoshigi: () => (tone("square", 1400, 900, 0.05, 0.3), noise(0.04, 0.4, 4000)),
     clang: () => (tone("square", 880, 860, 0.18, 0.15), tone("sine", 1760, 1700, 0.25, 0.1)),
     boom: () => (noise(1.2, 0.9, 260), tone("sine", 70, 30, 1.0, 0.6)),
@@ -338,6 +355,11 @@
     // メニュー: カーソル、決める、もどる
     cursor: () => tone("square", 1320, 1320, 0.035, 0.07),
     ok: () => (tone("square", 990, 990, 0.05, 0.08), tone("square", 1480, 1480, 0.07, 0.08, 0.05)),
+    // ピンポン: クイズの解答者が答えた(形而アップダウンクイズ D513)
+    pinpon: () => (tone("sine", 1320, 1320, 0.16, 0.16), tone("sine", 1040, 1040, 0.3, 0.16, 0.16)),
+    // 問いの合図(D517): ふつうの問いは明るく、よくわからない問いは濁る
+    kjNorm: () => (tone("triangle", 880, 880, 0.12, 0.12), tone("triangle", 1320, 1320, 0.18, 0.12, 0.1)),
+    kjOdd: () => (tone("sawtooth", 233, 220, 0.5, 0.1), tone("sawtooth", 247, 262, 0.5, 0.1), tone("sine", 117, 110, 0.6, 0.12)),
     back: () => (tone("square", 990, 990, 0.05, 0.07), tone("square", 660, 660, 0.07, 0.07, 0.05)),
     // 紙をめくる音(雑誌 D325、D326)
     page: () => paper(),
@@ -537,5 +559,5 @@
       sfxGain.gain.value = level(vol.sfx) * 0.7;
     }
   }
-  window.bogiAudio = { bgm, bgmLevel, sfx, fromText, setVolume, volume: vol, unlock, race: { start: raceStart, set: raceSet, stop: raceStop, kind: () => race && race.kind }, state: () => ({ ctx: ctx && ctx.state, bgm: cur && cur.key, level: placeLv }) };
+  window.bogiAudio = { bgm, bgmLevel, bgmWarp, sfx, fromText, setVolume, volume: vol, unlock, race: { start: raceStart, set: raceSet, stop: raceStop, kind: () => race && race.kind }, state: () => ({ ctx: ctx && ctx.state, bgm: cur && cur.key, level: placeLv }) };
 })();

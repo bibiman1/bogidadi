@@ -8,11 +8,11 @@ window.BOGI_WORLDS = {
     id: "void",
     name: "懲罰空間",
     hub: true,
-    fragments: ["lake", "haihei", "kasumi", "banana", "suzuki", "takarabune", "noroi", "padre", "kinsei", "bomber"],
+    fragments: ["lake", "haihei", "kasumi", "banana", "suzuki", "takarabune", "noroi", "padre", "kinsei", "bomber", "keiji"],
     fragmentTexts: Object.fromEntries(VOID_FRAGMENTS.map((f) => [f.id, f.text])),
     // おもいで(todo 32 の A): 断片を終えると持ち帰る物。ステータスの「おもいで」に、見届けたしるしと並べて出す
-    souvenirs: { lake: "氷のかけら", haihei: "おたかぽっぽ", kasumi: "蓮の花", banana: "マンゴー", suzuki: "納品書", takarabune: "白紙の海図", noroi: "クラブの札", padre: "水あめのわりばし", kinsei: "焼けたピザのひと切れ", bomber: "安全ピンのリボン" },
-    souvenirIcons: { 氷のかけら: "ic_kori", おたかぽっぽ: "ic_poppo", 蓮の花: "ic_hasu", マンゴー: "ic_mango", 納品書: "ic_nouhin", 白紙の海図: "ic_kaizu", クラブの札: "ic_fuda", 水あめのわりばし: "ic_ame", 焼けたピザのひと切れ: "ic_slice", 安全ピンのリボン: "ic_ribbon" },
+    souvenirs: { lake: "氷のかけら", haihei: "おたかぽっぽ", kasumi: "蓮の花", banana: "マンゴー", suzuki: "納品書", takarabune: "白紙の海図", noroi: "クラブの札", padre: "水あめのわりばし", kinsei: "焼けたピザのひと切れ", bomber: "安全ピンのリボン", keiji: "白紙の解答札" },
+    souvenirIcons: { 氷のかけら: "ic_kori", おたかぽっぽ: "ic_poppo", 蓮の花: "ic_hasu", マンゴー: "ic_mango", 納品書: "ic_nouhin", 白紙の海図: "ic_kaizu", クラブの札: "ic_fuda", 水あめのわりばし: "ic_ame", 焼けたピザのひと切れ: "ic_slice", 安全ピンのリボン: "ic_ribbon", 白紙の解答札: "ic_kaitou" },
     // 断片の中の謎解きに使う物。その断片にいる間だけ「どうぐ」に出る
     puzzleItems: { 伝票: "suzuki", 荷札: "suzuki", スタンプ台紙: "haihei", ペレット: "takarabune", コンロッド: "takarabune", リプレイ券: "noroi" }, // リプレイ券(D366)は呪いの野犬にいる間だけ
     assetBase: "./assets/worlds/void/",
@@ -29,6 +29,7 @@ window.BOGI_WORLDS = {
       frag_padre: "frag_padre.png",
       frag_kinsei: "frag_kinsei.png",
       frag_bomber: "frag_bomber.png",
+      frag_keiji: "frag_keiji.png",
       // 太宰治全集が 10 冊そろったとき、カメラが引いて月の裏側が見える(D215)
       v_pull1: "./assets/worlds/finale/v_pull1.png",
       v_pull1c: "./assets/worlds/finale/v_pull1c.png",
@@ -341,6 +342,30 @@ window.BOGI_WORLDS = {
       nS.fuelT0 = -1;
     },
   },
+  // 断片: 形而アップダウンクイズ(D503〜D516。keiji.js)。絵は PixelLab(D516)
+  keiji: {
+    id: "keiji",
+    name: "形而アップダウンクイズ",
+    assetBase: "./assets/worlds/keiji/",
+    images: Object.fromEntries(
+      ["u1", "u2", "u3", "u4", "u5", "u6", "matryo", "matryo_s", "matryo_xs", "booth", "kj_show", "kj_studio"]
+        .map((k) => [k, `${k}.png`])
+        .concat([
+          ["ki", "./assets/worlds/lake/ki_walk.png"],
+          ["pi", "./assets/worlds/lake/pi_walk.png"],
+          ["tetsubin", "./assets/worlds/suzuki/tetsubin.png"],
+          ["goron", "./assets/worlds/banana/goron.png"],
+          ["kikikori", "./assets/worlds/banana/kikikori.png"],
+        ])
+    ),
+    playerSprite: { img: "ki", cell: 64, frames: 7, footY: 17 },
+    start: "studio",
+    startSpawn: "start",
+    maps: { studio: KJ_STUDIO, show: KJ_SHOW },
+    onEnterWorld() {
+      kjReset();
+    },
+  },
 };
 
 // 太宰治全集(D214): 小さなメダルのように、断片に 1 冊ずつ隠れている文庫本。近くに寄ると、かすかに光る。
@@ -395,7 +420,7 @@ window.BOGI_DAZAI = DAZAI_BOOKS;
 // おもいでのアイコン(D200): どの世界でも、手に入れたときに掲げて見せられるように、全部の世界に読みこむ
 // 能力で開く所の小物(D201〜D203): 踏み台(ホテル)、倒れた荷車(鈴木商店)、砂の吹きだまり(呪いの野犬)、草むら(ぼぎボマー)
 const ABILITY_PROPS = ["fumidai", "niguruma", "kusa", "bunko", "shelf"];
-const OMOIDE_ICONS = ["ic_bunko", "ic_kori", "ic_poppo", "ic_hasu", "ic_mango", "ic_nouhin", "ic_kaizu", "ic_fuda", "ic_ame", "ic_slice", "ic_ribbon"];
+const OMOIDE_ICONS = ["ic_bunko", "ic_kori", "ic_poppo", "ic_hasu", "ic_mango", "ic_nouhin", "ic_kaizu", "ic_fuda", "ic_ame", "ic_slice", "ic_ribbon", "ic_kaitou"];
 for (const w of Object.values(window.BOGI_WORLDS)) {
   w.images = w.images || {};
   for (const k of OMOIDE_ICONS) w.images[k] = `./assets/icons/${k}.png`;
