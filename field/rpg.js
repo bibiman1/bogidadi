@@ -1750,10 +1750,14 @@ const ASSET_V = (() => {
       `16px ${document.fonts && document.fonts.check("16px DotGothic16") ? '"DotGothic16", ' : ""}"Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif`;
     const meas = document.createElement("canvas").getContext("2d");
     const cache = new Map();
+    // ことばの切りかえ(D487): 文字はすべてここを通るので、入口で英語に訳す(i18n.js)
+    const tr = (s) => (window.bogiLang ? window.bogiLang.tr(s) : s);
+
     if (document.fonts && document.fonts.load) {
       document.fonts.load("16px DotGothic16").then(() => cache.clear()).catch(() => {});
     }
     function width(text) {
+      text = tr(text);
       meas.font = font();
       return Math.ceil(meas.measureText(text).width);
     }
@@ -1786,6 +1790,7 @@ const ASSET_V = (() => {
       return top;
     }
     function glyphs(text, color = "#ffffff") {
+      text = tr(text);
       const key = `${color}|${text}`;
       let c = cache.get(key);
       if (c) return c;
@@ -1852,8 +1857,23 @@ const ASSET_V = (() => {
     // 1 倍の幅 maxW で折り返した行の配列(改行も守る)
     function wrap(str, maxW) {
       meas.font = font();
+      str = tr(str);
       const lines = [];
+      const en = window.bogiLang && window.bogiLang.get() === "en";
       for (const para of String(str).split("\n")) {
+        if (en) {
+          // 英語は単語の切れ目で分ける(長すぎる単語だけ文字で切る)
+          let line = "";
+          for (const word of para.split(" ")) {
+            const next = line ? line + " " + word : word;
+            if (line && meas.measureText(next).width > maxW) {
+              lines.push(line);
+              line = word;
+            } else line = next;
+          }
+          lines.push(line);
+          continue;
+        }
         let line = "";
         for (const ch of para) {
           if (line && meas.measureText(line + ch).width > maxW) {

@@ -12,9 +12,10 @@ const ST_FONT = () => "";
 const stTmpCtx = { measureText: (t) => ({ width: window.bogiPix.width(t) }), set font(v) {} };
 function stText(text, x, y, color = "#ffffff", maxW = 999) {
   const P = window.bogiPix;
-  let t = text;
+  const full = window.bogiLang ? window.bogiLang.tr(text) : text; // 削る前に訳す(D487)
+  let t = full;
   while (t.length > 1 && P.width(t) > maxW) t = t.slice(0, -1);
-  if (t !== text) t = t.slice(0, -1) + "…";
+  if (t !== full) t = t.slice(0, -1) + "…";
   P.text(stCtx, t, x, y, 1, color);
 }
 // 白い二重枠の窓(角を 1 ドット落とす)
@@ -30,6 +31,7 @@ const ST_CMDS = [
   { key: "memories", label: "おもいで" },
   { key: "skills", label: "とくぎ" },
   { key: "sound", label: "おと" }, // BGM と効果音の大きさ(D195)
+  { key: "lang", label: "Language" }, // 日本語 / English(D487)。どちらの言葉でも読めるよう、名前は英語のまま
   { key: "save", label: "セーブ" }, // いる場所を記録する(D262、todo 55)。進み具合は前から自動で記録している
   // テストプレイ用: すべての条件を満たす(D294。灰色の字)。公開版では出さず、?debug のときだけ(D301)
   // フラグ(D385): 断片の旗を一つずつ ON / OFF、断片をはじめから。これも ?debug のときだけ
@@ -110,7 +112,9 @@ function stRows(key) {
     // 太宰治全集(D267): その断片の 1 冊を拾ったか。拾っていれば本、まだなら薄い本の影
     const bk = (window.BOGI_DAZAI || []).find((b) => b.w === id);
     const book = bk ? (gameState.flags[`${id}.dazai`] ? "got" : "miss") : null;
-    const note = done ? [texts[id], thing ? `「${thing}」` : null, book === "got" ? `『${bk.title}』` : null].filter(Boolean).join("　") : null;
+    const L = window.bogiLang;
+    const tr = (s) => (L ? L.tr(s) : s);
+    const note = done ? [tr(texts[id]), thing ? tr(`「${thing}」`) : null, book === "got" ? tr(`『${bk.title}』`) : null].filter(Boolean).join(L && L.get() === "en" ? " " : "　") : null;
     return { text: window.BOGI_WORLDS[id].name, done, mark: done ? (seen ? "✦" : "……") : null, note, icon, book };
   });
 }
@@ -170,6 +174,16 @@ function renderStatus() {
       stText("■".repeat(v) + "□".repeat(5 - v), 200, ty, v ? "#ffffff" : "#8a8a8a");
     });
     stText("左右で　かえる", 300, 262, "#8a8a8a");
+  } else if (stMenu.mode === "lang") {
+    // ことば(D487): 上下で選び、A で決める。絵の中の文字は日本語のまま
+    const now = window.bogiLang ? window.bogiLang.get() : "ja";
+    stWindow(12, 138, 456, 150);
+    stText("Language", 28, 150);
+    [["ja", "日本語"], ["en", "English"]].forEach(([k, label], i) => {
+      const ty = 184 + i * 32;
+      if (stMenu.cur === i) stCursor(28, ty + 2);
+      stText(label, 50, ty, now === k ? "#ffffff" : "#8a8a8a");
+    });
   } else if (stMenu.mode === "grant") {
     // テストプレイ用: すべての条件を満たす
     stWindow(12, 138, 456, 150);
@@ -226,10 +240,12 @@ function renderStatus() {
       // 行の数に合わせて窓をのばす(作品名まで入ると 3 行におさまらず切れていた。2026-10-10、作者「文字が切れて読めない」)
       // アイコン(持ち帰った物)の横の 2 行はせまく、その下は窓の幅いっぱいに
       const P = window.bogiPix;
-      let lines = P.wrap(sel.note, sel.icon ? 106 : 146);
+      const note = window.bogiLang ? window.bogiLang.tr(sel.note) : sel.note;
+      const en = window.bogiLang && window.bogiLang.get() === "en";
+      let lines = P.wrap(note, sel.icon ? 106 : 146);
       if (sel.icon && lines.length > 2) {
         const head = lines.slice(0, 2);
-        lines = head.concat(P.wrap(sel.note.slice(head.join("").length), 146));
+        lines = head.concat(P.wrap(note.slice(head.join(en ? " " : "").length).trimStart(), 146));
       }
       const lh = lines.length > 5 ? 18 : 21;
       const h = Math.min(132, 22 + lines.length * lh);
@@ -276,8 +292,8 @@ function statusInput(action) {
     else if (action === "a") {
       const k = ST_CMDS[stMenu.cmd].key;
       if (k === "save") saveHere();
-      stMenu.mode = k === "reset" || k === "sound" || k === "save" || k === "grant" ? k : "list";
-      stMenu.cur = 0;
+      stMenu.mode = k === "reset" || k === "sound" || k === "save" || k === "grant" || k === "lang" ? k : "list";
+      stMenu.cur = k === "lang" && window.bogiLang && window.bogiLang.get() === "en" ? 1 : 0;
       stMenu.fw = null;
     } else if (action === "b" || action === "c") return toggleStatus(false);
   } else if (stMenu.mode === "save") {
@@ -290,6 +306,12 @@ function statusInput(action) {
       A.setVolume(k, A.volume[k] + (action === "right" ? 1 : -1));
       if (k === "sfx") A.sfx("pop");
     } else if (action === "b" || action === "c" || action === "a") stMenu.mode = "top";
+  } else if (stMenu.mode === "lang") {
+    if (action === "up" || action === "down") stMenu.cur = 1 - stMenu.cur;
+    else if (action === "a") {
+      if (window.bogiLang) window.bogiLang.set(stMenu.cur === 1 ? "en" : "ja");
+      stMenu.mode = "top";
+    } else if (action === "b" || action === "c") stMenu.mode = "top";
   } else if (stMenu.mode === "grant") {
     if (stMenu.cur === 2) stMenu.mode = "top"; // 「そろえました」は、どのボタンでも閉じる
     else if (action === "left" || action === "right" || action === "up" || action === "down") stMenu.cur = 1 - stMenu.cur;

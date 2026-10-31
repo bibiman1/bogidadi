@@ -168,10 +168,11 @@ function updateStatus() {
   const hub = window.BOGI_WORLDS[HUB];
   const frags = hub.fragments || [];
   const found = frags.filter((id) => gameState.flags[`${HUB}.found.${id}`]).length;
-  progressText.textContent = rpg.isHub ? `見つけた断片: ${found} / ${frags.length}` : `断片のなか: ${rpg.worldName}`;
+  const tr = (s) => (window.bogiLang ? window.bogiLang.tr(s) : s);
+  progressText.textContent = tr(rpg.isHub ? `見つけた断片: ${found} / ${frags.length}` : `断片のなか: ${rpg.worldName}`);
   const parts = [];
   if (gameState.items.length) parts.push(`もちもの: ${gameState.items.join("、")}`);
   if (gameState.words.length) parts.push(`ことば: ${gameState.words.join("、")}`);
-  inventoryText.textContent = parts.join("　／　");
+  inventoryText.textContent = parts.map(tr).join(window.bogiLang && window.bogiLang.get() === "en" ? "  /  " : "　／　");
   inventoryText.hidden = parts.length === 0;
 }

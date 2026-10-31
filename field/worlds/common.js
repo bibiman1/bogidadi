@@ -156,6 +156,7 @@ const kWord = (ctx, text, x, y, a, color = "#fff6d8") => {
   ctx.lineWidth = 3;
   ctx.strokeStyle = "rgba(30, 30, 40, 0.8)";
   ctx.fillStyle = color;
+  if (window.bogiLang) text = window.bogiLang.tr(text); // ことばの切りかえ(D487)
   ctx.strokeText(text, x, y);
   ctx.fillText(text, x, y);
   ctx.restore();

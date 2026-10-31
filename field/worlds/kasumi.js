@@ -324,7 +324,7 @@ const repairCrew = (id, img, fx, fy, phase) =>
       ctx.fillStyle = "#fff6d8";
       const ty = sy - this.h / 2 - 4 - k * 8;
       ctx.strokeText("カン", sx + 12, ty);
-      ctx.fillText("カン", sx + 12, ty);
+      ctx.fillText(window.bogiLang ? window.bogiLang.tr("カン") : "カン", sx + 12, ty);
       ctx.fillStyle = "#ffe27a";
       ctx.fillRect(sx + 9, sy - 2, 2, 2);
       ctx.restore();

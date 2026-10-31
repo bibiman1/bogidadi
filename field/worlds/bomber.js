@@ -262,7 +262,7 @@ const bCrew = (id, img, x, y, phase, extra) =>
           ctx.strokeStyle = "rgba(30, 30, 40, 0.8)";
           ctx.fillStyle = "#fff6d8";
           ctx.strokeText("カン", sx + 12, sy - im.height - 4 - k * 8);
-          ctx.fillText("カン", sx + 12, sy - im.height - 4 - k * 8);
+          ctx.fillText(window.bogiLang ? window.bogiLang.tr("カン") : "カン", sx + 12, sy - im.height - 4 - k * 8);
           ctx.restore();
         }
       },
