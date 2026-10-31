@@ -98,6 +98,11 @@ function stRows(key) {
     const pz = hub.puzzleItems || {};
     return gameState.items.filter((t) => pz[t] && pz[t] === rpg.worldId).map((t) => ({ text: t }));
   }
+  // デバッグのとき(D301、todo 176)は、覚えていない能力も灰色で並べ、A で ON / OFF を切りかえる
+  if (key === "skills" && BOGI_DEBUG) return ABILITIES.map((a) => {
+    const on = rpg.hasAbility(a.id);
+    return { ability: a.id, text: a.text, note: a.note, mark: on ? "ON" : "OFF", on, dim: !on };
+  });
   if (key === "skills") return ABILITIES.filter((a) => rpg.hasAbility(a.id)).map((a) => ({ text: a.text, note: a.note }));
   // おもいで: 断片ごとに 1 枚。持ち帰った物と、見届けたしるし(見届けていなければ「……」。説明はしない)
   const texts = hub.fragmentTexts || {};
@@ -344,6 +349,16 @@ function statusInput(action) {
         const k = `${stFlagWorld()}.${r.flag}`;
         if (r.on) delete gameState.flags[k];
         else gameState.flags[k] = true;
+        saveState();
+      }
+    } else if (action === "a" && ST_CMDS[stMenu.cmd].key === "skills" && BOGI_DEBUG) {
+      // 能力の ON / OFF(デバッグ用、todo 176)。OFF は、ジャンプの古い保存のしるしも消す
+      const r = stRows("skills")[stMenu.cur];
+      if (r && r.ability) {
+        if (r.on) {
+          delete gameState.flags[`ability.${r.ability}`];
+          if (r.ability === "jump") delete gameState.flags["kasumi.jumpLearned"];
+        } else gameState.flags[`ability.${r.ability}`] = true;
         saveState();
       }
     } else if (action === "b" || action === "c") {

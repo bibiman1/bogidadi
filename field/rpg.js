@@ -1257,12 +1257,20 @@ const ASSET_V = (() => {
       g.fillRect(px - R, py - R, R * 2, R * 2);
       ctx.drawImage(darkBuf, 0, 0);
       if (lit) {
-        // 青い光(宝舟の沖で光った燃料の色)
-        const gl = ctx.createRadialGradient(px, py, 2, px, py, 60);
-        gl.addColorStop(0, "rgba(120, 200, 255, 0.16)");
-        gl.addColorStop(1, "rgba(120, 200, 255, 0)");
+        // チェレンコフ光の青(todo 177): 照らした輪を青く染め、きーのまわりは青くにじんで光る
+        const gl = ctx.createRadialGradient(px, py, 4, px, py, R);
+        gl.addColorStop(0, "rgba(30, 110, 255, 0.45)");
+        gl.addColorStop(0.6, "rgba(20, 80, 235, 0.3)");
+        gl.addColorStop(1, "rgba(20, 60, 220, 0)");
         ctx.fillStyle = gl;
-        ctx.fillRect(px - 60, py - 60, 120, 120);
+        ctx.fillRect(px - R, py - R, R * 2, R * 2);
+        ctx.globalCompositeOperation = "lighter";
+        const gk = ctx.createRadialGradient(px, py, 6, px, py, 30);
+        gk.addColorStop(0, "rgba(40, 120, 255, 0.35)");
+        gk.addColorStop(1, "rgba(40, 120, 255, 0)");
+        ctx.fillStyle = gk;
+        ctx.fillRect(px - 30, py - 30, 60, 60);
+        ctx.globalCompositeOperation = "source-over";
       }
     }
 
