@@ -38,6 +38,12 @@ function frame(timestamp) {
     drawWatch(t);
     return;
   }
+  if (crash.on) {
+    // こわれたふり(D521)のあいだは、ゲームを止めて、固まった絵だけ描く
+    updateCrash(dt);
+    if (crash.on) drawCrash(t);
+    return;
+  }
   if (maroudo.on) {
     // まろうど(D493)のあいだは、ゲームを止めて画面の効果だけ描く
     updateMaroudo(dt);

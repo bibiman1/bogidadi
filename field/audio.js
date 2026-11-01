@@ -356,6 +356,24 @@
     cursor: () => tone("square", 1320, 1320, 0.035, 0.07),
     ok: () => (tone("square", 990, 990, 0.05, 0.08), tone("square", 1480, 1480, 0.07, 0.08, 0.05)),
     // ピンポン: クイズの解答者が答えた(形而アップダウンクイズ D513)
+    // こわれたふり(D521): 音が一つのまま鳴りっぱなしになり、ぷつっと切れる(だんだん小さくしない)
+    crashBuzz: () => {
+      const t = ctx.currentTime;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.07, t);
+      g.gain.setValueAtTime(0.07, t + 2.5);
+      g.gain.linearRampToValueAtTime(0, t + 2.52);
+      g.connect(sfxGain);
+      for (const [type, f] of [["square", 331], ["sawtooth", 662.5]]) {
+        const o = ctx.createOscillator();
+        o.type = type;
+        o.frequency.value = f;
+        o.connect(g);
+        o.start(t);
+        o.stop(t + 2.55);
+      }
+    },
+    crashTick: () => (noise(0.12, 0.25, 6000), tone("square", 90, 60, 0.15, 0.12)),
     pinpon: () => (tone("sine", 1320, 1320, 0.16, 0.16), tone("sine", 1040, 1040, 0.3, 0.16, 0.16)),
     // 問いの合図(D517): ふつうの問いは明るく、よくわからない問いは濁る
     kjNorm: () => (tone("triangle", 880, 880, 0.12, 0.12), tone("triangle", 1320, 1320, 0.18, 0.12, 0.1)),

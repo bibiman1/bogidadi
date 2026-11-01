@@ -107,7 +107,7 @@ const VOID_FRAGMENTS = [
 
 const VOID_DOOR = { x: 22 * T, y: 4 * T }; // 扉の足もと。いちばん北、まん中の通り道の突き当たり(D257)
 let vDoorT = 0; // 扉が開いた時刻(灯りのふくらみ)。-1 は開くところを見せている最中
-let vJustPulled = false; // 全集 10 冊の引きを見せた直後(続けて扉を開くときは、同じ引きをもう一度見せない)
+let vJustPulled = false; // 全集がそろった引きを見せた直後(続けて扉を開くときは、同じ引きをもう一度見せない)
 const VOID = {
   tile: T,
   bg: "#f7f7f9",
@@ -151,7 +151,7 @@ const VOID = {
     },
     {
       // 太宰治全集の本棚(D214): 拾った文庫本が並んでいく。調べると冊数だけ見せる。どの断片の本が足りないかは、ステータスの「おもいで」でわかる(D267)
-      // 10 冊そろえて真のエンディング(C)を見ると、本棚の奥に書庫(gallery)が見える(D258、D260)。戻ると、きーの部屋(はじまり)に戻る
+      // 全集をそろえて真のエンディング(C)を見ると、本棚の奥に書庫(gallery)が見える(D258、D260)。戻ると、きーの部屋(はじまり)に戻る
       id: "shelf",
       x: 28 * T,
       y: 31.7 * T,
@@ -166,15 +166,18 @@ const VOID = {
         const x0 = Math.round(sx - im.width / 2);
         const y0 = Math.round(sy - im.height + 2);
         ctx.drawImage(im, x0, y0);
-        // 並んだ背表紙(上の段に 5 冊、下の段に 5 冊)。同じ装丁、色だけ少しちがう
+        // 並んだ背表紙(上の段と下の段に半分ずつ。12 冊なら 6 冊ずつ D529)。同じ装丁、色だけ少しちがう
         // 本棚の絵は斜めから見たものなので、棚板も右へ上がっている。背表紙は棚板の上に立てる(作者「本棚がへん」)
         // 棚板の上面: 上の段は左 y=29、下の段は左 y=49。右へ 26 ドットで 4 ドット上がる。左右は x=17〜37
         const got = (window.BOGI_DAZAI || []).filter((b) => api.flagOf(`${b.w}.dazai`));
+        const per = Math.ceil((window.BOGI_DAZAI || []).length / 2);
+        const step = Math.min(4, 20 / per); // 棚の幅(x=17〜37)に収まるように
         got.forEach((b, i) => {
-          const row = i < 5 ? 0 : 1;
-          const col = i % 5;
-          const bx = x0 + 17 + col * 4;
-          const base = (row ? 49 : 29) - Math.round(((17 + col * 4 - 15) * 4) / 26);
+          const row = i < per ? 0 : 1;
+          const col = i % per;
+          const dx = 17 + Math.round(col * step);
+          const bx = x0 + dx;
+          const base = (row ? 49 : 29) - Math.round(((dx - 15) * 4) / 26);
           const h = 9 + ((i * 7) % 3 === 0 ? 1 : 0);
           const by = y0 + base - h;
           ctx.fillStyle = ["#e9dfc6", "#e3d6b8", "#efe6cf"][i % 3];
@@ -189,8 +192,8 @@ const VOID = {
       interact(api) {
         const n = (window.BOGI_DAZAI || []).filter((b) => api.flagOf(`${b.w}.dazai`)).length;
         api.bubble("shelf", n ? `${n}さつ` : "……", 1600);
-        // 書庫は、10 冊そろえて、真のエンディング(C)を見たあとだけ開く(D260)
-        if (n >= 10 && api.flagOf("finale.ending_c")) {
+        // 書庫は、全集を全部そろえて、真のエンディング(C)を見たあとだけ開く(D260、D529)
+        if (n >= (window.BOGI_DAZAI || []).length && api.flagOf("finale.ending_c")) {
           api.freeze(2);
           api.later(1300, () => {
             try {
@@ -258,7 +261,7 @@ const VOID = {
           api.sfx("chime");
         });
       };
-      // 全集 10 冊と、すべての断片を同時にそろえて戻ったとき: 引きは 10 冊のほうで見せたので、すぐ扉へ(作者「演出が２回出る」)
+      // 全集と、すべての断片を同時にそろえて戻ったとき: 引きは全集のほうで見せたので、すぐ扉へ(作者「演出が２回出る」)
       if (vJustPulled) {
         vJustPulled = false;
         api.later(600, door);
@@ -266,9 +269,9 @@ const VOID = {
       }
       api.later(1400, () => api.showSeq(["v_pull1", "v_pull1c", "v_pull2", "v_pull3"], 2.6, door));
     };
-    // 太宰治全集が 10 冊そろって戻ってきたら(D215): きーが「ださいおさむん」とつぶやき、カメラが引いて、月の裏側が見える。一度だけ
+    // 太宰治全集が全部(12 冊 D528)そろって戻ってきたら(D215): きーが「ださいおさむん」とつぶやき、カメラが引いて、月の裏側が見える。一度だけ
     const books = (window.BOGI_DAZAI || []).filter((b) => api.flagOf(`${b.w}.dazai`)).length;
-    if (books >= 10 && !api.flag("dazaiMoon")) {
+    if (books >= (window.BOGI_DAZAI || []).length && !api.flag("dazaiMoon")) {
       api.setFlag("dazaiMoon");
       api.freeze(4.4);
       api.later(1200, () => api.mutter("ださいおさむん", 2600));

@@ -1,4 +1,4 @@
-# ぼぎだぢ Ver.1.6
+# ぼぎだぢ Ver.1.7
 
 ブラウザで遊べるドット絵の小さな RPG。遊ぶ: https://bibiman1.github.io/bogidadi/
 

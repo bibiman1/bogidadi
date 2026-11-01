@@ -14,7 +14,7 @@ window.BOGI_WORLDS = {
     souvenirs: { lake: "氷のかけら", haihei: "おたかぽっぽ", kasumi: "蓮の花", banana: "マンゴー", suzuki: "納品書", takarabune: "白紙の海図", noroi: "クラブの札", padre: "水あめのわりばし", kinsei: "焼けたピザのひと切れ", bomber: "安全ピンのリボン", keiji: "白紙の解答札" },
     souvenirIcons: { 氷のかけら: "ic_kori", おたかぽっぽ: "ic_poppo", 蓮の花: "ic_hasu", マンゴー: "ic_mango", 納品書: "ic_nouhin", 白紙の海図: "ic_kaizu", クラブの札: "ic_fuda", 水あめのわりばし: "ic_ame", 焼けたピザのひと切れ: "ic_slice", 安全ピンのリボン: "ic_ribbon", 白紙の解答札: "ic_kaitou" },
     // 断片の中の謎解きに使う物。その断片にいる間だけ「どうぐ」に出る
-    puzzleItems: { 伝票: "suzuki", 荷札: "suzuki", スタンプ台紙: "haihei", ペレット: "takarabune", コンロッド: "takarabune", リプレイ券: "noroi" }, // リプレイ券(D366)は呪いの野犬にいる間だけ
+    puzzleItems: { 賞金: "keiji", 伝票: "suzuki", 荷札: "suzuki", スタンプ台紙: "haihei", ペレット: "takarabune", コンロッド: "takarabune", リプレイ券: "noroi" }, // リプレイ券(D366)は呪いの野犬にいる間だけ
     assetBase: "./assets/worlds/void/",
     images: {
       wang_void: "wang_void.png",
@@ -30,7 +30,7 @@ window.BOGI_WORLDS = {
       frag_kinsei: "frag_kinsei.png",
       frag_bomber: "frag_bomber.png",
       frag_keiji: "frag_keiji.png",
-      // 太宰治全集が 10 冊そろったとき、カメラが引いて月の裏側が見える(D215)
+      // 太宰治全集が全部そろったとき、カメラが引いて月の裏側が見える(D215)
       v_pull1: "./assets/worlds/finale/v_pull1.png",
       v_pull1c: "./assets/worlds/finale/v_pull1c.png",
       v_pull2: "./assets/worlds/finale/v_pull2.png",
@@ -348,7 +348,7 @@ window.BOGI_WORLDS = {
     name: "形而アップダウンクイズ",
     assetBase: "./assets/worlds/keiji/",
     images: Object.fromEntries(
-      ["u1", "u2", "u3", "u4", "u5", "u6", "matryo", "matryo_s", "matryo_xs", "booth", "kj_show", "kj_studio"]
+      ["u1", "u2", "u3", "u4", "u5", "u6", "matryo", "matryo_s", "matryo_xs", "booth", "kj_show", "kj_studio", "kj_desk"]
         .map((k) => [k, `${k}.png`])
         .concat([
           ["ki", "./assets/worlds/lake/ki_walk.png"],
@@ -356,6 +356,7 @@ window.BOGI_WORLDS = {
           ["tetsubin", "./assets/worlds/suzuki/tetsubin.png"],
           ["goron", "./assets/worlds/banana/goron.png"],
           ["kikikori", "./assets/worlds/banana/kikikori.png"],
+          ["ic_shoukin", "./assets/icons/ic_shoukin.png"], // 下で終わったときの賞金の袋(D526)
         ])
     ),
     playerSprite: { img: "ki", cell: 64, frames: 7, footY: 17 },
@@ -382,6 +383,7 @@ const DAZAI_BOOKS = [
   { w: "padre", map: "akichi", x: 18.6 * T, y: 5.3 * T, title: "お伽草紙" },
   { w: "kinsei", map: "sancho", x: 6.95 * T, y: 3.75 * T, title: "斜陽" }, // 気象台の色あせた太陽のシールの下(D392)
   { w: "bomber", map: "kichi", x: 3.6 * T, y: 6.5 * T, title: "トカトントン" },
+  { w: "keiji", map: "studio", x: 10.5 * T, y: 11.6 * T, title: "もの思う葦" }, // 空の客席の、通路ぎわのいすの上(D529)
 ];
 const kBook = (b) => ({
   id: "dazai",
