@@ -1488,9 +1488,11 @@ const KJ_STUDIO = {
     ctx.fillStyle = g;
     ctx.fillRect(ox + 12 * T - 60, oy + 11 * T - 60, 120, 120);
   },
-  // 西の戸口(絵の左の扉)。扉に向かって歩くと出る
+  // 西の戸口(絵の左の扉)。扉に向かって歩くと出る。上へ歩くと y 6.23 マス、左へ歩くと x 3.34 マスで止まるので、
+  // そこまで届くようにする(はじめの帯は 6.1 マスまでで、足が届かず出られなかった todo 202)。入口(3.5, 6.7)にはかけない
   triggers: [
-    { id: "leave", x: 2.9 * T, y: 5.6 * T, w: 1.1 * T, h: 0.5 * T, run: (api) => api.exit() },
+    { id: "leave", x: 2.9 * T, y: 5.6 * T, w: 1.1 * T, h: 0.85 * T, run: (api) => api.exit() },
+    { id: "leaveW", x: 2.9 * T, y: 5.6 * T, w: 0.55 * T, h: 1.4 * T, run: (api) => api.exit() },
     { id: "piFall", x: 5 * T, y: 5 * T, w: 15 * T, h: 5 * T, run: kjPiFallStart }, // 舞台に上がると(D520)
   ],
   objects: [

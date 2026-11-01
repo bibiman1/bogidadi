@@ -44,7 +44,7 @@ function fragment(id, title, text, icon, col, row, tier) {
       headY: 86,
       solid: { w: 44, h: 18, dy: -8 },
       range: 46,
-      // 台座は、はじめから 11 並んでいる(空の台座 D229)。断片が現れると模型が置かれ、終えると灯り、見届けるといっそう明るく灯る
+      // 台座は、はじめから 12 並んでいる(空の台座 D229)。断片が現れると模型が置かれ、終えると灯り、見届けるといっそう明るく灯る
       canInteract: (api) => present(api) && found(api),
       interact(api) {
         api.enterWorld(id);
@@ -91,18 +91,20 @@ function fragment(id, title, text, icon, col, row, tier) {
 }
 
 const VOID_FRAGMENTS = [
-  // 配置(D257、todo 51): はじまり(南)から扉(北)へ、段ごとに北へ並ぶ。まん中の列(22)は扉への通り道として空ける
-  fragment("lake", "凍った湖と富士山", "きーが見た風景。", "frag_lake", 20, 26, 1),
-  fragment("haihei", "アンバリッド・ホテル", "Hi Hey Win！", "frag_haihei", 13, 21, 2),
-  fragment("kasumi", "霞ヶ浦のエクラノプラン", "ミイラさまの遊覧飛行。", "frag_kasumi", 25, 21, 2),
-  fragment("suzuki", "荒川の鈴木商店", "宛先がにじんで読めない。", "frag_suzuki", 34, 21, 2), // 説明の文面は仮
-  fragment("banana", "南極のバナナ農園", "けさの気温 28℃。", "frag_banana", 9, 14, 3), // 説明の文面は仮
-  fragment("takarabune", "宝舟と首振りエンジン", "何も描かれていない。", "frag_takarabune", 19, 14, 3), // 説明の文面は仮
-  fragment("noroi", "呪いの野犬", "ポン　ポン　ポン。", "frag_noroi", 33, 14, 3), // 説明の文面は仮
-  fragment("padre", "ぱーでれとだいにち", "カチ　カチ。", "frag_padre", 12, 8, 4), // 説明の文面は仮
-  fragment("kinsei", "きこりと金星", "無風、92気圧、456℃、雲。", "frag_kinsei", 26, 8, 4), // D179
-  fragment("bomber", "ぼぎボマーと地上ぼぎクルー", "REMOVE BEFORE FLIGHT", "frag_bomber", 34, 8, 4), // 説明の文面は仮
-  fragment("keiji", "形而アップダウンクイズ", "これは何？", "frag_keiji", 18, 5, 5), // 5 段目に、この断片だけ(D505)。扉の手前。説明の文面は仮
+  // 配置(D257、todo 51、D578): はじまり(南)から扉(北)へ、段ごとに北へ並ぶ。まん中の列(22)は扉への通り道として空ける。
+  // 段の間は 5 マス(27、22、17、12、7 行目)。3 つの段は左右を交互に寄せ、5 段目は扉の左右に対称(todo 220)
+  fragment("lake", "凍った湖と富士山", "きーが見た風景。", "frag_lake", 20, 27, 1),
+  fragment("haihei", "アンバリッド・ホテル", "Hi Hey Win！", "frag_haihei", 10, 22, 2),
+  fragment("kasumi", "霞ヶ浦のエクラノプラン", "ミイラさまの遊覧飛行。", "frag_kasumi", 17, 22, 2),
+  fragment("suzuki", "荒川の鈴木商店", "宛先がにじんで読めない。", "frag_suzuki", 32, 22, 2), // 説明の文面は仮
+  fragment("banana", "南極のバナナ農園", "けさの気温 28℃。", "frag_banana", 12, 17, 3), // 説明の文面は仮
+  fragment("takarabune", "宝舟と首振りエンジン", "何も描かれていない。", "frag_takarabune", 27, 17, 3), // 説明の文面は仮
+  fragment("noroi", "呪いの野犬", "ポン　ポン　ポン。", "frag_noroi", 34, 17, 3), // 説明の文面は仮
+  fragment("padre", "ぱーでれとだいにち", "カチ　カチ。", "frag_padre", 10, 12, 4), // 説明の文面は仮
+  fragment("kinsei", "きこりと金星", "無風、92気圧、456℃、雲。", "frag_kinsei", 17, 12, 4), // D179
+  fragment("bomber", "ぼぎボマーと地上ぼぎクルー", "REMOVE BEFORE FLIGHT", "frag_bomber", 32, 12, 4), // 説明の文面は仮
+  fragment("keiji", "形而アップダウンクイズ", "これは何？", "frag_keiji", 17, 7, 5), // 5 段目(D505)。扉の手前。説明の文面は仮
+  fragment("nagato", "本栖湖の長門", "喫水 9.08m、平均水深 67.9m。", "frag_nagato", 27, 7, 5), // 5 段目に形而と並べる(D533、D573)。説明の文は D579
 ];
 
 const VOID_DOOR = { x: 22 * T, y: 4 * T }; // 扉の足もと。いちばん北、まん中の通り道の突き当たり(D257)
@@ -207,7 +209,7 @@ const VOID = {
       },
     },
     {
-      // 閉ざされた扉(D229、D232): いちばん北の奥(D257)。すべての台座(11。D503)がそろうと開き、その先にボタンの部屋がある
+      // 閉ざされた扉(D229、D232): いちばん北の奥(D257)。すべての台座(12。D503、D573)がそろうと開き、その先にボタンの部屋がある
       id: "door",
       x: VOID_DOOR.x,
       y: VOID_DOOR.y,

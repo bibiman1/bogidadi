@@ -8,11 +8,11 @@ window.BOGI_WORLDS = {
     id: "void",
     name: "懲罰空間",
     hub: true,
-    fragments: ["lake", "haihei", "kasumi", "banana", "suzuki", "takarabune", "noroi", "padre", "kinsei", "bomber", "keiji"],
+    fragments: ["lake", "haihei", "kasumi", "banana", "suzuki", "takarabune", "noroi", "padre", "kinsei", "bomber", "keiji", "nagato"],
     fragmentTexts: Object.fromEntries(VOID_FRAGMENTS.map((f) => [f.id, f.text])),
     // おもいで(todo 32 の A): 断片を終えると持ち帰る物。ステータスの「おもいで」に、見届けたしるしと並べて出す
-    souvenirs: { lake: "氷のかけら", haihei: "おたかぽっぽ", kasumi: "蓮の花", banana: "マンゴー", suzuki: "納品書", takarabune: "白紙の海図", noroi: "クラブの札", padre: "水あめのわりばし", kinsei: "焼けたピザのひと切れ", bomber: "安全ピンのリボン", keiji: "白紙の解答札" },
-    souvenirIcons: { 氷のかけら: "ic_kori", おたかぽっぽ: "ic_poppo", 蓮の花: "ic_hasu", マンゴー: "ic_mango", 納品書: "ic_nouhin", 白紙の海図: "ic_kaizu", クラブの札: "ic_fuda", 水あめのわりばし: "ic_ame", 焼けたピザのひと切れ: "ic_slice", 安全ピンのリボン: "ic_ribbon", 白紙の解答札: "ic_kaitou" },
+    souvenirs: { lake: "氷のかけら", haihei: "おたかぽっぽ", kasumi: "蓮の花", banana: "マンゴー", suzuki: "納品書", takarabune: "白紙の海図", noroi: "クラブの札", padre: "水あめのわりばし", kinsei: "焼けたピザのひと切れ", bomber: "安全ピンのリボン", keiji: "白紙の解答札", nagato: "絵葉書" },
+    souvenirIcons: { 氷のかけら: "ic_kori", おたかぽっぽ: "ic_poppo", 蓮の花: "ic_hasu", マンゴー: "ic_mango", 納品書: "ic_nouhin", 白紙の海図: "ic_kaizu", クラブの札: "ic_fuda", 水あめのわりばし: "ic_ame", 焼けたピザのひと切れ: "ic_slice", 安全ピンのリボン: "ic_ribbon", 白紙の解答札: "ic_kaitou", 絵葉書: "ic_ehagaki" },
     // 断片の中の謎解きに使う物。その断片にいる間だけ「どうぐ」に出る
     puzzleItems: { 賞金: "keiji", 伝票: "suzuki", 荷札: "suzuki", スタンプ台紙: "haihei", ペレット: "takarabune", コンロッド: "takarabune", リプレイ券: "noroi" }, // リプレイ券(D366)は呪いの野犬にいる間だけ
     assetBase: "./assets/worlds/void/",
@@ -30,6 +30,7 @@ window.BOGI_WORLDS = {
       frag_kinsei: "frag_kinsei.png",
       frag_bomber: "frag_bomber.png",
       frag_keiji: "frag_keiji.png",
+      frag_nagato: "frag_nagato.png",
       // 太宰治全集が全部そろったとき、カメラが引いて月の裏側が見える(D215)
       v_pull1: "./assets/worlds/finale/v_pull1.png",
       v_pull1c: "./assets/worlds/finale/v_pull1c.png",
@@ -367,6 +368,35 @@ window.BOGI_WORLDS = {
       kjReset();
     },
   },
+  // 断片: 本栖湖の長門(D532〜D575。nagato.js)。懲罰空間の 5 段目の台座(D573)
+  nagato: {
+    id: "nagato",
+    name: "本栖湖の長門",
+    bgm: "canon", // パッヘルベルの「カノン」(D542、todo 222)。斉射の場面だけ止める
+    assetBase: "./assets/worlds/nagato/",
+    images: Object.fromEntries(
+      ["bg_kohan", "bg_mise", "bg_kojo2", "ng_ladder", "ng_post", "bg_kansen", "ng_swan", "ng_far", "ng_hat", "ki_hat", "ng_ki_e_hat", "ng_ki_w_hat", "bg_hotou", "bg_souten", "ng_cage_back", "ng_cage_front", "ng_shell", "ng_bag", "ng_plug_out", "ng_plug_open", "ng_ram", "fg_souten_drum", "fg_souten_beam", "fg_souten_floor", "ng_ki_e", "ng_ki_w", "ng_dial_turn", "ng_dial_elev", "ng_wheel_L", "ng_wheel_R", "fg_hotou_wall", "fg_hotou_dialL", "fg_hotou_dialR", "fg_hotou_stoolL", "fg_hotou_stoolR", "ng_ring", "bg_seiha", "bg_sora", "ng_e_ship"]
+        .map((k) => [k, `${k}.png`])
+        .concat([
+          ["ki", "./assets/worlds/lake/ki_walk.png"],
+          ["crew_hawk", "./assets/worlds/kasumi/crew_hawk.png"],
+          ["crew_wagtail", "./assets/worlds/kasumi/crew_wagtail.png"],
+          ["crew_rooster", "./assets/worlds/kasumi/crew_rooster.png"],
+          ["matryo", "./assets/worlds/keiji/matryo.png"],
+        ])
+    ),
+    // 水兵帽をかぶっているあいだは、帽子つきの歩きの絵(D571)
+    playerSprite: { get img() { return ngKiImg(); }, cell: 64, frames: 7, footY: 17 },
+    start: "kohan",
+    startSpawn: "start",
+    maps: { kohan: NG_KOHAN, mise: NG_MISE, kojo: NG_KOJO, kansen: NG_KANSEN, hotou: NG_HOTOU, souten: NG_SOUTEN, seiha: NG_SEIHA },
+    onEnterWorld(api) {
+      for (const f of ["hat", "fired", "hatBack", "bought"]) api.setFlag(f, false); // 毎回はじめから(D571)
+      ngHat.on = false;
+      ngReset();
+      ngDrill(api); // 入るたびに、こめるところから訓練をやり直す(作者「装填後にきーがハンドルの位置を調べても何も起こらない」)
+    },
+  },
 };
 
 // 太宰治全集(D214): 小さなメダルのように、断片に 1 冊ずつ隠れている文庫本。近くに寄ると、かすかに光る。
@@ -422,7 +452,7 @@ window.BOGI_DAZAI = DAZAI_BOOKS;
 // おもいでのアイコン(D200): どの世界でも、手に入れたときに掲げて見せられるように、全部の世界に読みこむ
 // 能力で開く所の小物(D201〜D203): 踏み台(ホテル)、倒れた荷車(鈴木商店)、砂の吹きだまり(呪いの野犬)、草むら(ぼぎボマー)
 const ABILITY_PROPS = ["fumidai", "niguruma", "kusa", "bunko", "shelf"];
-const OMOIDE_ICONS = ["ic_bunko", "ic_kori", "ic_poppo", "ic_hasu", "ic_mango", "ic_nouhin", "ic_kaizu", "ic_fuda", "ic_ame", "ic_slice", "ic_ribbon", "ic_kaitou"];
+const OMOIDE_ICONS = ["ic_bunko", "ic_kori", "ic_poppo", "ic_hasu", "ic_mango", "ic_nouhin", "ic_kaizu", "ic_fuda", "ic_ame", "ic_slice", "ic_ribbon", "ic_kaitou", "ic_ehagaki"];
 for (const w of Object.values(window.BOGI_WORLDS)) {
   w.images = w.images || {};
   for (const k of OMOIDE_ICONS) w.images[k] = `./assets/icons/${k}.png`;

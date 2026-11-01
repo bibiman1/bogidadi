@@ -35,7 +35,8 @@ const ST_CMDS = [
   { key: "save", label: "セーブ" }, // いる場所を記録する(D262、todo 55)。進み具合は前から自動で記録している
   // テストプレイ用: すべての条件を満たす(D294。灰色の字)。公開版では出さず、?debug のときだけ(D301)
   // フラグ(D385): 断片の旗を一つずつ ON / OFF、断片をはじめから。これも ?debug のときだけ
-  ...(BOGI_DEBUG ? [{ key: "grant", label: "テスト" }, { key: "flags", label: "フラグ" }] : []),
+  // 作業中: 懲罰空間にまだ置いていない断片(index.js で wip: true)へ、すぐ入る(長門 D558)。これも ?debug のときだけ
+  ...(BOGI_DEBUG ? [{ key: "grant", label: "テスト" }, { key: "flags", label: "フラグ" }, { key: "wip", label: "作業中" }] : []),
   // はじめから(D94 のデバッグ用)は、タイトルで B を長押しする形に移した(D259)
 ];
 // きーの能力(とくぎ)。断片で習得する。新しい能力はここに 1 行足し、断片で api.learnAbility(id) を呼ぶ
@@ -60,6 +61,7 @@ const ST_FLAGS = {
   padre: { ending_oneness: "", gone: "", taken: "", observed: "見届けた" },
   bomber: { cap: "", loadSeen: "", ribbonBlown: "", observed: "見届けた" },
   keiji: { lit: "明かりがついた(露出のあと)", observed: "見届けた" },
+  nagato: { hat: "水兵帽をかぶった", fired: "斉射した", hatBack: "帽子を返した", bought: "絵葉書を買った", observed: "見届けた" },
 };
 const stFlagWorld = () => (rpg.isHub ? stMenu.fw : rpg.worldId);
 function stFlagRows() {
@@ -93,6 +95,7 @@ function stFlagReset(w) {
 }
 function stRows(key) {
   if (key === "flags") return stFlagRows();
+  if (key === "wip") return Object.values(window.BOGI_WORLDS).filter((w) => w.wip).map((w) => ({ text: w.name, wip: w.id }));
   const hub = window.BOGI_WORLDS[HUB];
   // どうぐ: いまいる断片の謎解きに使う物だけ(断片を出たら出さない。持ち帰った物は「おもいで」へ)
   if (key === "items") {
@@ -144,11 +147,12 @@ function renderStatus() {
   stCtx.fillRect(0, 0, 480, 300);
   // 左: コマンド
   stWindow(12, 12, 156, 118);
-  // デバッグのとき(コマンドが 6 つより多い)は、テストとフラグを右の列の下に置く(縦に 7 つは窓に入らない)
-  const cmdPos = (i) => (ST_CMDS.length > 6 && i >= 5 ? [118, 21 + (i - 2) * 17] : [42, 21 + i * 17]);
+  // デバッグのとき(コマンドが 6 つより多い)は、テスト・フラグ・作業中を右の列の下に置く(縦に 7 つは窓に入らない)。
+  // 右の列は下の行(6 行目)でそろえる
+  const cmdPos = (i) => (ST_CMDS.length > 6 && i >= 5 ? [118, 21 + (i - (ST_CMDS.length - 6)) * 17] : [42, 21 + i * 17]);
   ST_CMDS.forEach((c, i) => {
     const [x, y] = cmdPos(i);
-    stText(c.label, x, y, c.key === "reset" || c.key === "grant" || c.key === "flags" ? "#8a8a8a" : "#ffffff");
+    stText(c.label, x, y, c.key === "reset" || c.key === "grant" || c.key === "flags" || c.key === "wip" ? "#8a8a8a" : "#ffffff");
     if (stMenu.cmd === i) stCursor(x - 18, y + 3);
   });
   // 右: 要約(数だけ。いくつ増えてもあふれない)
@@ -351,6 +355,13 @@ function statusInput(action) {
         if (r.on) delete gameState.flags[k];
         else gameState.flags[k] = true;
         saveState();
+      }
+    } else if (action === "a" && ST_CMDS[stMenu.cmd].key === "wip") {
+      const r = stRows("wip")[stMenu.cur];
+      if (r) {
+        toggleStatus(false);
+        rpg.enter(window.BOGI_WORLDS[r.wip]);
+        return;
       }
     } else if (action === "a" && ST_CMDS[stMenu.cmd].key === "skills" && BOGI_DEBUG) {
       // 能力の ON / OFF(デバッグ用、todo 176)。OFF は、ジャンプの古い保存のしるしも消す

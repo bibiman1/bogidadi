@@ -162,7 +162,10 @@ const rpg = window.createBogiRPG({
     // 断片の世界から、懲罰空間のその断片の前へ
     exit(id) {
       transition(() => {
-        rpg.enter(window.BOGI_WORLDS[HUB], `from_${id}`);
+        // 台座のない作りかけの断片(長門 wip)からは、懲罰空間のはじまりへ
+        const hub = window.BOGI_WORLDS[HUB];
+        const back = `from_${id}`;
+        rpg.enter(hub, hub.maps[hub.start].spawns[back] ? back : hub.startSpawn);
         updateStatus();
       });
     },
@@ -171,6 +174,9 @@ const rpg = window.createBogiRPG({
 
 if (BOGI_DEBUG) {
   window.bogiDebug = { rpg, gameState, enterWorld: (id) => rpg.enter(window.BOGI_WORLDS[id]) };
+  // ?debug&world=<世界id> で、その世界にすぐ入る(懲罰空間にまだ置いていない作りかけの断片を確かめる。長門 D558)
+  const wq = location.search.match(/[?&]world=(\w+)/);
+  if (wq && window.BOGI_WORLDS[wq[1]]) setTimeout(() => rpg.enter(window.BOGI_WORLDS[wq[1]]), 600);
 }
 
 function updateStatus() {
