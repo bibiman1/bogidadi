@@ -1149,8 +1149,8 @@ const NG_KOJO = {
     const next = (phase) => ((ngRide.phase = phase), (ngRide.t = 0));
     if (ngRide.phase === "open") {
       api.place(15 * T, 8 * T);
-      // 行きは、水面のまん中で遠景の一枚絵。閉じるまでボートは止まって待つ(一枚絵のあいだ input は来ない)
-      if (ngRide.dir === "go" && ngRide.t >= R.open / 2 && !ngRide.shown) {
+      // 行きは、航行の終わりごろ(15 秒のうち 13 秒。D582)に遠景の一枚絵。閉じるまでボートは止まって待つ(一枚絵のあいだ input は来ない)
+      if (ngRide.dir === "go" && ngRide.t >= R.open - 2 && !ngRide.shown) {
         ngRide.shown = true;
         api.show("ng_far", null, { full: true });
       }
@@ -1209,6 +1209,9 @@ const NG_KOJO = {
     if (ngRide.phase === "near") {
       const [x, y] = ngBoatNear();
       ngSwanDraw(ctx, api, Math.round(ox + x), Math.round(oy + y), ngRide.dir !== "go", ngRide.t < NG_RIDE.near);
+      // ボートは艦橋のうしろを通る(艦橋だけを切り抜いた絵を上に重ねる。D582、todo 226)
+      const br = api.image("ng_kojo2_bridge");
+      if (br) ctx.drawImage(br, Math.round(ox + 340), Math.round(oy));
       return;
     }
     // のぼっているあいだ、ボートは梯子のわきで待つ

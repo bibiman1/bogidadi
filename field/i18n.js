@@ -61,6 +61,7 @@
     "斜陽": "The Setting Sun",
     "トカトントン": "Tokatonton",
     "もの思う葦": "The Thinking Reed",
+    "十二月八日": "December Eighth",
     "太宰治": "Osamu Dazai",
     // 断片の名前と、おもいでの説明
     "懲罰空間": "Punishment Space",

@@ -375,7 +375,7 @@ window.BOGI_WORLDS = {
     bgm: "canon", // パッヘルベルの「カノン」(D542、todo 222)。斉射の場面だけ止める
     assetBase: "./assets/worlds/nagato/",
     images: Object.fromEntries(
-      ["bg_kohan", "bg_mise", "bg_kojo2", "ng_ladder", "ng_post", "bg_kansen", "ng_swan", "ng_far", "ng_hat", "ki_hat", "ng_ki_e_hat", "ng_ki_w_hat", "bg_hotou", "bg_souten", "ng_cage_back", "ng_cage_front", "ng_shell", "ng_bag", "ng_plug_out", "ng_plug_open", "ng_ram", "fg_souten_drum", "fg_souten_beam", "fg_souten_floor", "ng_ki_e", "ng_ki_w", "ng_dial_turn", "ng_dial_elev", "ng_wheel_L", "ng_wheel_R", "fg_hotou_wall", "fg_hotou_dialL", "fg_hotou_dialR", "fg_hotou_stoolL", "fg_hotou_stoolR", "ng_ring", "bg_seiha", "bg_sora", "ng_e_ship"]
+      ["bg_kohan", "bg_mise", "bg_kojo2", "ng_kojo2_bridge", "ng_ladder", "ng_post", "bg_kansen", "ng_swan", "ng_far", "ng_hat", "ki_hat", "ng_ki_e_hat", "ng_ki_w_hat", "bg_hotou", "bg_souten", "ng_cage_back", "ng_cage_front", "ng_shell", "ng_bag", "ng_plug_out", "ng_plug_open", "ng_ram", "fg_souten_drum", "fg_souten_beam", "fg_souten_floor", "ng_ki_e", "ng_ki_w", "ng_dial_turn", "ng_dial_elev", "ng_wheel_L", "ng_wheel_R", "fg_hotou_wall", "fg_hotou_dialL", "fg_hotou_dialR", "fg_hotou_stoolL", "fg_hotou_stoolR", "ng_ring", "bg_seiha", "bg_sora", "ng_e_ship"]
         .map((k) => [k, `${k}.png`])
         .concat([
           ["ki", "./assets/worlds/lake/ki_walk.png"],
@@ -414,6 +414,7 @@ const DAZAI_BOOKS = [
   { w: "kinsei", map: "sancho", x: 6.95 * T, y: 3.75 * T, title: "斜陽" }, // 気象台の色あせた太陽のシールの下(D392)
   { w: "bomber", map: "kichi", x: 3.6 * T, y: 6.5 * T, title: "トカトントン" },
   { w: "keiji", map: "studio", x: 10.5 * T, y: 11.6 * T, title: "もの思う葦" }, // 空の客席の、通路ぎわのいすの上(D529)
+  { w: "nagato", map: "kansen", x: 1.5 * T, y: 13.6 * T, title: "十二月八日" }, // 甲板の西のはし(D583。開戦の電文は旗艦の長門から出た)
 ];
 const kBook = (b) => ({
   id: "dazai",

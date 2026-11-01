@@ -66,9 +66,6 @@ const HS = {
   workbench: { img: "workbench", w: 96, h: 48, top: 10, bottom: 46, solid: [86, 14] },
   drums: { img: "drums", w: 96, h: 48, top: 10, bottom: 44, solid: [88, 12] },
   gondola: { img: "gondola", w: 160, h: 72, top: 14, bottom: 62, solid: [150, 20] },
-  crew_hawk: { img: "crew_hawk", w: 32, h: 40, top: 0, bottom: 39, solid: [14, 8] },
-  crew_wagtail: { img: "crew_wagtail", w: 30, h: 39, top: 0, bottom: 38, solid: [14, 8] },
-  crew_rooster: { img: "crew_rooster", w: 30, h: 39, top: 0, bottom: 38, solid: [14, 8] },
   seat: { img: "seat", w: 48, h: 64, top: 4, bottom: 56, solid: [34, 14] },
   mummy: { img: "mummy", w: 48, h: 64, top: 2, bottom: 56, solid: [34, 14] },
   poppo_row: { img: "poppo_row", w: 40, h: 12, top: 1, bottom: 11 },
@@ -104,10 +101,7 @@ function board(id, fx, fy) {
   });
 }
 function hat(kind, fx, fy, extra) {
-  const s = HS[kind];
-  const o = { img: s.img, w: s.w, h: s.h, x: fx, y: fy - (s.bottom - s.h / 2), sortDy: s.bottom - s.h / 2, headY: s.h / 2 - s.top };
-  if (s.solid) o.solid = { w: s.solid[0], h: s.solid[1], dy: o.sortDy - s.solid[1] / 2 };
-  return Object.assign(o, extra || {});
+  return placeAt(HS[kind], fx, fy, extra);
 }
 
 // スタンプラリー(屋台・展示・舞台)

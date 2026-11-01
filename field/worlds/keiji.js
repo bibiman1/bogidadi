@@ -531,19 +531,7 @@ const kjDrawShow = (ctx, ox, oy, api) => {
   // 縦穴のはり(段ごと)
   ctx.fillStyle = "rgba(120, 120, 140, 0.18)";
   for (let k = -KJ_SPAN; k <= KJ_SPAN; k++) ctx.fillRect(0, Math.round(kjGy(k)), W, 1);
-  // 形而上: 名前の字が浮かぶ(物は字にほどける)
-  const P = window.bogiPix;
-  if (P) {
-    // 幕(まん中)をよけて、左右に少しだけ
-    for (let j = 0; j < 8; j++) {
-      const L = 5 + (j % 4) * 0.9;
-      const y = Math.round(KJ_BASE - L * KJ_BG);
-      const x = j < 4 ? 8 + ((j * 37) % 60) : 300 + ((j * 41) % 70);
-      ctx.globalAlpha = 0.22 + (j % 3) * 0.06;
-      P.text(ctx, KJ_SOUV[(j * 3) % KJ_SOUV.length][0], x, y, 1, "#7a7a96");
-    }
-    ctx.globalAlpha = 1;
-  }
+  // 形而上の帯に、おみやげの名前の字を浮かべていたのはやめた(D582、todo 226。作者「お土産の名前がかいてあるのもいらない」)
   // 形而下: 名前のはがれた塊
   for (let j = 0; j < 14; j++) {
     const L = -5.2 - (j % 6) * 0.9;
@@ -1243,7 +1231,7 @@ const kjDistort = (ctx, e, t) => {
 // ---- A スタジオ(24×14、見下ろし)。配置図 Q1 第 2 版(docs/assets/keiji/plan/layout_q1.png)----
 // スタジオの絵(D516、PixelLab): 上に幕、まん中に舞台(5〜19 列、5〜9 行)、10 行目に低い塀(11、12 列が切れ目)、下に客席と通路
 const KJ_G = { m: 7.5 * T, k: 10.5 * T, p: 13.5 * T, t: 16.5 * T, y: 7.4 * T }; // ゴンドラ(舞台の上)
-const KJ_WALK = (c, r) => (r === 6 && c >= 3 && c <= 4) || (r >= 5 && r <= 9 && c >= 5 && c <= 19) || (r >= 10 && c >= 11 && c <= 12);
+const KJ_WALK = (c, r) => (r >= 5 && r <= 8 && c >= 3 && c <= 4) || (r >= 5 && r <= 9 && c >= 5 && c <= 19) || (r >= 10 && c >= 11 && c <= 12);
 const KJ_SEATS = (c, r) => r >= 9 && r <= 13 && ((c >= 4 && c <= 10) || (c >= 14 && c <= 20));
 const kjStudioGround = (ctx, ox, oy, img, api) => {
   const lit = api && api.flag("lit");
@@ -1490,9 +1478,10 @@ const KJ_STUDIO = {
   },
   // 西の戸口(絵の左の扉)。扉に向かって歩くと出る。上へ歩くと y 6.23 マス、左へ歩くと x 3.34 マスで止まるので、
   // そこまで届くようにする(はじめの帯は 6.1 マスまでで、足が届かず出られなかった todo 202)。入口(3.5, 6.7)にはかけない
+  // 戸口の前の通り道は 4 マスの高さ(5〜8 段)。1 マスだと、舞台の上の端や司会台の下から左へ歩いて壁で止まり、出られなかった(todo 227)
   triggers: [
     { id: "leave", x: 2.9 * T, y: 5.6 * T, w: 1.1 * T, h: 0.85 * T, run: (api) => api.exit() },
-    { id: "leaveW", x: 2.9 * T, y: 5.6 * T, w: 0.55 * T, h: 1.4 * T, run: (api) => api.exit() },
+    { id: "leaveW", x: 2.9 * T, y: 5 * T, w: 0.55 * T, h: 4 * T, run: (api) => api.exit() },
     { id: "piFall", x: 5 * T, y: 5 * T, w: 15 * T, h: 5 * T, run: kjPiFallStart }, // 舞台に上がると(D520)
   ],
   objects: [

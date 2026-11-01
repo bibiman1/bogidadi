@@ -8,35 +8,6 @@
 //       → 機体の上を歩いて乗降口へ → 機内を通って操縦席へ → ミイラさまの遊覧飛行 → 懲罰空間に帰る
 // 背景は docs/assets/kasumi の設計図と下絵(*_blockout.png)から生成
 // ================================================================
-const kGrid = (cols, rows, solidAt) => {
-  const g = [];
-  for (let r = 0; r < rows; r++) {
-    let row = "";
-    for (let c = 0; c < cols; c++) row += solidAt(c, r) ? "#" : ".";
-    g.push(row);
-  }
-  return g;
-};
-const K_LEGEND = { "#": { solid: true }, ".": {} };
-const kImage = (key, w, h) => (ctx, ox, oy, img) => {
-  const im = typeof img === "function" && img(key);
-  if (im) ctx.drawImage(im, ox, oy, w, h);
-};
-// 床に立つ物の切り出し(fg_<map>.png の x0, y0, w, h)を、足もとの y(base)できーと前後させる
-// 2026-10-03、作者「重ね合わせみてね」。切り出しは docs/assets/kasumi/fg_kasumi.py
-const kFg = (img, x0, y0, w, h, base) => ({
-  id: `fg${x0}_${y0}`,
-  x: x0 + w / 2,
-  y: base,
-  w: 1,
-  h: 1,
-  draw(ctx, sx, sy, t, api) {
-    const im = api.image(img);
-    if (im) ctx.drawImage(im, x0, y0, w, h, sx - this.x + x0, sy - this.y + y0, w, h);
-  },
-});
-const kWall = (x0, y0, x1, y1) => ({ id: `wall${x0}_${y0}`, x: (x0 + x1) / 2, y: (y0 + y1) / 2, w: 1, h: 1, solid: { w: x1 - x0, h: y1 - y0 } });
-
 // A 蓮田のあぜ道(入口。北の門柱の先が基地跡)
 const K_LOTUS = {
   tile: T,
@@ -160,8 +131,15 @@ const HANGAR_SOLID = (c, r) =>
   (r === 4 && c >= 1 && c <= 11) || // 機体の模型とドラム缶の手前まで(うしろに回りこまない)
   (r === 6 && c >= 5 && c <= 7) ||
   (r === 7 && c >= 8 && c <= 12);
+// 地上ぼぎクルーの絵の大きさ(足もとの位置と当たり)
+const KS = {
+  crew_hawk: { img: "crew_hawk", w: 32, h: 40, top: 0, bottom: 39, solid: [14, 8] },
+  crew_wagtail: { img: "crew_wagtail", w: 30, h: 39, top: 0, bottom: 38, solid: [14, 8] },
+  crew_rooster: { img: "crew_rooster", w: 30, h: 39, top: 0, bottom: 38, solid: [14, 8] },
+};
+const kHat = (kind, fx, fy, extra) => placeAt(KS[kind], fx, fy, extra);
 const crewMember = (id, img, fx, fy, phase) =>
-  Object.assign(hat(img, fx, fy), {
+  Object.assign(kHat(img, fx, fy), {
     id,
     bob: 0,
     update(dt, t) {
@@ -182,10 +160,8 @@ const CREW = [
 CREW.forEach((c) => (c.baseY = c.y));
 // ジャンプの習い方: クルーが順番に跳んでみせる → どのボタンで跳ぶかを出す → きーが自分で跳べたら覚える
 // どのボタンで跳ぶか: 最後にキーボードを使っていれば「Xキー」、画面をさわっていれば「Bボタン」
-let lastInputTouch = false;
-window.addEventListener("keydown", () => (lastInputTouch = false), true);
-window.addEventListener("touchstart", () => (lastInputTouch = true), { capture: true, passive: true });
-const jumpKey = () => (lastInputTouch ? "Bボタン" : "Xキー");
+// (さわったかどうかは app/layout.js の lastTouch。遊んでいるときには読みこみずみ)
+const jumpKey = () => (lastTouch ? "Bボタン" : "Xキー");
 const hintB = (on) => {
   const b = document.getElementById("actionBtnB");
   if (b) b.classList.toggle("hint", on);
@@ -304,7 +280,7 @@ const WING_SOLID = (c, r) =>
   WING_TUBES.some(([x0, y0, x1, y1]) => c + 0.5 > x0 && c + 0.5 < x1 && r + 0.5 > y0 && r + 0.5 < y1);
 // 機体の脇で、地上ぼぎクルーが直している(カン、カン)
 const repairCrew = (id, img, fx, fy, phase) =>
-  hat(img, fx, fy, {
+  kHat(img, fx, fy, {
     id,
     range: 44,
     update(dt, t) {

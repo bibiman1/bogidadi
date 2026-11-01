@@ -344,7 +344,6 @@ const sOut = (api) => {
 // 船殻は左上へ遠ざかって小さくなり、きーは右へただよいながら、引力に引かれてじわじわ右下へ落ちていく。最後は赤く光って流れ星の絵へ
 const SPACE_DUR = 9;
 let spaceT0 = 0;
-const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 const S_SPACE = {
   tile: T,
   bg: "#04060f",

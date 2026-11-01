@@ -187,8 +187,8 @@ const SPRITES = {
   poster: { img: "k_poster", w: 20, h: 24, top: 0, bottom: 23 },
 };
 
-function at(kind, fx, fy, extra) {
-  const s = SPRITES[kind];
+// 絵の表の 1 行(s)から、足もとを (fx, fy) に置く物を作る。at(この表)、hat(廃兵院の HS)、kHat(霞ヶ浦の KS)が使う
+function placeAt(s, fx, fy, extra) {
   const o = {
     img: s.img,
     w: s.w,
@@ -201,9 +201,47 @@ function at(kind, fx, fy, extra) {
   if (s.solid) o.solid = { w: s.solid[0], h: s.solid[1], dy: o.sortDy - s.solid[1] / 2 };
   return Object.assign(o, extra || {});
 }
+function at(kind, fx, fy, extra) {
+  return placeAt(SPRITES[kind], fx, fy, extra);
+}
 
 // 決まった並びの疑似乱数(毎回同じ森になる)
 function rand(r, c, k) {
   const x = Math.sin(r * 127.1 + c * 311.7 + k * 74.7) * 43758.5453;
   return x - Math.floor(x);
 }
+
+// ================================================================
+// 断片をまたいで使う部品(11-01、todo 225。もとは霞ヶ浦と鈴木商店のファイルにあった)
+// ================================================================
+// マップの並び(# は通れない)を、solidAt(列, 段) から作る
+const kGrid = (cols, rows, solidAt) => {
+  const g = [];
+  for (let r = 0; r < rows; r++) {
+    let row = "";
+    for (let c = 0; c < cols; c++) row += solidAt(c, r) ? "#" : ".";
+    g.push(row);
+  }
+  return g;
+};
+const K_LEGEND = { "#": { solid: true }, ".": {} };
+const kImage = (key, w, h) => (ctx, ox, oy, img) => {
+  const im = typeof img === "function" && img(key);
+  if (im) ctx.drawImage(im, ox, oy, w, h);
+};
+// 床に立つ物の切り出し(fg_<map>.png の x0, y0, w, h)を、足もとの y(base)できーと前後させる
+// 2026-10-03、作者「重ね合わせみてね」。切り出しは docs/assets/kasumi/fg_kasumi.py
+const kFg = (img, x0, y0, w, h, base) => ({
+  id: `fg${x0}_${y0}`,
+  x: x0 + w / 2,
+  y: base,
+  w: 1,
+  h: 1,
+  draw(ctx, sx, sy, t, api) {
+    const im = api.image(img);
+    if (im) ctx.drawImage(im, x0, y0, w, h, sx - this.x + x0, sy - this.y + y0, w, h);
+  },
+});
+const kWall = (x0, y0, x1, y1) => ({ id: `wall${x0}_${y0}`, x: (x0 + x1) / 2, y: (y0 + y1) / 2, w: 1, h: 1, solid: { w: x1 - x0, h: y1 - y0 } });
+// なめらかに 0 から 1 へ(はじめと終わりがゆっくり)
+const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
