@@ -1066,7 +1066,8 @@ const NG_KOHAN = {
       headY: 30,
       range: 1.7 * T,
       draw() {},
-      canInteract: (api) => !api.flag("hatBack"), // 帽子を返したあとは、もう乗らない(土産物屋へ)
+      // 帽子を返したあとは、もう乗らない(土産物屋へ)。ただし甲板の『十二月八日』を拾い忘れていたら、取りに戻れる(todo 229)
+      canInteract: (api) => !api.flag("hatBack") || !api.flag("dazai"),
       interact(api) {
         ngRide.dir = "go";
         api.warp("kojo", "ride");
