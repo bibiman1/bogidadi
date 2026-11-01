@@ -110,6 +110,7 @@ const VOID_FRAGMENTS = [
 const VOID_DOOR = { x: 22 * T, y: 4 * T }; // 扉の足もと。いちばん北、まん中の通り道の突き当たり(D257)
 let vDoorT = 0; // 扉が開いた時刻(灯りのふくらみ)。-1 は開くところを見せている最中
 let vJustPulled = false; // 全集がそろった引きを見せた直後(続けて扉を開くときは、同じ引きをもう一度見せない)
+let vOwnCut = false; // 扉や全集の演出の中で、自分で void に入りなおしている(cut)あいだ
 const VOID = {
   tile: T,
   bg: "#f7f7f9",
@@ -243,13 +244,16 @@ const VOID = {
   ]),
   // すべての断片を終えて戻ると(D173、D184、D232): カメラが引いて月の欠けが見え、北の奥の扉が開く。一度だけ
   onEnter(api) {
+    // 扉の演出の途中で出たり入りなおしたりすると、その予約は捨てられる。「見せている最中」のしるしだけ残ると、
+    // 同じページでは二度と扉が開かなかった(「つづきから」で断片から始めたとき。作者「12冊あつめても地球シミュレーターが開かない」todo 232)
+    if (!vOwnCut && vDoorT < 0) vDoorT = 0;
     const all = VOID_FRAGMENTS.every((f) => api.cleared(f.id));
     const openDoor = () => {
       if (!all || api.flag("doorOpen") || vDoorT < 0) return;
       vDoorT = -1; // 見せているあいだ(cut で onEnter がもう一度呼ばれても、くり返さない)
       api.freeze(3);
       const door = () => {
-        api.cut("void", "start");
+        (vOwnCut = true), api.cut("void", "start"), (vOwnCut = false);
         const p = api.player();
         const d = VOID_DOOR;
         api.camPath([
@@ -280,7 +284,7 @@ const VOID = {
       api.later(4200, () =>
         api.showSeq(["v_pull1", "v_pull1c", "v_pull2", "v_pull3"], 2.8, () => {
           vJustPulled = all;
-          api.cut("void", "start");
+          (vOwnCut = true), api.cut("void", "start"), (vOwnCut = false);
           openDoor();
         })
       );
