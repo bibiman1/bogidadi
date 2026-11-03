@@ -152,6 +152,8 @@ const NG_HOTOU = {
     ngBreech("R", 11.3 * T),
     ngSeat("L"),
     ngSeat("R"),
+    // 奥の戸(C 甲板へ)。前は出口がなく、斉射のあとにもう一度入ると出られなかった(作者「斉射した後、砲塔にもう一度入ると装填できるが出られなくなる」)
+    { id: "exit", x: 7.0 * T, y: 3.1 * T, w: 1, h: 1, headY: 30, range: 1.0 * T, draw() {}, interact: (api) => api.warp("kansen", "door") },
     // まん中の仕切り。戸の前のいちばん上の列だけ、左右に通れる(D562)。絵はきーよりいつも手前(todo 217 オ)
     { id: "wall", x: 8 * T, y: 10 * T, w: 1, h: 1, sortDy: 1000, solid: { w: 0.8 * T, h: 6 * T, dy: -3 * T }, draw: ngFg("wall", 8 * T, 10 * T) },
     // 計器の箱と丸椅子は、きーの足もとと比べて前後を決める
@@ -427,6 +429,7 @@ const NG_E = {
   // 秒(カット 2、切りかえから)
   burst1: 3.5,
   burst2: 8.5,
+  boom: 3.0, // 音とゆれは、火球と EMP より遅れて届く(作者「火球とEMPが見えて、音が後から聞こえるようにして」)
   end: 15.0,
 };
 const NG_BURST = [
@@ -855,8 +858,8 @@ const NG_SEIHA = {
     once("swap", NG_E.swap0, () => api.sfx("whir"));
     once("fireB", NG_E.fireB, () => (api.sfx("salvo"), api.shake(1.2, 4)));
     const c2 = NG_E.cut;
-    once("b1", c2 + NG_E.burst1, () => (api.sfx("nuke"), api.shake(2.5, 2)));
-    once("b2", c2 + NG_E.burst2, () => (api.sfx("nuke"), api.shake(2.5, 2)));
+    once("b1", c2 + NG_E.burst1 + NG_E.boom, () => (api.sfx("nuke"), api.shake(2.5, 2)));
+    once("b2", c2 + NG_E.burst2 + NG_E.boom, () => (api.sfx("nuke"), api.shake(2.5, 2)));
     once("end", c2 + NG_E.end, () => {
       api.setFlag("fired");
       ngDrill(api);
