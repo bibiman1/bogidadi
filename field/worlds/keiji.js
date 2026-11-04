@@ -1301,11 +1301,11 @@ const kjParade = {
   h: 1,
   draw(ctx, sx, sy, t, api) {
     const lit = api.flag("lit");
-    const span = 14 * T;
+    const span = 14 * T; // 8 つを等しい間で回す(2 マスおきだと 8 つめが 1 つめに重なった、todo 252)
     KJ_PARADE.forEach((k, i) => {
       const im = api.image(k);
       if (!im) return;
-      let x = lit ? 5.6 * T + i * 1.5 * T : 5.2 * T + ((i * 2 * T + t * 18) % span);
+      let x = lit ? 5.6 * T + i * 1.5 * T : 5.2 * T + ((i * (span / KJ_PARADE.length) + t * 18) % span);
       if (!lit && x > 10.9 * T && x < 13.1 * T) return; // 塀の切れ目では見えない
       if (lit && x > 10.6 * T) x += 2.6 * T;
       const px = Math.round(sx - 12 * T + x);
