@@ -430,6 +430,7 @@ const NG_E = {
   burst1: 3.5,
   burst2: 8.5,
   boom: 3.0, // 音とゆれは、火球と EMP より遅れて届く(作者「火球とEMPが見えて、音が後から聞こえるようにして」)
+  boomGap: 0.45, // 火球 4 つの音は 4 回ずつ(作者「爆発音を4回づつにして」)。光の 0.18 秒おきでは 1 つに溶けるので、音は間をあける
   end: 15.0,
 };
 const NG_BURST = [
@@ -858,8 +859,9 @@ const NG_SEIHA = {
     once("swap", NG_E.swap0, () => api.sfx("whir"));
     once("fireB", NG_E.fireB, () => (api.sfx("salvo"), api.shake(1.2, 4)));
     const c2 = NG_E.cut;
-    once("b1", c2 + NG_E.burst1 + NG_E.boom, () => (api.sfx("nuke"), api.shake(2.5, 2)));
-    once("b2", c2 + NG_E.burst2 + NG_E.boom, () => (api.sfx("nuke"), api.shake(2.5, 2)));
+    [NG_E.burst1, NG_E.burst2].forEach((b, s) => {
+      for (let i = 0; i < 4; i++) once(`b${s + 1}_${i}`, c2 + b + NG_E.boom + i * NG_E.boomGap, () => (api.sfx("nuke"), api.shake(2.5, 2)));
+    });
     once("end", c2 + NG_E.end, () => {
       api.setFlag("fired");
       ngDrill(api);
