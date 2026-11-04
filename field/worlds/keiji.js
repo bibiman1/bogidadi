@@ -139,7 +139,7 @@ const kjPick = (who, q) => {
 // 問いのはじめに、ほかの 3 人がいつ押すかを決める(D515)。押さない者は Infinity
 const kjBeginQ = (api) => {
   const q = kjQ();
-  if (api) api.sfx("kjNorm"); // 問いの合図: 変な物の問いも同じ明るい音(D527。影の形だけで見分ける)
+  if (api) api.sfx(q.kind === "u" ? "kjOdd" : "kjNorm"); // 問いの合図: 変な物の問いは濁った音(D517。D527 をやめて戻した D598)
   const r = (w) => (kjS.rest[w] ? Infinity : 0);
   const [a, b] = KJ.tAt;
   const n = q.kind === "n";
@@ -653,9 +653,10 @@ const kjDrawShow = (ctx, ox, oy, api) => {
     ctx.fillStyle = "#1a1820";
     ctx.fillRect(196, 6, 88, 66);
     const g = ctx.createRadialGradient(240, 40, 4, 240, 40, 46);
-    // 変な物の問いも同じ白い幕(D527。D517 の紫の幕はやめた)
-    g.addColorStop(0, "#f0eadb");
-    g.addColorStop(1, "#cfc6b0");
+    // 変な物の問いは紫がかった暗い幕(D517)。ぴーがいつもわざと押すのが分かる(D598。D527 の白い幕をやめた)
+    const odd = kjS.phase !== "intro" && kjQ() && kjQ().kind === "u";
+    g.addColorStop(0, odd ? "#a898b4" : "#f0eadb");
+    g.addColorStop(1, odd ? "#5e4e6c" : "#cfc6b0");
     ctx.fillStyle = g;
     ctx.fillRect(200, 10, 80, 58);
     const q = kjQ();
@@ -667,7 +668,7 @@ const kjDrawShow = (ctx, ox, oy, api) => {
     for (let i = 0; i < 8; i++) {
       const left = kjS.phase === "q" ? KJ.qSec - kjEl() : kjS.phase === "choose" ? KJ.qSec - kjS.qEl : 0;
       const hot = kjS.phase === "choose" && Math.sin(t * 18) > 0; // 押したあとは点滅
-      const on = "#ffd75a"; // 変な物の問いも同じ黄色(D527)
+      const on = kjQ() && kjQ().kind === "u" ? "#b07ad8" : "#ffd75a"; // 変な物の問いはランプも紫(D517、D598)
       const skip = kjS.eerie >= 2 && kjRnd(Math.floor(t * 6) * 13 + i) < 0.1 * kjS.eerie; // 怖さ 2 から: ランプが飛び飛びに消える
       ctx.fillStyle = lampOn && i < Math.ceil(left) && !skip ? (hot ? "#ff7a4a" : on) : "#3a3228";
       ctx.fillRect(208 + i * 9, 74, 5, 4);
@@ -1249,12 +1250,7 @@ const kjStudioGround = (ctx, ox, oy, img, api) => {
       ctx.fillStyle = "#0c0b10";
       ctx.fillRect(KJ_G[k] - 18, KJ_G.y + 4, 36, 7);
     }
-    // スクリーンに番組名(todo 200。字は絵に描かせず、ゲームの字で映す)
-    const P = window.bogiPix;
-    if (P) {
-      const s = "形而アップダウンクイズ";
-      P.text(ctx, s, Math.round(384 - P.width(s) / 2), 84, 1, "#3a2c5c");
-    }
+    // スクリーンの番組名は、作者のバナーを縮めて背景に入れた(todo 245、D596 の案 5。左右の余白に上下の矢印 todo 248、D597。docs/record/2026-11-04/keiji_banner/side.py)
     if (lit) (ctx.fillStyle = "rgba(255, 250, 235, 0.12)"), ctx.fillRect(0, 0, 24 * T, 14 * T);
     ctx.restore();
     return;
@@ -1458,7 +1454,7 @@ const KJ_STUDIO = {
   legend: K_LEGEND,
   drawGround: kjStudioGround,
   spawns: {
-    start: { x: 3.5 * T, y: 6.7 * T, facing: "east" },
+    start: { x: 3.9 * T, y: 7.7 * T, facing: "east" }, // 扉の手前(todo 246)
     stage: { x: 12 * T, y: 8.6 * T, facing: "north" },
   },
   onEnter() {
@@ -1476,12 +1472,13 @@ const KJ_STUDIO = {
     ctx.fillStyle = g;
     ctx.fillRect(ox + 12 * T - 60, oy + 11 * T - 60, 120, 120);
   },
-  // 西の戸口(絵の左の扉)。扉に向かって歩くと出る。上へ歩くと y 6.23 マス、左へ歩くと x 3.34 マスで止まるので、
-  // そこまで届くようにする(はじめの帯は 6.1 マスまでで、足が届かず出られなかった todo 202)。入口(3.5, 6.7)にはかけない
-  // 戸口の前の通り道は 4 マスの高さ(5〜8 段)。1 マスだと、舞台の上の端や司会台の下から左へ歩いて壁で止まり、出られなかった(todo 227)
+  // 西の戸口(絵の左の扉。x 2.7〜4.4 マス、下の端 6.9 マス)。扉に向かって上へ歩くか、扉の下で左へ歩くと出る。
+  // 上へ歩くと y 6.23 マス、左へ歩くと x 3.34 マスで止まるので、そこまで届くようにする(todo 202)。
+  // 戸口の前の通り道は 4 マスの高さ(5〜8 段。todo 227)。前は左の帯が 4 マスぜんぶと入口の 2 ドット隣にかかり、
+  // 入ってすぐ左や下へ少し動くだけで出てしまった(todo 246)。左の帯は扉の下(7.2 マスまで)だけにし、入口は扉の手前に下げた
   triggers: [
-    { id: "leave", x: 2.9 * T, y: 5.6 * T, w: 1.1 * T, h: 0.85 * T, run: (api) => api.exit() },
-    { id: "leaveW", x: 2.9 * T, y: 5 * T, w: 0.55 * T, h: 4 * T, run: (api) => api.exit() },
+    { id: "leave", x: 2.9 * T, y: 5.6 * T, w: 1.5 * T, h: 0.85 * T, run: (api) => api.exit() },
+    { id: "leaveW", x: 2.9 * T, y: 5 * T, w: 0.55 * T, h: 2.2 * T, run: (api) => api.exit() },
     { id: "piFall", x: 5 * T, y: 5 * T, w: 15 * T, h: 5 * T, run: kjPiFallStart }, // 舞台に上がると(D520)
   ],
   objects: [
