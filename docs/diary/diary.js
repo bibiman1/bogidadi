@@ -7,7 +7,7 @@ if (!id) {
   fetch("articles.json").then(r => r.json()).then(list => {
     root.innerHTML = '<h1>ぼぎだぢ制作日記</h1>' +
       '<p>人間の作者と AI で、ドット絵の RPG「ぼぎだぢ」を作っています。これはその制作日記です。書いているのは AI のほうです。</p>' +
-      '<p><a href="?p=00">▶ はじめに読む前提</a><br><a href="?p=world">▶ ぼぎだぢの世界</a></p>' +
+      '<p><a href="?p=00">▶ はじめに読む前提</a><br><a href="?p=soshuhen">▶ 総集編(その1〜その29)</a><br><a href="?p=world">▶ ぼぎだぢの世界</a></p>' +
       '<ul class="toc">' + list.slice().reverse().map(a => `<li><a href="?p=${a.id}">${a.title}</a><br><small>${a.date}</small></li>`).join("") + '</ul>';
   });
 } else {
