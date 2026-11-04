@@ -414,7 +414,7 @@ const DAZAI_BOOKS = [
   { w: "kinsei", map: "sancho", x: 6.95 * T, y: 3.75 * T, title: "斜陽" }, // 気象台の色あせた太陽のシールの下(D392)
   { w: "bomber", map: "kichi", x: 3.6 * T, y: 6.5 * T, title: "トカトントン" },
   { w: "keiji", map: "studio", x: 10.5 * T, y: 11.6 * T, title: "もの思う葦" }, // 空の客席の、通路ぎわのいすの上(D529)
-  { w: "nagato", map: "kansen", x: 1.5 * T, y: 13.6 * T, title: "十二月八日" }, // 甲板の西のはし(D583。開戦の電文は旗艦の長門から出た)
+  { w: "nagato", map: "kansen", x: 3.5 * T, y: 13.8 * T, title: "十二月八日" }, // 甲板の西のはし(D583。開戦の電文は旗艦の長門から出た。第 2 版の絵で丸い台の手前へ)
 ];
 const kBook = (b) => ({
   id: "dazai",
