@@ -595,8 +595,10 @@ const F_CREDITS = [
   ["世界とことば", ["bibiman1"]],
   ["ゲームデザイン", ["bibiman1", "Claude"]],
   ["プログラム", ["Claude"]],
-  ["ドット絵", ["PixelLab", "下絵 Claude"]],
-  ["音と制作日記", ["Claude"]],
+  ["ドット絵", ["PixelLab"]], // 絵が 12 枚になったので、2 組を分けて 12 組に(D600。前は「ドット絵 PixelLab・下絵 Claude」「音と制作日記 Claude」)
+  ["下絵", ["Claude"]],
+  ["音", ["Claude"]],
+  ["制作日記", ["Claude"]],
   ["文字", ["DotGothic16", "(Fontworks)"]],
   ["道具", ["Claude Code", "GitHub", "Playwright"]],
   ["音楽", ["Iskander Ramazanov", "（Pixabay）", "Kevin MacLeod", "Komiku"]],
@@ -680,7 +682,7 @@ const F_ROLL = {
     // C: 作者のイメージボード(手描き)だけを、額に入れて流す。断片の名も、最後の写真も出さない(D284、D285)
     const fw = 160 * S;
     const fh = 112 * S;
-    const items = F_ROLL_ITEMS.slice(0, 10).map((_, i) => `roll_${String(i).padStart(2, "0")}`); // 作者のスケッチは 10 枚(11、12 番目の断片のぶんは、まだない)
+    const items = F_ROLL_ITEMS.map((_, i) => `roll_${String(i).padStart(2, "0")}`); // 作者のスケッチは 12 枚(11、12 枚目は断片の絵でない漫画。D600)
     items.forEach((key, i) => {
       const y = y0 + 90 * S + i * (fh + 40 * S);
       if (y < -fh - 40 * S || y > VHc + 10) return;

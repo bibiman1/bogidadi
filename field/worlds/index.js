@@ -214,7 +214,7 @@ window.BOGI_WORLDS = {
     anims: { v_b_flag: { frames: ["v_b_flag1", "v_b_flag2", "v_b_flag3", "v_b_flag2"], fps: 5 } },
     images: Object.assign(
       Object.fromEntries(
-        ["v_pull1", "v_pull1c", "v_pull2", "v_pull3", "v_b_heal", "v_b_town", "v_b_shelf", "v_b_flag", "v_b_flag1", "v_b_flag2", "v_b_flag3", "v_c_one", "v_off", "v_s1", "v_s2", "v_s3", "v_s4", "v_s5", "v_s6", "v_s7", "v_s8", "v_q1", "v_q2", "v_q3", "v_q4", "v_q5", "v_cluster", "v_cl1", "v_cl2", "v_cl3", ...Array.from({ length: 10 }, (_, i) => `roll_${String(i).padStart(2, "0")}`)].map((k) => [k, `${k}.png`])
+        ["v_pull1", "v_pull1c", "v_pull2", "v_pull3", "v_b_heal", "v_b_town", "v_b_shelf", "v_b_flag", "v_b_flag1", "v_b_flag2", "v_b_flag3", "v_c_one", "v_off", "v_s1", "v_s2", "v_s3", "v_s4", "v_s5", "v_s6", "v_s7", "v_s8", "v_q1", "v_q2", "v_q3", "v_q4", "v_q5", "v_cluster", "v_cl1", "v_cl2", "v_cl3", ...Array.from({ length: 12 }, (_, i) => `roll_${String(i).padStart(2, "0")}`)].map((k) => [k, `${k}.png`])
       ),
       Object.fromEntries(VOID_FRAGMENTS.map((f) => [`frag_${f.id}`, `./assets/worlds/void/frag_${f.id}.png`])),
       {

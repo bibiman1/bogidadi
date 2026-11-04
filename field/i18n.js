@@ -224,6 +224,8 @@
     "ドット絵": "Pixel art",
     "下絵 Claude": "Sketches: Claude",
     "音と制作日記": "Sound & dev diary",
+    "下絵": "Sketches",
+    "制作日記": "Dev diary",
     "文字": "Font",
     "道具": "Tools",
     "音楽": "Music",
