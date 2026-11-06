@@ -222,6 +222,15 @@ function piPathAt(d) {
 }
 const PI_SLIDE = 170; // px / 秒(きーの歩き 150 より少し速い。追いこしていく)
 const PI_CLIMB = 42;
+// 峠の上で、古タイヤにぴょこんと飛び乗る(D642)。最初はきーが近づくまで待ち、2 回目からは登りきって少しおいて跳ぶ
+const PI_GAP = 40; // 引いている古タイヤは、ぴーの 40 ドットうしろ(坂の下)
+const PI_WAIT_NEAR = 2.5 * T; // 峠に着いた所(3 マスほど先)では、まだ跳ばない。きーが一歩寄ると跳ぶ
+const PI_REST = 0.5;
+const PI_CROUCH = 0.15;
+const PI_HOP = 0.35;
+const PI_HOP_H = 14;
+const PI_LAND = 0.12;
+const PI_RIDE_UP = 7; // タイヤに乗ると、ぴーはこれだけ上に描く
 function piSled() {
   return {
     id: "pi_sled",
@@ -236,31 +245,47 @@ function piSled() {
         this.phase = null;
         return;
       }
+      const pl = api.player();
+      const go = (phase) => {
+        this.phase = phase;
+        this.pt = t;
+      };
       if (!this.phase) {
-        // きーが峠の上に着いたところで、ちょうど滑りだす
-        this.phase = "slide";
+        // 峠の上で、古タイヤのとなりに立って、きーを待つ
+        go("wait");
         this.d = PI_PATH.total;
       }
-      if (this.phase === "slide") {
+      const top = PI_PATH.total;
+      if (this.phase === "wait") {
+        const q = piPathAt(top);
+        if (Math.hypot(pl.x - (q.x - q.ty * 26), pl.y - (q.y + q.tx * 26)) < PI_WAIT_NEAR) go("hop");
+      } else if (this.phase === "rest") {
+        if (t - this.pt >= PI_REST) go("hop");
+      } else if (this.phase === "hop") {
+        if (t - this.pt >= PI_CROUCH + PI_HOP) {
+          go("slide");
+          this.d = top - PI_GAP;
+          api.sfx("pop");
+        }
+      } else if (this.phase === "slide") {
         this.d -= PI_SLIDE * dt;
         if (this.d <= 0) {
           this.d = 0;
-          this.phase = "climb";
+          go("climb");
         }
       } else {
         this.d += PI_CLIMB * dt;
-        if (this.d >= PI_PATH.total) {
-          this.d = PI_PATH.total;
-          this.phase = "slide";
+        if (this.d >= top) {
+          this.d = top;
+          go("rest");
         }
       }
       const p = piPathAt(this.d);
-      // 滑るときは左右にゆれる。登るときは道の東より(下るきーとすれちがえるように)
-      const off = this.phase === "slide" ? Math.sin(t * 1.4) * 26 : 26;
+      // 滑るときは左右にゆれる(登ってきた道の東よりから、なめらかに)。登るときと峠の上では、道の東より(下るきーとすれちがえるように)
+      const off = this.phase === "slide" ? Math.cos((t - this.pt) * 1.4) * 26 : 26;
       this.x = p.x - p.ty * off;
       this.y = p.y + p.tx * off;
       this.dir = p;
-      const pl = api.player();
       if (this.phase === "slide") {
         const dx = pl.x - this.x;
         const dy = pl.y - this.y;
@@ -288,10 +313,53 @@ function piSled() {
       const tire = api.image("pi_tire");
       if (!pi || !tire || !this.dir) return;
       const { tx, ty } = this.dir;
+      // ぴーの正面の絵を、足もと(下のはし)をそろえて、のび縮みさせて描く
+      const drawFront = (x, y, kx, ky) => {
+        const w = Math.round(64 * kx);
+        const h = Math.round(64 * ky);
+        ctx.drawImage(pi, 0, 0, 64, 64, Math.round(x - w / 2), Math.round(y + 32 - h), w, h);
+      };
       if (this.phase === "slide") {
-        // タイヤに乗って、下を向いて滑る(ぴーは正面の絵)
+        // タイヤに乗って、下を向いて滑る(ぴーは正面の絵)。乗った直後は、一度つぶれる
         ctx.drawImage(tire, sx - tire.width / 2, sy - tire.height / 2);
-        ctx.drawImage(pi, 0, 0, 64, 64, sx - 32, sy - 32 - 7, 64, 64);
+        const land = t - this.pt < PI_LAND;
+        drawFront(sx, sy - PI_RIDE_UP, land ? 1.12 : 1, land ? 0.84 : 1);
+        return;
+      }
+      if (this.phase === "wait" || this.phase === "rest" || this.phase === "hop") {
+        // 峠の上: 古タイヤは坂の下(前)。ぴーは正面を向いて、となりに立ち、ぴょこんと跳んで乗る
+        const bx = Math.round(sx - tx * PI_GAP);
+        const by = Math.round(sy - ty * PI_GAP);
+        const e = this.phase === "hop" ? t - this.pt : -1;
+        let px = sx;
+        let py = sy;
+        let kx = 1;
+        let ky = 1;
+        if (e >= 0 && e < PI_CROUCH) {
+          kx = 1.08;
+          ky = 0.86;
+        } else if (e >= PI_CROUCH) {
+          const k = Math.min(1, (e - PI_CROUCH) / PI_HOP);
+          const gx = sx + (bx - sx) * k;
+          const gy = sy + (by - sy) * k;
+          // 足もとの影は、地面に残す
+          ctx.fillStyle = "rgba(59, 52, 64, 0.28)";
+          ctx.beginPath();
+          ctx.ellipse(Math.round(gx), Math.round(gy + 22), 14, 4, 0, 0, Math.PI * 2);
+          ctx.fill();
+          px = gx;
+          py = gy - PI_RIDE_UP * k - Math.sin(k * Math.PI) * PI_HOP_H;
+          kx = 0.94;
+          ky = 1.08;
+        }
+        const drawTire = () => ctx.drawImage(tire, bx - tire.width / 2, by - tire.height / 2);
+        if (by > py) {
+          drawFront(px, py, kx, ky);
+          drawTire();
+        } else {
+          drawTire();
+          drawFront(px, py, kx, ky);
+        }
         return;
       }
       // 古タイヤをひもで引いて登る: タイヤは坂の下(うしろ)、ぴーは前。ぴーは登る向きの絵
