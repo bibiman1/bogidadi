@@ -7,11 +7,11 @@
 const nRace = (api) => api.warp("race", "view");
 // 対戦カード(D367): 左にぼぎカー、右に 5 台(勝ち抜きの順)。勝った相手は暗くして「かち」、次の相手は黄の枠が点滅
 const N_CARD_SEC = 3.2;
-function nCardShow(api, round, then) {
+function nCardShow(api, round, then, lose) {
   // カードが出ているあいだも A は効くので、押すたびにカードと「競争へ」が積み重なり、競争が何度も始め直されていた
   // (作者「ポンポンカーとの競争の際、後ろからの絵が2回出た。」)。カードが出ている間は、新しいカードを出さない
   if (nS.card) return;
-  nS.card = { t0: nNow(), round, sec: N_CARD_SEC };
+  nS.card = { t0: nNow(), round, sec: N_CARD_SEC, lose: !!lose };
   api.freeze(N_CARD_SEC);
   api.sfx("pop");
   api.later(N_CARD_SEC * 1000, () => {
@@ -42,6 +42,7 @@ function nCardDraw(ctx, api) {
   const bc = im("bogicar_e_flame");
   if (bc) ctx.drawImage(bc, X + 14, Y + 132, 77 * 1.3, 37 * 1.3);
   if (pix) pix.text(ctx, "きー", X + 48, Y + 192, 1, "#f4f0dc");
+  if (nS.card.lose && pix) pix.text(ctx, "まけ", X + 48, Y + 208, 1, "#ff4a3c"); // 負けたら(D639。英語は LOSE)
   if (pix) pix.text(ctx, "VS", X + 118, Y + 140, 2, "#ff7a3c");
   // 右: 5 台。相手は左(ぼぎカー)を向くように左右を反転
   N_ROUNDS.forEach((rd, i) => {

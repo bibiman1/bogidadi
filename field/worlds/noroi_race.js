@@ -32,7 +32,7 @@ const N_FX = N_SX + N_RACE_D * N_PX; // ゴールの線
 const N_GY = { opp: 220, ki: 286 }; // 奥の車線と手前の車線の地面の y
 const N_TREE = { x: 214, foot: 298, xs: [7, 23], ys: [8, 24, 40, 56, 72, 89, 105], r: 5 }; // 手前の信号の柱(左の列 = 相手、右の列 = ぼぎカー)
 const N_LAMP = { stage: "#f4f0dc", amber: "#ffbe3c", green: "#7cf08a", red: "#ff4a3c" };
-const nr = { t0: 0, foul: -1, go: -1, end: null, endT: 0, snapT: -1, round: 0, repT: -1, rep0: 0, flash: -1 };
+const nr = { t0: 0, foul: -1, go: -1, end: null, endT: 0, snapT: -1, round: 0, repT: -1, rep0: 0, flash: -1, loseT: -1 };
 // 今の回(0〜4)。前の 3 回戦のころの記録(nrR1、nrR2)も読む
 const nRound = (api) => Math.min(N_ROUNDS.length - 1, Number(api.flagValue("nrRound")) || (api.flag("nrR2") ? 2 : api.flag("nrR1") ? 1 : 0));
 const nRaceReset = (api) => {
@@ -44,9 +44,31 @@ const nRaceReset = (api) => {
   nr.snapSfx = false;
   nr.repT = -1;
   nr.flash = -1;
+  nr.loseT = -1;
   nr.round = nRound(api);
   nRcPuffs.length = 0;
   nRrPuffs.length = 0;
+};
+// 負けたら(D639、D640): きーだけがガタガタ震えて悔しがる。そのあと対戦カードの きー に「まけ」、1 回戦からやり直し
+// 負け方(相手が先にゴール、フライング、押さないまま)はどれも同じ。勝った相手は何もしない
+const N_LOSE_SHAKE = 1.6;
+const nLose = (api) => {
+  if (nr.loseT >= 0) return;
+  nr.loseT = nNow();
+  api.sfx("gata");
+  api.later(N_LOSE_SHAKE * 1000, () => {
+    api.setFlag("nrRound", 0);
+    api.setFlag("nrR1", false);
+    api.setFlag("nrR2", false);
+    nCardShow(api, 0, () => nRaceReset(api), true);
+  });
+};
+// きーの震え(ドット)。負けてから N_LOSE_SHAKE 秒、左右に小きざみ
+const nLoseShake = (a) => {
+  if (nr.loseT < 0) return 0;
+  const e = nNow() - nr.loseT;
+  if (e > N_LOSE_SHAKE) return 0;
+  return (Math.floor(e * 28) % 2 === 0 ? 1 : -1) * a;
 };
 // 相手の位置(m)。青から少し遅れて出て、だんだん速く
 // ゴールのあとは慣性で走り抜け、N_BRAKE 秒のブレーキで止まる(D347。相手は無慣性ではない)
@@ -510,12 +532,13 @@ const nDrawRear = (ctx, ox, oy, get, api, st0) => {
     // きー: 立つ(向こう向き)。うしろから見ると、顔のうしろのくぼみに立つきーの下半分は、板のうしろのはしに隠れる
     // 青で押すと、つぶれて背中に張り付く(粘着駆動 D123)
     const { x, y, f } = nAt(NR_LANE.ki, ki);
+    const gx = nLoseShake(Math.max(1, Math.round(2 * f))); // 負けたら、きーだけ震える(D639)
     const bh = kim ? kim.height * f : 0;
     const stand = get("rc_ki_back");
     if (nr.go < 0 && stand && kim) {
       const w = stand.width * f, h = stand.height * f;
       const footY = y - bh + 22 * f;
-      ctx.drawImage(stand, Math.round(ox + x - w / 2), Math.round(oy + footY - h + shake), Math.round(w), Math.round(h));
+      ctx.drawImage(stand, Math.round(ox + x - w / 2 + gx), Math.round(oy + footY - h + shake), Math.round(w), Math.round(h));
     }
     const r = nDrawCar(ctx, kim, ox, oy, NR_LANE.ki, ki, shake);
     if (!r) return;
@@ -523,7 +546,7 @@ const nDrawRear = (ctx, ox, oy, get, api, st0) => {
     if (nr.go >= 0 && stick) {
       const w = stick.width * f, h = stick.height * f;
       const footY = y - bh + 12 * f;
-      ctx.drawImage(stick, Math.round(ox + x - w / 2), Math.round(oy + footY - h + shake), Math.round(w), Math.round(h));
+      ctx.drawImage(stick, Math.round(ox + x - w / 2 + gx), Math.round(oy + footY - h + shake), Math.round(w), Math.round(h));
     }
     if (burn && Math.random() < 0.55) {
       nRrPuff(r.x - r.w * 0.42, r.y - 4, r.f);
@@ -560,7 +583,7 @@ const N_RACE = {
     if (nr.end || nr.foul >= 0 || nr.go >= 0 || s < 3.4) return true;
     if (s < N_GREEN) {
       nr.foul = s; // 青より前は赤(フライング)
-      api.later(2000, () => nRaceReset(api));
+      api.later(400, () => nLose(api)); // 赤が灯るのを見せてから震える
       return true;
     }
     nr.go = s;
@@ -605,9 +628,11 @@ const N_RACE = {
               });
             }
           });
-        } else api.later(2200, () => nRaceReset(api)); // 負けたら、その回からやり直し
+        }
       }
     }
+    // 負けたら、震えて、カードに「まけ」、1 回戦から(D639、D640)。走っていれば、ゴールを過ぎてぴたりと止まってから震える
+    if (nr.end === "lose" && nr.loseT < 0 && (nr.go < 0 || ki >= N_RACE_D + 24)) nLose(api);
     if (nr.repT < 0) {
       nRaceSound(st0, null);
       nDrawRear(ctx, ox, oy, get, api, st0);
@@ -705,7 +730,7 @@ const N_RACE = {
         const standing = nr.go < 0 || s < nr.go;
         const kx = standing ? kr.x0 + 60 : kr.x0 + 30;
         const ky = standing ? kr.y0 + 20 : kr.y0 + 22;
-        ctx.drawImage(im, kx, ky - im.height);
+        ctx.drawImage(im, kx + nLoseShake(2), ky - im.height); // 負けたら、きーだけ震える(D639)
       }
       if (burn && Math.random() < 0.7) nRcPuff(kr.x0 - ox + cam + 26, N_GY.ki - 6, -60);
     }

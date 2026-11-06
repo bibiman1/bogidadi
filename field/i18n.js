@@ -204,6 +204,7 @@
     "タイム　スリップ": "Time slip",
     "かちぬきせん": "Knockout",
     "かち": "Win",
+    "まけ": "LOSE",
     "カチ　カチ": "clack  clack",
     "コロン": "clonk",
     "デン　デン": "dun  dun",
