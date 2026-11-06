@@ -516,8 +516,11 @@ const ASSET_V = (() => {
 
     // おす: 押せる物(o.push)に向かって歩くと、ゆっくり押す。押した先がふさがっていれば動かない
     // o.push = { area: [x0, y0, x1, y1](動ける範囲、省略可) }。押したあとで o.onPush(api)
+    // o.push.teach(api): まだ おす を覚えていないとき、ぶつかったここで覚える(D645)
     function tryPush(o, dx, dy) {
-      if (!o || !o.push || !can("osu") || !o.solid) return false;
+      if (!o || !o.push || !o.solid) return false;
+      if (!can("osu") && o.push.teach) o.push.teach(world.api);
+      if (!can("osu")) return false;
       if (o.push.enabled && !o.push.enabled(world.api)) return false;
       const nx = o.x + dx;
       const ny = o.y + dy;

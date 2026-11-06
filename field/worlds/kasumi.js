@@ -189,6 +189,7 @@ function learnedJump(api) {
   api.later(500, () => {
     crewHop(0); // クルーも一緒に跳ぶ
     api.setFlag("jumpLearned");
+    if (api.hasAbility("jump")) return; // 南極で、もう覚えている(D645)。教わる場面はそのまま
     api.learnAbility("jump"); // ここで習得。ほかのフィールドでも跳べるようになる
     api.bubble("player", `ジャンプ　を　おぼえた（${jumpKey()}）`, 4000); // きーの吹き出しで(todo 156、todo 161)
   });

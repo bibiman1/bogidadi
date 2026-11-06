@@ -325,7 +325,8 @@ const B_STEPS_OBJS = [
       dir: 1,
       hidden: (api) => !api.flag("fledCanal"),
       // マンゴーのあと(D201): きこりはマンゴーをくわえたまま、下の雪原を逃げまわる。歩いて近づくと逃げられる。
-      // はしる(呪いの野犬で覚える)で追いつくと、立ち止まって、ちりんと食べはじめる(見届け)
+      // はしるで追いつくと、立ち止まって、ちりんと食べはじめる(見届け)。まだ はしる を覚えていなければ、
+      // 走って逃げるきこりをまねて、ここで覚える(呪いの野犬より先に来るため。D645)
       ang: 0,
       update(dt, t, api) {
         if (!api.cleared("banana")) return;
@@ -334,6 +335,7 @@ const B_STEPS_OBJS = [
         if (api.flag("caught")) return;
         if (!this.fleeing) {
           this.fleeing = true;
+          if (!api.hasAbility("hashiru")) api.later(1200, () => kLearn(api, "hashiru", "はしる"));
           this.ang = Math.PI / 2;
           Object.assign(this, at());
         }
@@ -396,17 +398,18 @@ const B_STEPS = {
     south: { x: 8 * T, y: 18.6 * T, facing: "north" },
   },
   triggers: [{ id: "toCanal", x: 7 * T, y: 19.6 * T, w: 2 * T, h: T, warp: { map: "canal", spawn: "north" } }],
-  // 段の並び(D628)で、霞ヶ浦(ジャンプ)より先に来ることがある。きこりがマンゴーに跳びつくのをまねて、
-  // ここでだけ跳べる(霞ヶ浦の「教わっている断片の中だけ」と同じ D201。覚えはしない D637)
+  // 段の並び(D628)で、霞ヶ浦(ジャンプ)より先に来ることがある。まだ覚えていなければ、
+  // きこりがマンゴーに跳びつくのをまねて、ここで覚える(霞ヶ浦と同じ吹き出し。D645)
   onEnter(api) {
     chirinEnter(B_STEPS_OBJS)();
-    if (api.hasAbility("jump") || api.flag("jump")) return;
+    if (api.hasAbility("jump")) return;
     api.later(1500, () => {
-      api.setFlag("jump");
-      api.toast(`${lastTouch ? "Bボタン" : "Xキー"}で　とんでみよう`, 8); // 霞ヶ浦と同じ案内
+      api.learnAbility("jump");
+      api.sfx("chime");
+      api.bubble("player", `ジャンプ　を　おぼえた（${jumpKey()}）`, 4000); // 霞ヶ浦と同じ吹き出し(jumpKey は kasumi.js)
       const b = document.getElementById("actionBtnB");
       if (b) b.classList.add("hint");
-      api.later(8000, () => b && b.classList.remove("hint")); // 案内の字と同じ長さで消す
+      api.later(8000, () => b && b.classList.remove("hint")); // 霞ヶ浦の案内と同じ長さで消す
     });
   },
   onJump(api, p) {

@@ -524,7 +524,8 @@ const S_CRATER = sMap("crater", 28, 14, {
       h: 48,
       headY: 30,
       solid: { w: 52, h: 14, dy: -6 },
-      push: { area: [2 * T, 3 * T, 26 * T, 11.2 * T] },
+      // おすをまだ覚えていなければ、ぶつかったここで覚えて、そのまま押せる(ホテルより先に来るため。D645)
+      push: { area: [2 * T, 3 * T, 26 * T, 11.2 * T], teach: (api) => kLearn(api, "osu", "おす") },
       update(dt, t, api) {
         if (api.flag("cartOff") && !this._moved) {
           this._moved = true;
