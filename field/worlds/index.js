@@ -155,9 +155,9 @@ window.BOGI_WORLDS = {
     name: "荒川の鈴木商店",
     assetBase: "./assets/worlds/suzuki/",
     images: Object.fromEntries(
-      ["bg_stop", "bg_alley", "bg_shop", "bg_river", "bg_crater", "fg_river", "fg_crater", "fg_alley", "bg_orbit", "tetsubin", "v_inside", "v_rise3", "v_fall", "rise_sky", "rise_tube", "rise_earth", "rise_cloud", "v_denpyo", "v_nifuda", "v_nouhin", "bg_print"]
+      ["bg_stop", "bg_alley", "bg_shop", "bg_river", "bg_crater", "fg_river", "fg_crater", "fg_alley", "bg_orbit", "fg_orbit", "tetsubin", "v_inside", "v_rise3", "v_fall", "rise_sky", "rise_tube", "rise_earth", "rise_cloud", "v_denpyo", "v_nifuda", "v_nouhin", "bg_print"]
         .map((k) => [k, `${k}.png`])
-        .concat([["ki", "./assets/worlds/lake/ki_walk.png"], ["matryo", "./assets/worlds/keiji/matryo.png"]])
+        .concat([["ki", "./assets/worlds/lake/ki_walk.png"], ["matryo", "./assets/worlds/keiji/matryo.png"], ["pi", "./assets/worlds/lake/pi_walk.png"]]) // pi: 納品先の担当者の体(D655)
     ),
     playerSprite: { img: "ki", cell: 64, frames: 7, footY: 17 },
     start: "stop",
@@ -407,7 +407,7 @@ const DAZAI_BOOKS = [
   { w: "haihei", map: "sick", x: 2.6 * T, y: 4.3 * T, dy: -18, title: "人間失格", mutter: true },
   { w: "kasumi", map: "shore", x: 22.5 * T, y: 15.4 * T, title: "津軽" },
   { w: "banana", map: "steps", x: 3.5 * T, y: 18.4 * T, title: "雪の夜の話" },
-  { w: "suzuki", map: "shop", x: 2.5 * T, y: 7.4 * T, title: "貨幣" },
+  { w: "suzuki", map: "shop", x: 4.3 * T, y: 9.4 * T, title: "貨幣" }, // 灰色の机の足もとの床(昭和の事務所 todo 272)
   { w: "takarabune", map: "engineroom", x: 13.5 * T, y: 4.5 * T, title: "魚服記" },
   { w: "noroi", map: "diner", x: 3 * T, y: 5.5 * T, title: "走れメロス" },
   { w: "padre", map: "akichi", x: 18.6 * T, y: 5.3 * T, title: "お伽草紙" },

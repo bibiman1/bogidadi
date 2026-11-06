@@ -2,7 +2,7 @@
 const root = document.getElementById("root");
 fetch("guide.md").then(r => { if (!r.ok) throw 0; return r.text(); })
   .then(md => {
-    root.innerHTML = marked.parse(md) + '<p class="foot"><a href="../diary/index.html">制作日記へ</a></p>';
+    root.innerHTML = marked.parse(md) + '<p class="foot"><a href="../diary/index.html">制作日記へ</a><br><a href="https://bibiman1.github.io/bogidadi/">▶ ぼぎだぢのページへ</a></p>';
     // 目次: 章(h2)ごとに。1 つ目の hr の前に置く
     const hs = [...root.querySelectorAll("h2")];
     hs.forEach((h, i) => { h.id = "c" + i; });

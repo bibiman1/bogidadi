@@ -37,21 +37,21 @@ const S_GRIDS = {
     "............................",
     "............................",
   ],
+  // 昭和の事務所(todo 272): 奥に金庫・書類棚・帳簿の棚、左に灰色の机、まん中に事務机、右に石油ストーブと応接のいす
   shop: [
     "################",
     "################",
-    "#..............#",
-    "#####......#####",
-    "#####......#####",
-    "#####......#####",
-    "#....######....#",
-    "#..............#",
-    "####........####",
-    "####........####",
-    "####........####",
+    "################",
+    "#########......#",
+    "#####..##....###",
+    "#####.#####..###",
+    "#####.#####..###",
+    "#####.#####.##.#",
+    "#####.......####",
+    "###.........####",
+    "###.........####",
     "#######..#######",
-  ],
-  river: [
+  ],  river: [
     "############################",
     "############################",
     "............................",
@@ -155,7 +155,7 @@ const S_SHOP = sMap("shop", 16, 12, {
   triggers: [{ id: "out", x: 7 * T, y: 11.7 * T, w: 2 * T, h: T, warp: { map: "alley", spawn: "shop" } }],
   // 机の前の脚のあたりまで(机の足もと)は通れない(2026-10-03、作者「重ね合わせみてね」)
   objects: [
-    kWall(160, 224, 356, 250),
+    kWall(184, 200, 344, 252), // 事務机(todo 272)
     {
       id: "tetsubin",
       w: 44,
@@ -235,7 +235,7 @@ const S_SHOP = sMap("shop", 16, 12, {
     // カウンターの紙: 流れ星の前は伝票、あとは納品書(宛先がにじんで読めない)
     sSpot(
       "counter",
-      6.1 * T,
+      10.1 * T, // 事務机の右はしの紙(todo 272)
       6.4 * T,
       (api) => {
         if (api.flag("fallen")) {
@@ -434,17 +434,124 @@ const S_SPACE = {
   triggers: [],
   objects: [],
 };
+// 納品先の担当者(todo 272、D655): 体はぴーのまま(同じ色)で、下に触手がたくさん垂れて、浮かんでいる。しゃべらない。
+// きーがしばらくたたずんでいると、突然、左の穴から入ってきて、ゆっくり近づく。きーが話しかけると、
+// とつぜんきーを押しはじめ、右の穴まで押していって外へ落とす(きーは自分では出られない。はじき飛ばさない)
+const SK_M = { wait: 5, walk: 32, gap: 40, push: 95 };
+const skM = { t: 0, x: 0, y: 0, phase: "wait", step: 0, kx: 0, v: 0, lunge: 0 };
+// 触手 1 本: 根もと(x0, y0)から下へ垂れる。長さ len、少し外へ開く(ang)。先ほど、ゆらゆら
+function skTentacle(ctx, x0, y0, len, ang, t, k) {
+  const pts = [[x0, y0]];
+  for (let s = 1.5; s <= len; s += 1.5) {
+    const u = s / len;
+    const a = ang + Math.sin(t * 3.2 + k * 1.3 - u * 4) * 0.55 * u;
+    const q = pts[pts.length - 1];
+    pts.push([q[0] + Math.sin(a) * 1.5, q[1] + Math.cos(a) * 1.5]);
+  }
+  ctx.fillStyle = "#4a3828";
+  pts.forEach(([x, y], i) => {
+    const r = i < pts.length * 0.55 ? 3 : 2;
+    ctx.fillRect(Math.round(x) - r, Math.round(y) - r, r * 2, r * 2);
+  });
+  pts.forEach(([x, y], i) => {
+    ctx.fillStyle = i % 5 === 2 ? "#de8ca8" : "#f4b0c4";
+    const r = i < pts.length * 0.55 ? 2 : 1;
+    ctx.fillRect(Math.round(x) - r, Math.round(y) - r, r * 2, r * 2);
+  });
+}
 const S_ORBIT = sMap("orbit", 28, 10, {
   bg: "#060814",
-  spawns: { west: { x: 3 * T, y: 6 * T, facing: "east" } },
-  triggers: [
-    { id: "outE", x: 26.8 * T, y: 5 * T, w: 2.2 * T, h: 2 * T, run: sOut },
+  spawns: { west: { x: 9 * T, y: 6 * T, facing: "east" } }, // 筒のまん中寄りにたたずむ(左の穴から担当者が近づく間をとる)
+  onEnter() {
+    Object.assign(skM, { t: 0, x: 0.6 * T, y: 5.9 * T, phase: "wait", step: 0, v: 0, lunge: 0 });
+  },
+  // つなぎめの輪の手前の線は、筒の中のぴーときーより手前(docs/assets/suzuki/orbit_fg/cut.py)
+  drawOverlay(ctx, ox, oy, t, api) {
+    const fg = api.image("fg_orbit");
+    if (fg) ctx.drawImage(fg, ox, oy);
+  },
+  triggers: [],
+  objects: [
+    {
+      id: "nouhinsaki",
+      x: 0.6 * T,
+      y: 5.9 * T,
+      w: 1,
+      h: 1,
+      headY: 44,
+      range: 56,
+      canInteract: () => skM.phase === "near",
+      interact(api) {
+        // 話しかけると、とつぜん押しはじめる
+        skM.phase = "shove";
+        skM.lunge = 0;
+        api.sfx("pop");
+      },
+      update(dt, t, api) {
+        skM.t += dt;
+        const p = api.player();
+        if (skM.phase === "wait") {
+          if (skM.t < SK_M.wait || api.flag("fallen")) return;
+          skM.phase = "walk";
+        }
+        if (skM.phase === "walk" || skM.phase === "near") {
+          // きーの左どなりへ、ゆっくり近づく(きーが動けば、ついてくる)
+          const tx = p.x - SK_M.gap;
+          const dx = tx - skM.x;
+          const dy = p.y - skM.y;
+          const far = Math.hypot(dx, dy) > 3;
+          if (far) {
+            skM.x += Math.sign(dx) * Math.min(Math.abs(dx), SK_M.walk * dt);
+            skM.y += Math.sign(dy) * Math.min(Math.abs(dy), SK_M.walk * dt);
+            skM.step += dt;
+          }
+          skM.phase = Math.hypot(p.x - skM.x, p.y - skM.y) < SK_M.gap + 14 ? "near" : "walk";
+        } else if (skM.phase === "shove") {
+          // 前の触手をきーにあてて、そのまま右の穴まで押していく
+          skM.lunge = Math.min(1, skM.lunge + dt * 4);
+          skM.x += SK_M.push * skM.lunge * dt;
+          skM.y += (5.9 * T - skM.y) * Math.min(1, dt * 4);
+          skM.step += dt;
+          api.freeze(0.3);
+          api.place(Math.max(p.x, skM.x + SK_M.gap), skM.y);
+          if (p.x > 26.9 * T) {
+            skM.phase = "done";
+            sOut(api);
+          }
+        }
+        this.x = skM.x;
+        this.y = skM.y;
+      },
+      draw(ctx, sx, sy, t, api) {
+        if (skM.phase === "wait") return;
+        const im = api.image("pi");
+        const lift = 18; // 触手で浮かんでいるぶん、体が上にある
+        const by = sy - lift + Math.round(Math.sin(t * 2.4) * 2); // 体の底(ふわふわ上下する)
+        // 体の下から垂れる触手(体の前に出る長いもの)。押すときは前の 3 本が、きーのほうへ突き出る
+        const shove = skM.phase === "shove" || skM.phase === "done" ? skM.lunge : 0;
+        for (let k = 0; k < 9; k++) {
+          const bx = sx - 15 + k * 3.75;
+          let ang = (k - 4) * 0.09;
+          let len = 15 + ((k * 7) % 4) * 2;
+          if (shove && k >= 6) {
+            ang = ang + (Math.PI / 2 - 0.35 - ang) * shove;
+            len += 6 * shove;
+          }
+          skTentacle(ctx, bx, by - 4, len, ang, t, k);
+        }
+        if (im) ctx.drawImage(im, (Math.floor(skM.step * 6) % 7) * 64, 2 * 64, 64, 64, Math.round(sx - 32), Math.round(by - 47), 64, 64);
+      },
+    },
   ],
-  objects: [],
 });
 // 夜の河川敷。単結晶が寝ていた所が、クレーターになっている。きーは、その真ん中にいる
 // 着地の爆発: 白い光、飛び散る土、広がる煙の輪(1.6 秒)
 let boomT0 = -1;
+// クレーターの石積み(土嚢)を 12 ドットの幅に分けた [左, 上, 足もと](fg_crater の絵から測った)
+const SK_SANDBAG = [
+  [708, 262, 311], [720, 246, 311], [732, 238, 309], [744, 232, 283], [756, 226, 269], [768, 224, 263], [780, 222, 259], [792, 222, 257],
+  [804, 222, 259], [816, 222, 259], [828, 224, 265], [840, 226, 275], [852, 234, 291], [864, 242, 311], [876, 252, 311], [884, 270, 311],
+];
 const S_EMBER = { x: 18.6 * T, y: 7.4 * T }; // 残り火と、その上に倒れた荷車
 const S_CRATER = sMap("crater", 28, 14, {
   bg: "#101830",
@@ -453,6 +560,7 @@ const S_CRATER = sMap("crater", 28, 14, {
       // 白が引くと、もう火の玉が上がっている。画面がゆれ、煙が晴れるまで、きーは動かない(D91)
       api.setFlag("landing", false);
       boomT0 = performance.now() / 1000;
+      api.sfx("boom"); // 着地の爆発の音(todo 272)
       api.shake(0.7, 7);
       api.freeze(1.9);
     }
@@ -514,7 +622,9 @@ const S_CRATER = sMap("crater", 28, 14, {
   triggers: [{ id: "toAlley", x: 12 * T, y: 13.75 * T, w: 3 * T, h: T, warp: { map: "alley", spawn: "north" } }],
   // 石のアーチと小さな柱は、足もとの y できーと前後(アーチの下はくぐれる)。根もとはふさぐ
   objects: [
-    kFg("fg_crater", 704, 218, 194, 100, 313),
+    // 落ちたあとの石積みは、地面に積んだ土嚢のように見える(todo 272 の A)。くぐれない。
+    // 12 ドットの幅ごとに、その足もとできーと前後させ、帯は通れない
+    ...SK_SANDBAG.flatMap(([x0, top, bot]) => [kFg("fg_crater", x0, top, 12, bot - top + 1, bot + 2), kWall(x0, bot - 12, x0 + 12, bot + 1)]),
     // 倒れた荷車(D201): 着地の爆風で、土手の小屋から飛んできた。下に、大気圏突入の残り火が光っている。押してどけると見届けられる
     {
       id: "niguruma",
