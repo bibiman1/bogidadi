@@ -91,17 +91,18 @@ function fragment(id, title, text, icon, col, row, tier) {
 }
 
 const VOID_FRAGMENTS = [
-  // 配置(D257、todo 51、D578): はじまり(南)から扉(北)へ、段ごとに北へ並ぶ。まん中の列(22)は扉への通り道として空ける。
+  // 配置(D257、todo 51、D578、D628): はじまり(南)から扉(北)へ、段ごとに北へ並ぶ。まん中の列(22)は扉への通り道として空ける。
   // 段の間は 5 マス(27、22、17、12、7 行目)。3 つの段は左右を交互に寄せ、5 段目は扉の左右に対称(todo 220)
   fragment("lake", "凍った湖と富士山", "きーが見た風景。", "frag_lake", 20, 27, 1),
-  fragment("haihei", "アンバリッド・ホテル", "Hi Hey Win！", "frag_haihei", 10, 22, 2),
-  fragment("kasumi", "霞ヶ浦のエクラノプラン", "ミイラさまの遊覧飛行。", "frag_kasumi", 17, 22, 2),
-  fragment("suzuki", "荒川の鈴木商店", "宛先がにじんで読めない。", "frag_suzuki", 32, 22, 2), // 説明の文面は仮
-  fragment("banana", "南極のバナナ農園", "けさの気温 28℃。", "frag_banana", 12, 17, 3), // 説明の文面は仮
+  // 段の並び(D628): のどかで不思議 → 少し不穏 → 戦争の影。扉の前で「世界に何があったのか」を知りたくなるように
+  fragment("suzuki", "荒川の鈴木商店", "宛先がにじんで読めない。", "frag_suzuki", 10, 22, 2), // 説明の文面は仮
+  fragment("banana", "南極のバナナ農園", "けさの気温 28℃。", "frag_banana", 17, 22, 2), // 説明の文面は仮
+  fragment("noroi", "呪いの野犬", "ポン　ポン　ポン。", "frag_noroi", 32, 22, 2), // 説明の文面は仮
+  fragment("padre", "ぱーでれとだいにち", "カチ　カチ。", "frag_padre", 12, 17, 3), // 説明の文面は仮
   fragment("takarabune", "宝舟と首振りエンジン", "何も描かれていない。", "frag_takarabune", 27, 17, 3), // 説明の文面は仮
-  fragment("noroi", "呪いの野犬", "ポン　ポン　ポン。", "frag_noroi", 34, 17, 3), // 説明の文面は仮
-  fragment("padre", "ぱーでれとだいにち", "カチ　カチ。", "frag_padre", 10, 12, 4), // 説明の文面は仮
-  fragment("kinsei", "きこりと金星", "無風、92気圧、456℃、雲。", "frag_kinsei", 17, 12, 4), // D179
+  fragment("kinsei", "きこりと金星", "無風、92気圧、456℃、雲。", "frag_kinsei", 34, 17, 3), // D179
+  fragment("haihei", "アンバリッド・ホテル", "Hi Hey Win！", "frag_haihei", 10, 12, 4),
+  fragment("kasumi", "霞ヶ浦のエクラノプラン", "ミイラさまの遊覧飛行。", "frag_kasumi", 17, 12, 4),
   fragment("bomber", "ぼぎボマーと地上ぼぎクルー", "REMOVE BEFORE FLIGHT", "frag_bomber", 32, 12, 4), // 説明の文面は仮
   fragment("keiji", "形而アップダウンクイズ", "これは何？", "frag_keiji", 17, 7, 5), // 5 段目(D505)。扉の手前。説明の文面は仮
   fragment("nagato", "本栖湖の長門", "喫水 9.08m、平均水深 67.9m。", "frag_nagato", 27, 7, 5), // 5 段目に形而と並べる(D533、D573)。説明の文は D579
