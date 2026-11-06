@@ -396,8 +396,22 @@ const B_STEPS = {
     south: { x: 8 * T, y: 18.6 * T, facing: "north" },
   },
   triggers: [{ id: "toCanal", x: 7 * T, y: 19.6 * T, w: 2 * T, h: T, warp: { map: "canal", spawn: "north" } }],
-  onEnter: chirinEnter(B_STEPS_OBJS),
+  // 段の並び(D628)で、霞ヶ浦(ジャンプ)より先に来ることがある。きこりがマンゴーに跳びつくのをまねて、
+  // ここでだけ跳べる(霞ヶ浦の「教わっている断片の中だけ」と同じ D201。覚えはしない D637)
+  onEnter(api) {
+    chirinEnter(B_STEPS_OBJS)();
+    if (api.hasAbility("jump") || api.flag("jump")) return;
+    api.later(1500, () => {
+      api.setFlag("jump");
+      api.toast(`${lastTouch ? "Bボタン" : "Xキー"}で　とんでみよう`, 8); // 霞ヶ浦と同じ案内
+      const b = document.getElementById("actionBtnB");
+      if (b) b.classList.add("hint");
+      api.later(8000, () => b && b.classList.remove("hint")); // 案内の字と同じ長さで消す
+    });
+  },
   onJump(api, p) {
+    const b = document.getElementById("actionBtnB");
+    if (b) b.classList.remove("hint");
     const up = (y) => api.later(240, () => api.place(p.x, y));
     if (p.facing === "north") {
       if (p.y >= 15 * T && p.y < 16 * T && p.x > 2 * T && p.x < 14 * T) up(13.4 * T);
