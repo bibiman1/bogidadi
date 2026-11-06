@@ -211,6 +211,7 @@
     "まだ帰れない。": "Can't go back yet.",
     "ガシャン ガシャン": "clank clank",
     "シューッ！": "hissss!",
+    "ポイッ！": "Out you go!",
     "シューッ": "hissss",
     "ずず……": "slurp……",
     "ウーー　ウーー": "wooo  wooo",

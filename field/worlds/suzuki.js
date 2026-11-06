@@ -4,7 +4,7 @@
 
 // ======== 荒川の鈴木商店 ========
 // 今の雨上がりの夕方、荒川区の下町(D73〜D76)。マップの絵と当たり判定は docs/assets/suzuki/blockout.py から
-// 条件: 店で伝票 → 印刷屋で荷札 → 単結晶(両端に穴の空いた透明な筒)の穴で荷札を結んで中へ(一枚絵)→ 上昇(成層圏、熱圏)→ 衛星軌道で
+// 条件: 店で伝票 → 印刷屋の中でマトリョシカと活字ひろい、勝って荷札(D630)→ 単結晶(両端に穴の空いた透明な筒)の穴で荷札を結んで中へ(一枚絵)→ 上昇(成層圏、熱圏)→ 衛星軌道で
 // 筒の端の穴から出る → 流れ星(一枚絵)→ 夜、河川敷のクレーターの真ん中 → 店で納品書 → 都電で帰る
 const S_GRIDS = {
   stop: [
@@ -123,7 +123,6 @@ const S_STOP = sMap("stop", 28, 10, {
   ],
 });
 
-let sPrinting = false;
 // B 町工場と長屋の路地(北の階段の先が土手。入口はどれも南の小道に向く)
 const S_ALLEY = sMap("alley", 28, 16, {
   drawOverlay: sNight(28, 16),
@@ -131,6 +130,7 @@ const S_ALLEY = sMap("alley", 28, 16, {
     south: { x: 13.5 * T, y: 15.2 * T, facing: "north" },
     north: { x: 13.5 * T, y: 1.2 * T, facing: "south" },
     shop: { x: 19.25 * T, y: 7.6 * T, facing: "south" },
+    printer: { x: 8.5 * T, y: 7.6 * T, facing: "south" },
   },
   triggers: [
     { id: "toStop", x: 12 * T, y: 15.75 * T, w: 3 * T, h: T, warp: { map: "stop", spawn: "north" } },
@@ -142,19 +142,8 @@ const S_ALLEY = sMap("alley", 28, 16, {
     // 2026-10-03、作者「背景がおかしい」
     kFg("fg_alley", 478, 258, 200, 76, 440),
     sSpot("shopDoor", 19.25 * T, 7.15 * T, (api) => api.warp("shop", "door")),
-    // 印刷屋は無人。伝票を差しこむと、印刷機がひとりでに荷札を刷る(D75)
-    sSpot("printer", 8.5 * T, 7.15 * T, (api) => {
-      if (api.hasItem("荷札") || !api.hasItem("伝票") || sPrinting) return api.mutter("……", 1200); // 仮
-      // 刷っているあいだにもう一度調べても、2 枚目は刷らない(2026-10-03、作者「荷札が2回でる」)
-      sPrinting = true;
-      api.bubble("printer", "ガシャン ガシャン", 1400); // 仮
-      api.later(1500, () => {
-        sPrinting = false;
-        if (api.hasItem("荷札")) return;
-        api.giveItem("荷札");
-        api.show("v_nifuda");
-      });
-    }),
+    // 印刷屋(鈴木印刷)のガラス戸から中へ。荷札は中のマトリョシカとの活字ひろいで(D630。前は無人の印刷機がひとりでに刷った D75)
+    sSpot("printer", 8.5 * T, 7.15 * T, (api) => api.warp("print", "door")),
   ],
 });
 
