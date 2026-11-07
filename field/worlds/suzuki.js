@@ -436,9 +436,10 @@ const S_SPACE = {
 };
 // 納品先の担当者(todo 272、D655): 体はぴーのまま(同じ色)で、下に触手がたくさん垂れて、浮かんでいる。しゃべらない。
 // きーがしばらくたたずんでいると、突然、左の穴から入ってきて、ゆっくり近づく。きーが話しかけると、
-// とつぜんきーを押しはじめ、右の穴まで押していって外へ落とす(きーは自分では出られない。はじき飛ばさない)
-const SK_M = { wait: 5, walk: 32, gap: 40, push: 95 };
-const skM = { t: 0, x: 0, y: 0, phase: "wait", step: 0, kx: 0, v: 0, lunge: 0 };
+// とつぜん触手の張り手でグイグイ押しはじめ、右の穴から外へ落とす(きーは自分では出られない)。
+// きーははじめびっくりして跳ね、すぐに落とされまいと、ぴーのほうを向いて足をばたつかせて踏んばる(ここは動かせない)
+const SK_M = { wait: 5, walk: 32, gap: 40, slap: 0.22, hit: 330, back: -40, grip: 6, surprise: 0.55 };
+const skM = { t: 0, x: 0, y: 0, phase: "wait", step: 0, s: 0, kx: 0, ky: 0, kv: 0, slaps: 0 };
 // 触手 1 本: 根もと(x0, y0)から下へ垂れる。長さ len、少し外へ開く(ang)。先ほど、ゆらゆら
 function skTentacle(ctx, x0, y0, len, ang, t, k) {
   const pts = [[x0, y0]];
@@ -463,7 +464,7 @@ const S_ORBIT = sMap("orbit", 28, 10, {
   bg: "#060814",
   spawns: { west: { x: 9 * T, y: 6 * T, facing: "east" } }, // 筒のまん中寄りにたたずむ(左の穴から担当者が近づく間をとる)
   onEnter() {
-    Object.assign(skM, { t: 0, x: 0.6 * T, y: 5.9 * T, phase: "wait", step: 0, v: 0, lunge: 0 });
+    Object.assign(skM, { t: 0, x: 0.6 * T, y: 5.9 * T, phase: "wait", step: 0, s: 0, kv: 0, slaps: 0 });
   },
   // つなぎめの輪の手前の線は、筒の中のぴーときーより手前(docs/assets/suzuki/orbit_fg/cut.py)
   drawOverlay(ctx, ox, oy, t, api) {
@@ -482,10 +483,10 @@ const S_ORBIT = sMap("orbit", 28, 10, {
       range: 56,
       canInteract: () => skM.phase === "near",
       interact(api) {
-        // 話しかけると、とつぜん押しはじめる
-        skM.phase = "shove";
-        skM.lunge = 0;
-        api.sfx("pop");
+        // 話しかけると、とつぜん張り手で押しはじめる
+        const p = api.player();
+        Object.assign(skM, { phase: "shove", s: 0, kx: p.x, ky: p.y, kv: 0, slaps: 0 });
+        api.bubble("player", "！", 700);
       },
       update(dt, t, api) {
         skM.t += dt;
@@ -507,14 +508,24 @@ const S_ORBIT = sMap("orbit", 28, 10, {
           }
           skM.phase = Math.hypot(p.x - skM.x, p.y - skM.y) < SK_M.gap + 14 ? "near" : "walk";
         } else if (skM.phase === "shove") {
-          // 前の触手をきーにあてて、そのまま右の穴まで押していく
-          skM.lunge = Math.min(1, skM.lunge + dt * 4);
-          skM.x += SK_M.push * skM.lunge * dt;
-          skM.y += (5.9 * T - skM.y) * Math.min(1, dt * 4);
-          skM.step += dt;
+          // 張り手のたびに、きーがぐいっと右へ。あいだは、きーが踏んばって少し押し返す
+          skM.s += dt;
+          const n = Math.floor(skM.s / SK_M.slap);
+          if (n > skM.slaps || skM.s === dt) {
+            skM.slaps = n;
+            skM.kv += SK_M.hit;
+            if (n % 2 === 0) api.sfx("pop");
+          }
+          const want = skM.s < SK_M.surprise ? 0 : SK_M.back;
+          skM.kv += (want - skM.kv) * Math.min(1, dt * SK_M.grip);
+          skM.kx += skM.kv * dt;
+          skM.ky += (5.9 * T - skM.ky) * Math.min(1, dt * 5);
+          skM.x += (skM.kx - SK_M.gap - skM.x) * Math.min(1, dt * 14);
+          skM.y = skM.ky;
+          skM.step += dt * 2;
           api.freeze(0.3);
-          api.place(Math.max(p.x, skM.x + SK_M.gap), skM.y);
-          if (p.x > 26.9 * T) {
+          api.place(skM.kx, skM.ky); // カメラはきーについてくる(きーの絵はこの物が描く)
+          if (skM.kx > 26.9 * T) {
             skM.phase = "done";
             sOut(api);
           }
@@ -527,23 +538,54 @@ const S_ORBIT = sMap("orbit", 28, 10, {
         const im = api.image("pi");
         const lift = 18; // 触手で浮かんでいるぶん、体が上にある
         const by = sy - lift + Math.round(Math.sin(t * 2.4) * 2); // 体の底(ふわふわ上下する)
-        // 体の下から垂れる触手(体の前に出る長いもの)。押すときは前の 3 本が、きーのほうへ突き出る
-        const shove = skM.phase === "shove" || skM.phase === "done" ? skM.lunge : 0;
+        const shoving = skM.phase === "shove";
+        // 張り手: 前の 3 本が順番に、すばやく突き出ては引っこむ(当たった瞬間に体も少し前へ)
+        const ph = (skM.s % SK_M.slap) / SK_M.slap;
+        const jab = ph < 0.3 ? ph / 0.3 : 1 - (ph - 0.3) / 0.7;
+        const hand = 6 + (skM.slaps % 3);
+        const bodyX = sx + (shoving ? Math.round(jab * 4) : 0);
+        // 体の下から垂れる触手
         for (let k = 0; k < 9; k++) {
-          const bx = sx - 15 + k * 3.75;
-          let ang = (k - 4) * 0.09;
-          let len = 15 + ((k * 7) % 4) * 2;
-          if (shove && k >= 6) {
-            ang = ang + (Math.PI / 2 - 0.35 - ang) * shove;
-            len += 6 * shove;
-          }
-          skTentacle(ctx, bx, by - 4, len, ang, t, k);
+          if (shoving && k === hand) continue;
+          skTentacle(ctx, bodyX - 15 + k * 3.75, by - 4, 15 + ((k * 7) % 4) * 2, (k - 4) * 0.09 + (shoving && k >= 6 ? 0.5 : 0), t, k);
         }
-        if (im) ctx.drawImage(im, (Math.floor(skM.step * 6) % 7) * 64, 2 * 64, 64, 64, Math.round(sx - 32), Math.round(by - 47), 64, 64);
+        if (im) ctx.drawImage(im, (Math.floor(skM.step * 6) % 7) * 64, 2 * 64, 64, 64, Math.round(bodyX - 32), Math.round(by - 47), 64, 64);
+        if (!shoving) return;
+        // きー(この場面はこの物が描く)。はじめはびっくりして跳ね、そのあとぴーのほうを向いて足をばたつかせ、踏んばる
+        const kim = api.image("ki");
+        const kxs = Math.round(sx + (skM.kx - skM.x));
+        const kys = Math.round(sy + (skM.ky - skM.y));
+        const sur = skM.s < SK_M.surprise;
+        const hopZ = sur ? Math.round(Math.sin((Math.PI * skM.s) / SK_M.surprise) * 12) : 0;
+        ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
+        ctx.beginPath();
+        ctx.ellipse(kxs, kys + 1, 9, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+        const row = sur ? 2 : 3; // 跳ねるあいだは前を向いたまま、そのあとふり返って踏んばる
+        const frame = sur ? 0 : 1 + (Math.floor(skM.s * 22) % 6);
+        const jit = sur ? 0 : Math.round(Math.sin(skM.s * 70));
+        if (kim) ctx.drawImage(kim, frame * 64, row * 64, 64, 64, kxs - 32 + jit, kys - 47 - hopZ, 64, 64);
+        if (!sur) {
+          // 踏んばる足もとから、うしろ(右)へ土けむり。頭から汗
+          ctx.fillStyle = "rgba(200, 210, 225, 0.7)";
+          for (let k = 0; k < 4; k++) {
+            const u = (skM.s * 3 + k / 4) % 1;
+            ctx.fillRect(kxs + 10 + Math.round(u * 16), kys - 2 - Math.round(u * 6) - (k % 2) * 2, 3, 3);
+          }
+          ctx.fillStyle = "#bfe4ff";
+          for (let k = 0; k < 2; k++) {
+            const u = (skM.s * 2.2 + k * 0.5) % 1;
+            ctx.fillRect(kxs + (k ? 8 : -4) + Math.round(u * (k ? 8 : -6)), kys - 26 - Math.round(u * 8) + Math.round(u * u * 14), 2, 3);
+          }
+        }
+        // 張り手の触手は、きーより手前に
+        skTentacle(ctx, bodyX + 12, by - 8 + (skM.slaps % 3) * 2, 6 + jab * (skM.kx - skM.x - 24), Math.PI / 2 - 0.1, t * 0.3, hand);
       },
     },
   ],
 });
+// 押されているあいだは、きーの絵を担当者の物が描く(びっくりして跳ね、ふり返って踏んばる)
+Object.defineProperty(S_ORBIT, "hidePlayer", { get: () => skM.phase === "shove" });
 // 夜の河川敷。単結晶が寝ていた所が、クレーターになっている。きーは、その真ん中にいる
 // 着地の爆発: 白い光、飛び散る土、広がる煙の輪(1.6 秒)
 let boomT0 = -1;
