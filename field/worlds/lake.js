@@ -690,7 +690,7 @@ const LAKE = {
   },
   spawns: {
     west: { x: 0.9 * T, y: 18 * T, facing: "east" },
-    door: { x: 9.3 * T, y: 17 * T, facing: "south" },
+    door: { x: 13.1 * T, y: 17 * T, facing: "south" }, // ほうとう屋の戸口の前(D662)
   },
   // 左の端から、ワインディングロードへ戻る
   triggers: [{ id: "toRoad", x: -T, y: 16.5 * T, w: 1.6 * T, h: 3 * T, warp: { map: "road", spawn: "pass" } }],
@@ -768,15 +768,15 @@ const LAKE = {
         if (p > 0.5) kTint(ctx, `rgba(30, 40, 90, ${(p - 0.5) * 0.7})`);
       },
     }),
-    // のれんの前
+    // 古民家の右の面の土間の戸口(D662。前は左の窓口の前と、右の戸口の 2 か所だった D660)
     {
       id: "door",
-      x: 9.7 * T,
-      y: 16 * T,
+      x: 13.1 * T,
+      y: 16.4 * T,
       w: 1,
       h: 1,
       headY: 30,
-      range: 30,
+      range: 40,
       nearRange: 64,
       near(api) {
         if (api.flag("saidHoutou")) return;
