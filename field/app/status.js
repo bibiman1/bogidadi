@@ -128,7 +128,11 @@ function stRows(key) {
   });
 }
 const stIcons = {};
+// 読めなかった絵(通信が切れたときなど)は描かない。broken の絵を drawImage すると例外になり、画面にエラーが出たままになる。
+// 次に開いたときに読み直す
 function stIcon(key) {
+  const old = stIcons[key];
+  if (old && old.complete && !old.naturalWidth) delete stIcons[key];
   if (!stIcons[key]) {
     stIcons[key] = new Image();
     stIcons[key].onload = () => statusOpen && renderStatus();
@@ -236,7 +240,7 @@ function renderStatus() {
       if (r.mark) stText(r.mark, 258, ty, r.mark === "✦" || r.mark === "ON" || /^\d/.test(r.mark) ? "#ffe08a" : "#8a8a8a");
       if (r.book) {
         const bim = stIcon("../props/bunko");
-        if (bim && bim.complete) {
+        if (bim && bim.complete && bim.naturalWidth) {
           stCtx.globalAlpha = r.book === "got" ? 1 : 0.22;
           stCtx.drawImage(bim, 274, ty + 1);
           stCtx.globalAlpha = 1;
@@ -263,7 +267,7 @@ function renderStatus() {
       stWindow(290, wy, 168, h);
       lines.forEach((line, i) => stText(line, 302, wy + 12 + i * lh));
       const im = sel.icon && stIcon(sel.icon);
-      if (im && im.complete) stCtx.drawImage(im, 418, wy + 8);
+      if (im && im.complete && im.naturalWidth) stCtx.drawImage(im, 418, wy + 8);
     }
   } else {
     // パソコンでは A ボタンがないので、キーの名前で(画面をさわっていればボタンの名前)
