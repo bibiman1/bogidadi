@@ -72,8 +72,6 @@ function nCardDraw(ctx, api) {
   });
   ctx.restore();
 }
-// お世話係(木の葉のぼぎ)は、カスタムのあと札をもらうまで、ストリップの入口にいる(D367。峠からはいなくなる)
-const nFuelerAtStrip = (api) => nAtStrip(api) && !nSoOn(api);
 // ストリップでのマシンの場所(D367): 次の相手だけがスタートの白線(ぼぎカーのとなり)、ほかは北の路肩。ぽんぽんカーの路肩は線のつながる待避所
 const N_STRIP_HOME = { ponpon: [7.6, 5.25], toribogi: [12, 4.4], kokeshi: [15.4, 4.4], tansu: [19.4, 4.4], akabeko: [25.2, 4.4] };
 const N_STRIP_SLOT = [7.6, 6.9];

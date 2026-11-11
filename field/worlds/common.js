@@ -245,3 +245,7 @@ const kFg = (img, x0, y0, w, h, base) => ({
 const kWall = (x0, y0, x1, y1) => ({ id: `wall${x0}_${y0}`, x: (x0 + x1) / 2, y: (y0 + y1) / 2, w: 1, h: 1, solid: { w: x1 - x0, h: y1 - y0 } });
 // なめらかに 0 から 1 へ(はじめと終わりがゆっくり)
 const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+// ジャンプを教えるときの吹き出しに出す(霞ヶ浦と南極。もとは kasumi.js、D666)
+// どのボタンで跳ぶか: 最後にキーボードを使っていれば「Xキー」、画面をさわっていれば「Bボタン」
+// (さわったかどうかは app/layout.js の lastTouch。遊んでいるときには読みこみずみ)
+const jumpKey = () => (lastTouch ? "Bボタン" : "Xキー");

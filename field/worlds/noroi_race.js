@@ -13,15 +13,6 @@
 // マシンの絵は三面図(docs/assets/noroi/sanmen/)の横の下絵から。空・スタンド・道は 1 ドット = ゲームの 1 ドット(D145)
 const N_RACE_D = 402; // クォーターマイル(m)
 const N_GREEN = 5.6; // 青の時刻(ステージ 3.4、黄 4.1、4.6、5.1)
-const N_KI_ET = 2.4; // ぼぎカーは無慣性: 押した瞬間に全速、ゴールまで 2.4 秒
-// 相手: ゴールまでの時間(青から)。ぼぎカーが勝つには、青から押すまでが (et - 2.4) 秒より短いこと
-const N_ROUNDS = [
-  { id: "ponpon", img: "rcs_pon", name: "１かいせん", et: 3.0, snap: 0.86, lift: 0.07, snd: "pon" }, // バンジーで戻されるので、フライングしなければ勝てる
-  { id: "toribogi", img: "rcs_tori", name: "２かいせん", et: N_KI_ET + 1.4, lift: 0, snd: "jet" },
-  { id: "tansu", img: "rcs_tansu", name: "３かいせん", et: N_KI_ET + 1.2, lift: 0, rattle: 2, snd: "v8big" }, // ヘミ V8 の重い箱。出だしで引き出しがガタつく(みとんが中に乗る)
-  { id: "akabeko", img: "rcs_aka", name: "じゅんけっしょう", et: N_KI_ET + 0.9, lift: 0.2, snd: "v8" },
-  { id: "kokeshi", img: "rcs_kokeshi", name: "けっしょう", et: N_KI_ET + 0.6, lift: 0.1, snd: "bike" }, // いちばん速い。反応が遅いと負ける
-];
 // D341 の優勝のあとの一騎打ちはやめた(D367。作者「もう一度レースしたいなら、ピンボールでリプレイでいい。」)
 const nCurRd = () => N_ROUNDS[nr.round];
 const N_PX = 3; // 1 m = 3 ドット
@@ -33,8 +24,6 @@ const N_GY = { opp: 220, ki: 286 }; // 奥の車線と手前の車線の地面�
 const N_TREE = { x: 214, foot: 298, xs: [7, 23], ys: [8, 24, 40, 56, 72, 89, 105], r: 5 }; // 手前の信号の柱(左の列 = 相手、右の列 = ぼぎカー)
 const N_LAMP = { stage: "#f4f0dc", amber: "#ffbe3c", green: "#7cf08a", red: "#ff4a3c" };
 const nr = { t0: 0, foul: -1, go: -1, end: null, endT: 0, snapT: -1, round: 0, repT: -1, rep0: 0, flash: -1, loseT: -1 };
-// 今の回(0〜4)。前の 3 回戦のころの記録(nrR1、nrR2)も読む
-const nRound = (api) => Math.min(N_ROUNDS.length - 1, Number(api.flagValue("nrRound")) || (api.flag("nrR2") ? 2 : api.flag("nrR1") ? 1 : 0));
 const nRaceReset = (api) => {
   nr.t0 = nNow();
   nr.foul = -1;

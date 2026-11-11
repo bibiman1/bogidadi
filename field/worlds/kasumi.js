@@ -159,9 +159,6 @@ const CREW = [
 ];
 CREW.forEach((c) => (c.baseY = c.y));
 // ジャンプの習い方: クルーが順番に跳んでみせる → どのボタンで跳ぶかを出す → きーが自分で跳べたら覚える
-// どのボタンで跳ぶか: 最後にキーボードを使っていれば「Xキー」、画面をさわっていれば「Bボタン」
-// (さわったかどうかは app/layout.js の lastTouch。遊んでいるときには読みこみずみ)
-const jumpKey = () => (lastTouch ? "Bボタン" : "Xキー");
 const hintB = (on) => {
   const b = document.getElementById("actionBtnB");
   if (b) b.classList.toggle("hint", on);

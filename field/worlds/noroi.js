@@ -439,6 +439,23 @@ const nSoShortRev = (api) => {
   api.sfx("rev");
   api.later(1200, () => (nS.soT0 = -1));
 };
+// ---- ほかの野犬のファイルも使う部品(D666。もとは noroi_diner.js、noroi_strip.js、noroi_race.js にあり、前のファイルが後ろのファイルの名前を使っていた)----
+// カスタム(みとんが炎を塗る)がすんだら、野犬たちは直線(ストリップ)へ移る
+const nAtStrip = (api) => api.flag("custom");
+// お世話係(木の葉のぼぎ)は、カスタムのあと札をもらうまで、ストリップの入口にいる(D367。峠からはいなくなる)
+const nFuelerAtStrip = (api) => nAtStrip(api) && !nSoOn(api);
+// レースの相手と回(ストリップの並びと、レースの両方で使う)
+const N_KI_ET = 2.4; // ぼぎカーは無慣性: 押した瞬間に全速、ゴールまで 2.4 秒
+// 相手: ゴールまでの時間(青から)。ぼぎカーが勝つには、青から押すまでが (et - 2.4) 秒より短いこと
+const N_ROUNDS = [
+  { id: "ponpon", img: "rcs_pon", name: "１かいせん", et: 3.0, snap: 0.86, lift: 0.07, snd: "pon" }, // バンジーで戻されるので、フライングしなければ勝てる
+  { id: "toribogi", img: "rcs_tori", name: "２かいせん", et: N_KI_ET + 1.4, lift: 0, snd: "jet" },
+  { id: "tansu", img: "rcs_tansu", name: "３かいせん", et: N_KI_ET + 1.2, lift: 0, rattle: 2, snd: "v8big" }, // ヘミ V8 の重い箱。出だしで引き出しがガタつく(みとんが中に乗る)
+  { id: "akabeko", img: "rcs_aka", name: "じゅんけっしょう", et: N_KI_ET + 0.9, lift: 0.2, snd: "v8" },
+  { id: "kokeshi", img: "rcs_kokeshi", name: "けっしょう", et: N_KI_ET + 0.6, lift: 0.1, snd: "bike" }, // いちばん速い。反応が遅いと負ける
+];
+// 今の回(0〜4)。前の 3 回戦のころの記録(nrR1、nrR2)も読む
+const nRound = (api) => Math.min(N_ROUNDS.length - 1, Number(api.flagValue("nrRound")) || (api.flag("nrR2") ? 2 : api.flag("nrR1") ? 1 : 0));
 const N_PASS = nMap("pass", 28, 12, {
   spawns: {
     start: { x: 4.5 * T, y: 4.7 * T, facing: "south" },
