@@ -194,6 +194,136 @@ function pbScore(api, n, what) {
 function pbLeave(api) {
   api.warp("diner", "pinball");
 }
+const pbDrawBumpers = (ctx, get, X, Y, lit) => {
+  // バンパー(当たった直後は光る)
+  PB_BUMPERS.forEach((b, i) => {
+    const lit = pb.t - (pb.flash["b" + i] ?? -9) < 0.12;
+    const im = get("pb_bump_" + b.kind); // 絵(D330)。なければ手描き
+    if (!im) return pbBumper(ctx, X + b.x, Y + b.y, b, lit);
+    ctx.drawImage(im, Math.round(X + b.x - im.width / 2), Math.round(Y + b.y - im.height / 2));
+    if (lit) {
+      ctx.fillStyle = "rgba(255, 246, 200, 0.55)";
+      ctx.beginPath();
+      ctx.arc(X + b.x, Y + b.y, b.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  });
+  // スリングショット
+  PB_SLINGS.forEach((s, i) => {
+    const lit = pb.t - (pb.flash["sling" + i] ?? -9) < 0.1;
+    ctx.strokeStyle = lit ? "#ffffff" : "#f0e8d8";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(X + s[0], Y + s[1]);
+    ctx.lineTo(X + s[2], Y + s[3]);
+    ctx.stroke();
+  });
+};
+const pbDrawFlips = (ctx, X, Y, fim) => {
+  for (const f of pb.flips) {
+    if (fim) {
+      ctx.save();
+      ctx.translate(X + f.px, Y + f.py);
+      if (!f.left) ctx.scale(-1, 1);
+      ctx.rotate(f.th);
+      ctx.drawImage(fim, -8, -8);
+      ctx.restore();
+      continue;
+    }
+    const tip = pbTip(f);
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "#b02a24";
+    ctx.lineWidth = PB_FLIP.thick * 2 + 2;
+    ctx.beginPath();
+    ctx.moveTo(X + f.px, Y + f.py);
+    ctx.lineTo(X + tip.x, Y + tip.y);
+    ctx.stroke();
+    ctx.strokeStyle = "#f4ecd8";
+    ctx.lineWidth = PB_FLIP.thick * 2 - 2;
+    ctx.stroke();
+    ctx.lineCap = "butt";
+  }
+};
+const pbDrawBall = (ctx, X, Y) => {
+  // 玉
+  if (pb.live) {
+    const bx = Math.round(X + pb.x);
+    const by = Math.round(Y + pb.y);
+    ctx.fillStyle = "#7c8088";
+    ctx.beginPath();
+    ctx.arc(bx, by, PB_R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#e8ecf0";
+    ctx.beginPath();
+    ctx.arc(bx - 1, by - 1, PB_R - 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(bx - 2, by - 2, 1, 1);
+  }
+};
+function pbDrawGround(ctx, ox, oy, img) {
+  if (!pb.flips) return;
+  const get = (k) => (typeof img === "function" ? img(k) : null);
+  const X = Math.round(ox + PB_X);
+  const Y = Math.round(oy + PB_Y);
+  // 台のまわり(暗いダイナーの壁)
+  ctx.fillStyle = "#1a1512";
+  ctx.fillRect(ox, oy, 480, 288);
+  // 頭の絵(左)と得点
+  const bg = get("pb_backglass");
+  if (bg) ctx.drawImage(bg, Math.round(ox + 10), Math.round(oy + 6));
+  pbPanel(ctx, ox + 10, oy + 220, 136, 62);
+  pbText(ctx, ox + 18, oy + 226, "SCORE", "#e8c060", 2);
+  pbDigits(ctx, ox + 18, oy + 242, pb.score, 7, "#ff7a3c");
+  // 右: 玉と最高点
+  pbPanel(ctx, ox + 334, oy + 6, 136, 110);
+  pbText(ctx, ox + 344, oy + 14, "BALL", "#e8c060", 2);
+  for (let i = 0; i < 3; i++) {
+    const on = i < pb.balls; // 残りの玉(打っている玉もふくむ)
+    ctx.fillStyle = on ? "#ffe8a0" : "#3a3028";
+    ctx.beginPath();
+    ctx.arc(Math.round(ox + 352 + i * 22), Math.round(oy + 44), 6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  pbText(ctx, ox + 344, oy + 64, "HIGH", "#e8c060", 2);
+  pbDigits(ctx, ox + 344, oy + 80, pb.high, 7, "#9fe0ff");
+  // リプレイの点(D366)。超えたら 2 秒点滅して、そのあとは灯ったまま
+  pbPanel(ctx, ox + 334, oy + 172, 136, 58);
+  const lit = pb.replayed && (pb.t - pb.replayT > 2 || Math.floor(pb.t * 6) % 2 === 0);
+  pbText(ctx, ox + 344, oy + 180, "REPLAY", lit ? "#ffd84a" : "#e8c060", 2);
+  pbDigits(ctx, ox + 344, oy + 196, PB_REPLAY, 7, lit ? "#ffd84a" : "#7a6440");
+  if (pb.over && Math.floor(pb.t * 2) % 2 === 0) {
+    pbPanel(ctx, ox + 334, oy + 124, 136, 40);
+    pbText(ctx, ox + 346, oy + 134, "GAME OVER", "#ff5a4a", 2);
+  }
+  // 盤面
+  if (!pb.field || (!pb.fieldArt && get("pb_field"))) {
+    pb.fieldArt = get("pb_field");
+    pb.field = pbFieldArt(pb.fieldArt);
+  }
+  ctx.drawImage(pb.field, X, Y);
+  // 上のレーンの灯り
+  PB_TOPLANES.forEach((x, i) => {
+    ctx.fillStyle = pb.lanes[i] ? "#ffd84a" : "#5a4a30";
+    ctx.fillRect(X + x - 3, Y + 50, 6, 4);
+  });
+  pbDrawBumpers(ctx, get, X, Y, lit);
+  // 通路の口の仕切り(玉が盤面に出たあと)
+  if (pb.inPlay) {
+    ctx.strokeStyle = "#d8dce4";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(X + 150, Y + 100);
+    ctx.lineTo(X + 164, Y + 92);
+    ctx.stroke();
+  }
+  // 打ち出し棒とバネ(ためると頭が下がり、巻いたバネが縮む。作者「バネはちゃんと描写してほしい」)
+  pbPlunger(ctx, X, Y);
+  // フリッパー(絵 pb_flipper は右向き、支点が (8, 8)。右のフリッパーは左右を返す D330)
+  const fim = get("pb_flipper");
+  pbDrawFlips(ctx, X, Y, fim);
+  pbDrawBall(ctx, X, Y);
+}
 const N_PIN = {
   tile: T,
   bg: "#1a1512",
@@ -266,127 +396,7 @@ const N_PIN = {
       api.sfx("back");
     }
   },
-  drawGround(ctx, ox, oy, img) {
-    if (!pb.flips) return;
-    const get = (k) => (typeof img === "function" ? img(k) : null);
-    const X = Math.round(ox + PB_X);
-    const Y = Math.round(oy + PB_Y);
-    // 台のまわり(暗いダイナーの壁)
-    ctx.fillStyle = "#1a1512";
-    ctx.fillRect(ox, oy, 480, 288);
-    // 頭の絵(左)と得点
-    const bg = get("pb_backglass");
-    if (bg) ctx.drawImage(bg, Math.round(ox + 10), Math.round(oy + 6));
-    pbPanel(ctx, ox + 10, oy + 220, 136, 62);
-    pbText(ctx, ox + 18, oy + 226, "SCORE", "#e8c060", 2);
-    pbDigits(ctx, ox + 18, oy + 242, pb.score, 7, "#ff7a3c");
-    // 右: 玉と最高点
-    pbPanel(ctx, ox + 334, oy + 6, 136, 110);
-    pbText(ctx, ox + 344, oy + 14, "BALL", "#e8c060", 2);
-    for (let i = 0; i < 3; i++) {
-      const on = i < pb.balls; // 残りの玉(打っている玉もふくむ)
-      ctx.fillStyle = on ? "#ffe8a0" : "#3a3028";
-      ctx.beginPath();
-      ctx.arc(Math.round(ox + 352 + i * 22), Math.round(oy + 44), 6, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    pbText(ctx, ox + 344, oy + 64, "HIGH", "#e8c060", 2);
-    pbDigits(ctx, ox + 344, oy + 80, pb.high, 7, "#9fe0ff");
-    // リプレイの点(D366)。超えたら 2 秒点滅して、そのあとは灯ったまま
-    pbPanel(ctx, ox + 334, oy + 172, 136, 58);
-    const lit = pb.replayed && (pb.t - pb.replayT > 2 || Math.floor(pb.t * 6) % 2 === 0);
-    pbText(ctx, ox + 344, oy + 180, "REPLAY", lit ? "#ffd84a" : "#e8c060", 2);
-    pbDigits(ctx, ox + 344, oy + 196, PB_REPLAY, 7, lit ? "#ffd84a" : "#7a6440");
-    if (pb.over && Math.floor(pb.t * 2) % 2 === 0) {
-      pbPanel(ctx, ox + 334, oy + 124, 136, 40);
-      pbText(ctx, ox + 346, oy + 134, "GAME OVER", "#ff5a4a", 2);
-    }
-    // 盤面
-    if (!pb.field || (!pb.fieldArt && get("pb_field"))) {
-      pb.fieldArt = get("pb_field");
-      pb.field = pbFieldArt(pb.fieldArt);
-    }
-    ctx.drawImage(pb.field, X, Y);
-    // 上のレーンの灯り
-    PB_TOPLANES.forEach((x, i) => {
-      ctx.fillStyle = pb.lanes[i] ? "#ffd84a" : "#5a4a30";
-      ctx.fillRect(X + x - 3, Y + 50, 6, 4);
-    });
-    // バンパー(当たった直後は光る)
-    PB_BUMPERS.forEach((b, i) => {
-      const lit = pb.t - (pb.flash["b" + i] ?? -9) < 0.12;
-      const im = get("pb_bump_" + b.kind); // 絵(D330)。なければ手描き
-      if (!im) return pbBumper(ctx, X + b.x, Y + b.y, b, lit);
-      ctx.drawImage(im, Math.round(X + b.x - im.width / 2), Math.round(Y + b.y - im.height / 2));
-      if (lit) {
-        ctx.fillStyle = "rgba(255, 246, 200, 0.55)";
-        ctx.beginPath();
-        ctx.arc(X + b.x, Y + b.y, b.r, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    });
-    // スリングショット
-    PB_SLINGS.forEach((s, i) => {
-      const lit = pb.t - (pb.flash["sling" + i] ?? -9) < 0.1;
-      ctx.strokeStyle = lit ? "#ffffff" : "#f0e8d8";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(X + s[0], Y + s[1]);
-      ctx.lineTo(X + s[2], Y + s[3]);
-      ctx.stroke();
-    });
-    // 通路の口の仕切り(玉が盤面に出たあと)
-    if (pb.inPlay) {
-      ctx.strokeStyle = "#d8dce4";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(X + 150, Y + 100);
-      ctx.lineTo(X + 164, Y + 92);
-      ctx.stroke();
-    }
-    // 打ち出し棒とバネ(ためると頭が下がり、巻いたバネが縮む。作者「バネはちゃんと描写してほしい」)
-    pbPlunger(ctx, X, Y);
-    // フリッパー(絵 pb_flipper は右向き、支点が (8, 8)。右のフリッパーは左右を返す D330)
-    const fim = get("pb_flipper");
-    for (const f of pb.flips) {
-      if (fim) {
-        ctx.save();
-        ctx.translate(X + f.px, Y + f.py);
-        if (!f.left) ctx.scale(-1, 1);
-        ctx.rotate(f.th);
-        ctx.drawImage(fim, -8, -8);
-        ctx.restore();
-        continue;
-      }
-      const tip = pbTip(f);
-      ctx.lineCap = "round";
-      ctx.strokeStyle = "#b02a24";
-      ctx.lineWidth = PB_FLIP.thick * 2 + 2;
-      ctx.beginPath();
-      ctx.moveTo(X + f.px, Y + f.py);
-      ctx.lineTo(X + tip.x, Y + tip.y);
-      ctx.stroke();
-      ctx.strokeStyle = "#f4ecd8";
-      ctx.lineWidth = PB_FLIP.thick * 2 - 2;
-      ctx.stroke();
-      ctx.lineCap = "butt";
-    }
-    // 玉
-    if (pb.live) {
-      const bx = Math.round(X + pb.x);
-      const by = Math.round(Y + pb.y);
-      ctx.fillStyle = "#7c8088";
-      ctx.beginPath();
-      ctx.arc(bx, by, PB_R, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#e8ecf0";
-      ctx.beginPath();
-      ctx.arc(bx - 1, by - 1, PB_R - 1.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(bx - 2, by - 2, 1, 1);
-    }
-  },
+  drawGround: pbDrawGround,
 };
 // 打ち出し棒: 後ろは盤面の絵のまま(作者「バネの後ろ、黒いけど、背景つけれる？」)。まん中の棒、巻いたバネ(7 巻き、手前の線は明るく、奥は暗く)、メッキの頭、底の台
 function pbPlunger(ctx, X, Y) {

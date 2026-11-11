@@ -147,6 +147,30 @@ const skPiece = (ctx, x, y, s, ch, dim) => {
   ctx.restore();
 };
 const skCellXY = (i, ox, oy) => [ox + 44 + (i % SK_COLS) * 50, oy + 166 + Math.floor(i / SK_COLS) * 52];
+const skDrawScore = (ctx, ox, oy) => {
+  // 勝ち負け(3 回戦 D635): 右上に 3 つの丸。きーの勝ちは白い ○、マトリョシカの勝ちは赤い ●、まだの回は点線
+  for (let i = 0; i < 3; i++) {
+    const cx = ox + 386 + i * 26;
+    const cy = oy + 13;
+    const r = sK.results[i];
+    ctx.beginPath();
+    ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+    if (r === "m") {
+      ctx.fillStyle = "#d8342c"; // マトリョシカの赤
+      ctx.fill();
+    } else if (r === "k") {
+      ctx.strokeStyle = "#efe3c4";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    } else {
+      ctx.strokeStyle = "#6a5a4a";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 2]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+};
 const skDraw = (ctx, ox, oy, api) => {
   const t = sK.t;
   // 作業台
@@ -226,28 +250,7 @@ const skDraw = (ctx, ox, oy, api) => {
     ctx.lineWidth = 3;
     ctx.strokeRect(x - 3 + jx, y - 3, 46, 46);
   }
-  // 勝ち負け(3 回戦 D635): 右上に 3 つの丸。きーの勝ちは白い ○、マトリョシカの勝ちは赤い ●、まだの回は点線
-  for (let i = 0; i < 3; i++) {
-    const cx = ox + 386 + i * 26;
-    const cy = oy + 13;
-    const r = sK.results[i];
-    ctx.beginPath();
-    ctx.arc(cx, cy, 8, 0, Math.PI * 2);
-    if (r === "m") {
-      ctx.fillStyle = "#d8342c"; // マトリョシカの赤
-      ctx.fill();
-    } else if (r === "k") {
-      ctx.strokeStyle = "#efe3c4";
-      ctx.lineWidth = 3;
-      ctx.stroke();
-    } else {
-      ctx.strokeStyle = "#6a5a4a";
-      ctx.lineWidth = 1;
-      ctx.setLineDash([2, 2]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-  }
+  skDrawScore(ctx, ox, oy);
   // 1 回が終わったあとは、棚を少し暗く
   if (sK.phase === "round" || sK.phase === "win" || sK.phase === "lose") {
     ctx.fillStyle = "rgba(0, 0, 0, 0.35)";

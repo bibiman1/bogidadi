@@ -169,12 +169,7 @@ const kjHole = (ctx, cx, cy, s, t) => {
   ctx.closePath();
   ctx.fill();
 };
-const kjDrawShow = (ctx, ox, oy, api) => {
-  const t = kjS.t;
-  const W = 480;
-  const H = 288;
-  ctx.save();
-  ctx.translate(ox, oy);
+const kjShowBack = (ctx, api, W, H) => {
   // 背景: 上ほど白く(形而上)、下ほど暗い塊(形而下)。まん中はスタジオの暗い縦穴
   const bg = api.image("kj_show"); // 左半分の絵を、右へ反転して並べる(D516)
   if (bg) {
@@ -225,8 +220,9 @@ const kjDrawShow = (ctx, ox, oy, api) => {
     ctx.fillStyle = "#6e6e7a";
     ctx.fillRect(KJ_X[who] + 1, 0, 1, H);
   }
+};
+const kjShowEyes = (ctx, t, e) => {
   // 不気味さ 4 から: セットに目玉が生える(柱に)
-  const e = kjS.phase === "night" ? 6 : kjS.eerie;
   const kx = KJ_X.k;
   const ky = kjGy(kjS.d.k) - 30;
   if (e >= 4) {
@@ -237,6 +233,8 @@ const kjDrawShow = (ctx, ox, oy, api) => {
       kjEye(ctx, x, y, 3 + (j % 3), kx, ky, 0.5 + 0.5 * Math.abs(Math.sin(t * 0.7 + j)));
     }
   }
+};
+const kjShowGondolas = (ctx, api, t) => {
   // ゴンドラ
   for (const who of ["m", "k", "p", "t"]) {
     const hop = kjS.phase === "endU" && kjS.winner === who && kjEl() < KJ.win ? Math.abs(Math.sin(t * 9)) * 5 : 0; // 優勝した者がはねる
@@ -247,6 +245,8 @@ const kjDrawShow = (ctx, ox, oy, api) => {
     const wy = ra ? ra * 2 * Math.sin(t * 47 + j) : 0;
     kjGondola(ctx, api, who, KJ_X[who] + wob, kjGy(kjS.d[who]) - hop + wy, t);
   }
+};
+const kjShowSteam = (ctx, t) => {
   // 鉄瓶の湯気: まちがえて怒るときと、見届けの輪
   kjS.steam = kjS.steam.filter((s) => t - s.t0 < 3.4);
   for (const s of kjS.steam) {
@@ -259,6 +259,8 @@ const kjDrawShow = (ctx, ox, oy, api) => {
     ctx.ellipse(sx, sy, 5 + u * (s.angry ? 6 : 16), 3 + u * (s.angry ? 3 : 8), 0, 0, Math.PI * 2);
     ctx.stroke();
   }
+};
+const kjShowMark = (ctx, t, W) => {
   // 物自体の気配(D514): きーがはじまりの高さにいるあいだ、まん中にうすいおばけがちらつく。離れるとうすれ、2 段で消える
   if (["intro", "q", "choose", "reveal", "steer", "move"].includes(kjS.phase)) {
     // はじまりの高さの目印(D517): 光る床の帯を、いつも出す
@@ -280,6 +282,8 @@ const kjDrawShow = (ctx, ox, oy, api) => {
       ctx.globalAlpha = 1;
     }
   }
+};
+const kjShowThing = (ctx, api, t) => {
   // 露出(D504、D507): きーのとなりの絵がはがれて穴があく。見届けでは、小さな人形たちがまわりで遊ぶ
   if (["gather", "watch", "close", "gift"].includes(kjS.phase)) {
     const el = kjEl();
@@ -307,6 +311,8 @@ const kjDrawShow = (ctx, ox, oy, api) => {
       ctx.globalAlpha = 1;
     }
   }
+};
+const kjShowNight = (ctx, t, W, H, e) => {
   // 不気味さ 1 から: 暗くなる
   if (e >= 1) {
     ctx.fillStyle = `rgba(6, 4, 10, ${Math.min(0.6, e * 0.11)})`;
@@ -320,6 +326,8 @@ const kjDrawShow = (ctx, ox, oy, api) => {
       kjLimb(ctx, x, y, (j * 1.3) % (Math.PI * 2), 18 + (j % 4) * 6, t, j);
     }
   }
+};
+const kjShowScreen = (ctx, api, t) => {
   // 白い幕と影(洞窟の比喩 D508)。カメラが動いても、いつも上に見えている
   if (["intro", "q", "choose", "reveal", "steer", "move"].includes(kjS.phase)) {
     const lampOn = kjS.phase === "intro" ? 0 : 1;
@@ -348,7 +356,8 @@ const kjDrawShow = (ctx, ox, oy, api) => {
     }
     if (kjS.eerie > 0 && kjS.phase !== "intro") kjGlitchScreen(ctx, kjS.eerie * 0.45, t); // 怖さ 1 から: 幕が少しにじむ(段ごとに強く)
   }
-  if (kjS.phase === "intro") kjRules(ctx, api, t);
+};
+const kjShowAnswers = (ctx, api, t) => {
   // 答えの窓: 黒地に白の二重枠。絵が 3 つ
   if (["q", "choose", "reveal", "steer", "move"].includes(kjS.phase)) {
     const q = kjQ();
@@ -409,8 +418,8 @@ const kjDrawShow = (ctx, ox, oy, api) => {
       }
     });
   }
-  if (["reveal", "steer", "move"].includes(kjS.phase)) kjShowResult(ctx, t);
-  if (["q", "choose", "reveal", "steer", "move"].includes(kjS.phase)) kjMeter(ctx, t), kjGauge(ctx, t);
+};
+const kjShowEnding = (ctx, t, W, H) => {
   // 上で終わる: まぶしく白い字の中へ(D508 の 4)/ 下で終わる: 暗い塊の中へ
   if (kjS.phase === "endU" || kjS.phase === "endD") {
     const u = kjS.phase === "endU" ? kjClamp((kjEl() - KJ.win) / ((KJ.endSecU - KJ.win) * 0.7)) : kjClamp((kjEl() - KJ.prize) / ((KJ.endSec - KJ.prize) * 0.7));
@@ -426,6 +435,27 @@ const kjDrawShow = (ctx, ox, oy, api) => {
       ctx.fillRect(0, 0, W, H);
     }
   }
+};
+const kjDrawShow = (ctx, ox, oy, api) => {
+  const t = kjS.t;
+  const W = 480;
+  const H = 288;
+  ctx.save();
+  ctx.translate(ox, oy);
+  kjShowBack(ctx, api, W, H);
+  const e = kjS.phase === "night" ? 6 : kjS.eerie; // 不気味さ(悪夢のあいだは 6)
+  kjShowEyes(ctx, t, e);
+  kjShowGondolas(ctx, api, t);
+  kjShowSteam(ctx, t);
+  kjShowMark(ctx, t, W);
+  kjShowThing(ctx, api, t);
+  kjShowNight(ctx, t, W, H, e);
+  kjShowScreen(ctx, api, t);
+  if (kjS.phase === "intro") kjRules(ctx, api, t);
+  kjShowAnswers(ctx, api, t);
+  if (["reveal", "steer", "move"].includes(kjS.phase)) kjShowResult(ctx, t);
+  if (["q", "choose", "reveal", "steer", "move"].includes(kjS.phase)) kjMeter(ctx, t), kjGauge(ctx, t);
+  kjShowEnding(ctx, t, W, H);
   ctx.restore();
   // 不気味さ 3 から: 画面がゆがむ(横の帯をずらす)/ 悪夢: めちゃくちゃにバグる
   if (e >= 3) kjDistort(ctx, e, t);

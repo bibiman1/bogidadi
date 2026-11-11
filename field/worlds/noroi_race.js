@@ -552,6 +552,188 @@ const nDrawRear = (ctx, ox, oy, get, api, st0) => {
   nDrawRrPuffs(ctx, ox, oy);
   if (burn && Math.random() < 0.05) api.shake(0.25, 1);
 };
+function nRaceDrawGround(ctx, ox, oy, img, api) {
+  const get = (k) => (typeof img === "function" ? img(k) : null);
+  // 押して 1.1 秒たったら、横向きの再現シーンへ(青の 0.5 秒前から、同じ出来事をもう一度たどる D152)
+  if (nr.go >= 0 && nr.repT < 0 && nNow() - nr.t0 >= nr.go + 1.1) {
+    nr.repT = nNow() - nr.t0;
+    nr.rep0 = Math.min(nr.go, N_GREEN) - 0.5;
+    nr.snapT = -1;
+    nr.snapSfx = false;
+    nRcPuffs.length = 0;
+    nr.flash = nr.repT;
+  }
+  const st0 = nRaceState();
+  const { s, real, rd, ki, opp, back } = st0;
+  // 勝ち負け
+  if (!nr.end) {
+    const kiIn = ki >= N_RACE_D;
+    const oppIn = !rd.snap && opp >= N_RACE_D;
+    const timeout = nr.foul < 0 && s > N_GREEN + 7; // 押さなかった(再現の時計でも同じ)
+    if (kiIn || oppIn || timeout) {
+      nr.end = kiIn && !oppIn ? "win" : "lose";
+      nr.endT = s;
+      if (nr.end === "win") {
+        const rt = (nr.go - N_GREEN).toFixed(3);
+        const last = nr.round === N_ROUNDS.length - 1;
+        api.later(nSlipDelay(rd, s), () => {
+          if (last) {
+            api.show("v_finish", () =>
+              api.say([`タイム　スリップ`, ...nSlip(rd, rt)], () => {
+                api.setFlag("won");
+                api.warp("strip", "finish");
+              }), { full: true });
+          } else {
+            api.say([`タイム　スリップ`, ...nSlip(rd, rt), `つぎは　${N_ROUNDS[nr.round + 1].name}`], () => {
+              api.setFlag("nrRound", nr.round + 1);
+              nCardShow(api, nr.round + 1, () => nRaceReset(api)); // 対戦カード(D367)
+            });
+          }
+        });
+      }
+    }
+  }
+  // 負けたら、震えて、カードに「まけ」、1 回戦から(D639、D640)。走っていれば、ゴールを過ぎてぴたりと止まってから震える
+  if (nr.end === "lose" && nr.loseT < 0 && (nr.go < 0 || ki >= N_RACE_D + 24)) nLose(api);
+  if (nr.repT < 0) {
+    nRaceSound(st0, null);
+    nDrawRear(ctx, ox, oy, get, api, st0);
+    return;
+  }
+  // カメラ: 先を行く車の鼻先を画面の 300 に。ゴールの線が画面の 240 まで来たら止まる
+  const lead = Math.max(ki, opp, 0);
+  let cam = Math.max(0, Math.min(N_FX - 240, N_SX + lead * N_PX - 300));
+  // 1 回戦: ぼぎカーがゴールするか、線がのびきったら、カメラを左へ流して、ぽんぽんカーを画面のまん中に。
+  // 張って、飛んでいくのを見せてから、ゴールへ戻る(D338、作者「ポンポンカーが引き戻される演出がわかりにくい」)
+  if (rd.snap) {
+    const lim = N_RACE_D * rd.snap;
+    const t1 = Math.min(nr.end ? nr.endT : 1e9, nr.snapT >= 0 ? nr.snapT : 1e9);
+    if (t1 < 1e9) {
+      const sm = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+      let w = sm((s - t1) / 0.45);
+      if (nr.snapT >= 0) w *= 1 - sm((s - (nr.snapT + N_SNAP_HOLD + N_SNAP_FLY + 0.5)) / 0.5);
+      const pc = N_SX + (nr.snapT >= 0 ? lim : Math.min(opp, lim)) * N_PX - 300;
+      cam = cam + (pc - cam) * w;
+    }
+  }
+  nRaceSound(st0, cam);
+  const sky = get("rcs_sky");
+  if (sky) ctx.drawImage(sky, ox, oy);
+  const pcam = cam * 0.35; // スタンドは遠いので、ゆっくり流れる
+  nStrip(ctx, get("rcs_stands"), ox, oy + 64, pcam);
+  // 歓声: 勝つと、空っぽのスタンドに、かつてのちゃんの見物人の影が満ちて消える(D126)
+  if (nr.end === "win") {
+    const u = (s - nr.endT) / 3.2;
+    const a = u < 0.25 ? u / 0.25 : u < 0.7 ? 1 : Math.max(0, (1 - u) / 0.3);
+    if (a > 0) {
+      ctx.globalAlpha = 0.85 * a;
+      nStrip(ctx, get("rcs_crowd"), ox, oy + 64 + Math.round(Math.sin(s * 9) * 1.5), pcam); // 帯の上のほうは薄くしてある(D291)
+      ctx.globalAlpha = 1;
+    }
+  }
+  nStrip(ctx, get("rcs_road"), ox, oy + 150, cam);
+  // スタートとゴールの白線(道を横切る)
+  ctx.fillStyle = "rgba(236, 232, 220, 0.85)";
+  for (const lx of [N_SX, N_FX]) {
+    const x = ox + Math.round(lx - cam);
+    if (x < ox - 20 || x > ox + 500) continue;
+    for (let y = 196; y < 300; y++) ctx.fillRect(x + Math.round((300 - y) * 0.12), oy + y, lx === N_FX ? 4 : 2, 1);
+  }
+  const burn = s > 1 && s < 3.2;
+  const shk = (on, a) => (on ? Math.round(Math.sin(s * 47) * a) : 0);
+  const st = s - N_GREEN;
+  // 相手(奥の車線)
+  const oim = (N_KOGAMO[rd.img] && nKogamo(get, rd.img, st0)) || get(rd.img); // とりぼぎかーは子がもが回る(D352)
+  const pr = nProtest(st0);
+  const ofx = ox + N_SX + (pr ? pr.pos : opp) * N_PX - cam;
+  let lift = rd.lift && st > 0 && st < 1.1 && !back ? rd.lift * Math.sin((Math.PI * st) / 1.1) : 0;
+  if (pr && pr.rev) lift = 0.05 * Math.max(0, Math.sin(s * 11)); // ふかすたびに、前がはね上がる(首を振るように)
+  if (st0.taut > 0) lift = -0.06 * Math.sin(Math.PI * (1 - st0.taut)); // 張った瞬間、前のめりに
+  const r = nDrawSide(ctx, oim, ofx, oy + N_GY.opp, st0.taut > 0 ? Math.round(Math.sin(s * 90) * 1.5) : pr && pr.rev ? Math.round(Math.sin(s * 60) * 2) : shk(burn || (st > 0 && st < (rd.rattle ? 1.2 : 0.8)), rd.rattle || 1), lift);
+  if (r && pr && pr.rev && Math.sin(s * 11) > 0.6 && Math.random() < 0.5) nRcPuff(r.x0 - ox + cam + 10, N_GY.opp - 8, -50); // ふかした煙
+  if (r && N_FLAME[rd.img]) {
+    const I = nFlameI(st0);
+    const gy = oy + N_GY.opp;
+    const pv = r.x0 + r.w * 0.2;
+    for (const [ax, ay, dx, dy] of N_FLAME[rd.img]) {
+      // 前がはね上がっているときは、絵と同じだけ口の位置もまわす
+      let px = r.x0 + ax, py = r.y0 + ay, vx = dx, vy = dy;
+      if (lift) {
+        const c = Math.cos(-lift), sn = Math.sin(-lift);
+        const qx = px - pv, qy = py - gy;
+        px = pv + qx * c - qy * sn;
+        py = gy + qx * sn + qy * c;
+        [vx, vy] = [dx * c - dy * sn, dx * sn + dy * c];
+      }
+      nFlame(ctx, px, py, vx, vy, I, 1);
+    }
+  }
+  if (r && rd.snap) {
+    // 線: 画面の左の外(峠のドラム缶 = 過去)から、ぽんぽんカーのうしろへ。張ったときは真っすぐ、ふるえる
+    const sag = st0.taut > 0 ? Math.sin(s * 70) * 2 : back > 0 ? 6 + back * 30 : Math.max(3, 40 * (1 - opp / N_RACE_D));
+    nCable(ctx, ox - 20, oy + N_GY.opp - 24, r.x0 + 14, r.y0 + r.h * 0.45, sag, { taut: st0.taut > 0 });
+    if (st0.taut > 0 && !nr.snapSfx) {
+      nr.snapSfx = true;
+      api.sfx("pon_snap");
+      api.shake(0.3, 2);
+    }
+    if (back > 0 && back < 0.9 && Math.random() < 0.3) nRcPuff(r.x0 - ox + cam + 60, N_GY.opp - 10, 30);
+  }
+  if (r && (burn || (st > 0.1 && st < 0.9)) && Math.random() < 0.7) nRcPuff(r.x0 - ox + cam + 22, N_GY.opp - 6, -40);
+  // ぼぎカー(手前の車線)ときー
+  const kim = get("rcs_bogi");
+  const kfx = ox + N_SX + ki * N_PX - cam;
+  const shake = shk(burn, 1);
+  const kr = nDrawSide(ctx, kim, kfx, oy + N_GY.ki, shake, 0);
+  if (kr) {
+    const im = get(nr.go < 0 || s < nr.go ? "rcs_ki" : "rcs_ki_stick"); // 再現シーンでは、押した時刻まで立っている
+    // 顔のうしろのくぼみに立つ。押すと、つぶれて背中に張り付く(粘着駆動 D123)
+    if (im) {
+      const standing = nr.go < 0 || s < nr.go;
+      const kx = standing ? kr.x0 + 60 : kr.x0 + 30;
+      const ky = standing ? kr.y0 + 20 : kr.y0 + 22;
+      ctx.drawImage(im, kx + nLoseShake(2), ky - im.height); // 負けたら、きーだけ震える(D639)
+    }
+    if (burn && Math.random() < 0.7) nRcPuff(kr.x0 - ox + cam + 26, N_GY.ki - 6, -60);
+  }
+  nDrawRcPuffs(ctx, ox, oy, cam);
+  // 手前の信号の柱(スタートの線の少し先)
+  const tree = get("rcs_tree");
+  const tx = ox + N_TREE.x - cam;
+  if (tree && tx > ox - 40) {
+    const ty = oy + N_TREE.foot - tree.height;
+    ctx.drawImage(tree, tx, ty);
+    const lamp = (col, row, c) => {
+      const cx = tx + N_TREE.xs[col];
+      const cy = ty + N_TREE.ys[row];
+      ctx.globalAlpha = 0.3;
+      ctx.fillStyle = c;
+      nDisk(ctx, cx, cy, N_TREE.r + 3);
+      ctx.globalAlpha = 1;
+      nDisk(ctx, cx, cy, N_TREE.r - 1);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(cx - 2, cy - 2, 2, 1);
+    };
+    const fouled = nr.foul >= 0;
+    for (const col of [0, 1]) {
+      if (s > 3.4 && !(nr.end && s - nr.endT > 0.2)) lamp(col, 0, N_LAMP.stage);
+      for (let k = 0; k < 3; k++) if (!fouled && s > N_GREEN - 1.5 + k * 0.5 && s < N_GREEN) lamp(col, 1 + k, N_LAMP.amber);
+      if (!fouled && s >= N_GREEN && !nr.end) lamp(col, 4, N_LAMP.green);
+    }
+    if (fouled) {
+      lamp(1, 5, N_LAMP.red);
+      lamp(1, 6, N_LAMP.red);
+    }
+    if (nr.end && Math.floor((s - nr.endT) * 4) % 2 === 0 && s - nr.endT < 3) lamp(nr.end === "win" ? 1 : 0, 0, N_LAMP.stage); // 勝った側の灯り
+  }
+  if (burn && Math.random() < 0.05) api.shake(0.25, 1);
+  // 切りかえの白い光
+  const fu = (real - nr.flash) / 0.25;
+  if (nr.flash >= 0 && fu < 1) {
+    ctx.fillStyle = `rgba(255, 252, 240, ${1 - fu})`;
+    ctx.fillRect(ox, oy, 480, 300);
+  }
+}
 const N_RACE = {
   tile: T,
   bg: "#000",
@@ -579,188 +761,7 @@ const N_RACE = {
     api.shake(0.5, 2);
     return true;
   },
-  drawGround(ctx, ox, oy, img, api) {
-    const get = (k) => (typeof img === "function" ? img(k) : null);
-    // 押して 1.1 秒たったら、横向きの再現シーンへ(青の 0.5 秒前から、同じ出来事をもう一度たどる D152)
-    if (nr.go >= 0 && nr.repT < 0 && nNow() - nr.t0 >= nr.go + 1.1) {
-      nr.repT = nNow() - nr.t0;
-      nr.rep0 = Math.min(nr.go, N_GREEN) - 0.5;
-      nr.snapT = -1;
-      nr.snapSfx = false;
-      nRcPuffs.length = 0;
-      nr.flash = nr.repT;
-    }
-    const st0 = nRaceState();
-    const { s, real, rd, ki, opp, back } = st0;
-    // 勝ち負け
-    if (!nr.end) {
-      const kiIn = ki >= N_RACE_D;
-      const oppIn = !rd.snap && opp >= N_RACE_D;
-      const timeout = nr.foul < 0 && s > N_GREEN + 7; // 押さなかった(再現の時計でも同じ)
-      if (kiIn || oppIn || timeout) {
-        nr.end = kiIn && !oppIn ? "win" : "lose";
-        nr.endT = s;
-        if (nr.end === "win") {
-          const rt = (nr.go - N_GREEN).toFixed(3);
-          const last = nr.round === N_ROUNDS.length - 1;
-          api.later(nSlipDelay(rd, s), () => {
-            if (last) {
-              api.show("v_finish", () =>
-                api.say([`タイム　スリップ`, ...nSlip(rd, rt)], () => {
-                  api.setFlag("won");
-                  api.warp("strip", "finish");
-                }), { full: true });
-            } else {
-              api.say([`タイム　スリップ`, ...nSlip(rd, rt), `つぎは　${N_ROUNDS[nr.round + 1].name}`], () => {
-                api.setFlag("nrRound", nr.round + 1);
-                nCardShow(api, nr.round + 1, () => nRaceReset(api)); // 対戦カード(D367)
-              });
-            }
-          });
-        }
-      }
-    }
-    // 負けたら、震えて、カードに「まけ」、1 回戦から(D639、D640)。走っていれば、ゴールを過ぎてぴたりと止まってから震える
-    if (nr.end === "lose" && nr.loseT < 0 && (nr.go < 0 || ki >= N_RACE_D + 24)) nLose(api);
-    if (nr.repT < 0) {
-      nRaceSound(st0, null);
-      nDrawRear(ctx, ox, oy, get, api, st0);
-      return;
-    }
-    // カメラ: 先を行く車の鼻先を画面の 300 に。ゴールの線が画面の 240 まで来たら止まる
-    const lead = Math.max(ki, opp, 0);
-    let cam = Math.max(0, Math.min(N_FX - 240, N_SX + lead * N_PX - 300));
-    // 1 回戦: ぼぎカーがゴールするか、線がのびきったら、カメラを左へ流して、ぽんぽんカーを画面のまん中に。
-    // 張って、飛んでいくのを見せてから、ゴールへ戻る(D338、作者「ポンポンカーが引き戻される演出がわかりにくい」)
-    if (rd.snap) {
-      const lim = N_RACE_D * rd.snap;
-      const t1 = Math.min(nr.end ? nr.endT : 1e9, nr.snapT >= 0 ? nr.snapT : 1e9);
-      if (t1 < 1e9) {
-        const sm = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
-        let w = sm((s - t1) / 0.45);
-        if (nr.snapT >= 0) w *= 1 - sm((s - (nr.snapT + N_SNAP_HOLD + N_SNAP_FLY + 0.5)) / 0.5);
-        const pc = N_SX + (nr.snapT >= 0 ? lim : Math.min(opp, lim)) * N_PX - 300;
-        cam = cam + (pc - cam) * w;
-      }
-    }
-    nRaceSound(st0, cam);
-    const sky = get("rcs_sky");
-    if (sky) ctx.drawImage(sky, ox, oy);
-    const pcam = cam * 0.35; // スタンドは遠いので、ゆっくり流れる
-    nStrip(ctx, get("rcs_stands"), ox, oy + 64, pcam);
-    // 歓声: 勝つと、空っぽのスタンドに、かつてのちゃんの見物人の影が満ちて消える(D126)
-    if (nr.end === "win") {
-      const u = (s - nr.endT) / 3.2;
-      const a = u < 0.25 ? u / 0.25 : u < 0.7 ? 1 : Math.max(0, (1 - u) / 0.3);
-      if (a > 0) {
-        ctx.globalAlpha = 0.85 * a;
-        nStrip(ctx, get("rcs_crowd"), ox, oy + 64 + Math.round(Math.sin(s * 9) * 1.5), pcam); // 帯の上のほうは薄くしてある(D291)
-        ctx.globalAlpha = 1;
-      }
-    }
-    nStrip(ctx, get("rcs_road"), ox, oy + 150, cam);
-    // スタートとゴールの白線(道を横切る)
-    ctx.fillStyle = "rgba(236, 232, 220, 0.85)";
-    for (const lx of [N_SX, N_FX]) {
-      const x = ox + Math.round(lx - cam);
-      if (x < ox - 20 || x > ox + 500) continue;
-      for (let y = 196; y < 300; y++) ctx.fillRect(x + Math.round((300 - y) * 0.12), oy + y, lx === N_FX ? 4 : 2, 1);
-    }
-    const burn = s > 1 && s < 3.2;
-    const shk = (on, a) => (on ? Math.round(Math.sin(s * 47) * a) : 0);
-    const st = s - N_GREEN;
-    // 相手(奥の車線)
-    const oim = (N_KOGAMO[rd.img] && nKogamo(get, rd.img, st0)) || get(rd.img); // とりぼぎかーは子がもが回る(D352)
-    const pr = nProtest(st0);
-    const ofx = ox + N_SX + (pr ? pr.pos : opp) * N_PX - cam;
-    let lift = rd.lift && st > 0 && st < 1.1 && !back ? rd.lift * Math.sin((Math.PI * st) / 1.1) : 0;
-    if (pr && pr.rev) lift = 0.05 * Math.max(0, Math.sin(s * 11)); // ふかすたびに、前がはね上がる(首を振るように)
-    if (st0.taut > 0) lift = -0.06 * Math.sin(Math.PI * (1 - st0.taut)); // 張った瞬間、前のめりに
-    const r = nDrawSide(ctx, oim, ofx, oy + N_GY.opp, st0.taut > 0 ? Math.round(Math.sin(s * 90) * 1.5) : pr && pr.rev ? Math.round(Math.sin(s * 60) * 2) : shk(burn || (st > 0 && st < (rd.rattle ? 1.2 : 0.8)), rd.rattle || 1), lift);
-    if (r && pr && pr.rev && Math.sin(s * 11) > 0.6 && Math.random() < 0.5) nRcPuff(r.x0 - ox + cam + 10, N_GY.opp - 8, -50); // ふかした煙
-    if (r && N_FLAME[rd.img]) {
-      const I = nFlameI(st0);
-      const gy = oy + N_GY.opp;
-      const pv = r.x0 + r.w * 0.2;
-      for (const [ax, ay, dx, dy] of N_FLAME[rd.img]) {
-        // 前がはね上がっているときは、絵と同じだけ口の位置もまわす
-        let px = r.x0 + ax, py = r.y0 + ay, vx = dx, vy = dy;
-        if (lift) {
-          const c = Math.cos(-lift), sn = Math.sin(-lift);
-          const qx = px - pv, qy = py - gy;
-          px = pv + qx * c - qy * sn;
-          py = gy + qx * sn + qy * c;
-          [vx, vy] = [dx * c - dy * sn, dx * sn + dy * c];
-        }
-        nFlame(ctx, px, py, vx, vy, I, 1);
-      }
-    }
-    if (r && rd.snap) {
-      // 線: 画面の左の外(峠のドラム缶 = 過去)から、ぽんぽんカーのうしろへ。張ったときは真っすぐ、ふるえる
-      const sag = st0.taut > 0 ? Math.sin(s * 70) * 2 : back > 0 ? 6 + back * 30 : Math.max(3, 40 * (1 - opp / N_RACE_D));
-      nCable(ctx, ox - 20, oy + N_GY.opp - 24, r.x0 + 14, r.y0 + r.h * 0.45, sag, { taut: st0.taut > 0 });
-      if (st0.taut > 0 && !nr.snapSfx) {
-        nr.snapSfx = true;
-        api.sfx("pon_snap");
-        api.shake(0.3, 2);
-      }
-      if (back > 0 && back < 0.9 && Math.random() < 0.3) nRcPuff(r.x0 - ox + cam + 60, N_GY.opp - 10, 30);
-    }
-    if (r && (burn || (st > 0.1 && st < 0.9)) && Math.random() < 0.7) nRcPuff(r.x0 - ox + cam + 22, N_GY.opp - 6, -40);
-    // ぼぎカー(手前の車線)ときー
-    const kim = get("rcs_bogi");
-    const kfx = ox + N_SX + ki * N_PX - cam;
-    const shake = shk(burn, 1);
-    const kr = nDrawSide(ctx, kim, kfx, oy + N_GY.ki, shake, 0);
-    if (kr) {
-      const im = get(nr.go < 0 || s < nr.go ? "rcs_ki" : "rcs_ki_stick"); // 再現シーンでは、押した時刻まで立っている
-      // 顔のうしろのくぼみに立つ。押すと、つぶれて背中に張り付く(粘着駆動 D123)
-      if (im) {
-        const standing = nr.go < 0 || s < nr.go;
-        const kx = standing ? kr.x0 + 60 : kr.x0 + 30;
-        const ky = standing ? kr.y0 + 20 : kr.y0 + 22;
-        ctx.drawImage(im, kx + nLoseShake(2), ky - im.height); // 負けたら、きーだけ震える(D639)
-      }
-      if (burn && Math.random() < 0.7) nRcPuff(kr.x0 - ox + cam + 26, N_GY.ki - 6, -60);
-    }
-    nDrawRcPuffs(ctx, ox, oy, cam);
-    // 手前の信号の柱(スタートの線の少し先)
-    const tree = get("rcs_tree");
-    const tx = ox + N_TREE.x - cam;
-    if (tree && tx > ox - 40) {
-      const ty = oy + N_TREE.foot - tree.height;
-      ctx.drawImage(tree, tx, ty);
-      const lamp = (col, row, c) => {
-        const cx = tx + N_TREE.xs[col];
-        const cy = ty + N_TREE.ys[row];
-        ctx.globalAlpha = 0.3;
-        ctx.fillStyle = c;
-        nDisk(ctx, cx, cy, N_TREE.r + 3);
-        ctx.globalAlpha = 1;
-        nDisk(ctx, cx, cy, N_TREE.r - 1);
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(cx - 2, cy - 2, 2, 1);
-      };
-      const fouled = nr.foul >= 0;
-      for (const col of [0, 1]) {
-        if (s > 3.4 && !(nr.end && s - nr.endT > 0.2)) lamp(col, 0, N_LAMP.stage);
-        for (let k = 0; k < 3; k++) if (!fouled && s > N_GREEN - 1.5 + k * 0.5 && s < N_GREEN) lamp(col, 1 + k, N_LAMP.amber);
-        if (!fouled && s >= N_GREEN && !nr.end) lamp(col, 4, N_LAMP.green);
-      }
-      if (fouled) {
-        lamp(1, 5, N_LAMP.red);
-        lamp(1, 6, N_LAMP.red);
-      }
-      if (nr.end && Math.floor((s - nr.endT) * 4) % 2 === 0 && s - nr.endT < 3) lamp(nr.end === "win" ? 1 : 0, 0, N_LAMP.stage); // 勝った側の灯り
-    }
-    if (burn && Math.random() < 0.05) api.shake(0.25, 1);
-    // 切りかえの白い光
-    const fu = (real - nr.flash) / 0.25;
-    if (nr.flash >= 0 && fu < 1) {
-      ctx.fillStyle = `rgba(255, 252, 240, ${1 - fu})`;
-      ctx.fillRect(ox, oy, 480, 300);
-    }
-  },
+  drawGround: nRaceDrawGround,
   triggers: [],
   objects: [],
 };

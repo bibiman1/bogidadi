@@ -389,6 +389,101 @@ function piSled() {
 
 const roadMapGrid = roadGrid();
 
+function lakeRoadDrawGround(ctx, ox, oy, img, api) {
+  if (typeof img !== "function") return; // 古い rpg.js と混ざったとき(キャッシュ)に止まらないように
+  const tile = img("road_asphalt");
+  if (!tile) return;
+  // 谷の靄: 背景の森の裾をぼかし、崖の縁へつなぐ
+  const g = ctx.createLinearGradient(0, 6.9 * T + oy, 0, 8.05 * T + oy);
+  g.addColorStop(0, "rgba(238, 242, 246, 0)");
+  g.addColorStop(1, "rgba(238, 242, 246, 0.95)");
+  ctx.fillStyle = g;
+  ctx.fillRect(ox, 6.9 * T + oy, ROAD_COLS * T, 1.15 * T);
+  // 崖の縁(雪の土手)
+  ctx.fillStyle = "#d6e4ec";
+  ctx.fillRect(ox, 8 * T + oy, ROAD_COLS * T, 5);
+  ctx.fillStyle = "#b8ccd8";
+  ctx.fillRect(ox, 8 * T + 5 + oy, ROAD_COLS * T, 2);
+  // 待避所: 道からふくらんだ舗装
+  {
+    const { c0, c1, r0, r1 } = LAYBY;
+    ctx.save();
+    ctx.translate(ox, oy);
+    ctx.fillStyle = "#c4dae6";
+    ctx.beginPath();
+    ctx.roundRect(c0 * T - 4, r0 * T - 4, (c1 - c0) * T + 8, (r1 - r0) * T + 8, 18);
+    ctx.fill();
+    ctx.restore();
+    drawRoadVector(ctx, ox, oy, tile, this); // 道と待避所の舗装をつなげる
+    ctx.save();
+    ctx.translate(ox, oy);
+    ctx.fillStyle = this.pattern;
+    ctx.beginPath();
+    ctx.roundRect(c0 * T, r0 * T, (c1 - c0) * T, (r1 - r0) * T, 14);
+    ctx.fill();
+    ctx.restore();
+  }
+  if (api && homeward(api)) {
+    // 積もった雪: 道の上を白くなぞる(センターラインは雪の下)
+    // 半透明の線は継ぎ目の割れ(iPhone の Safari)を丸で埋めると重なって濃くなるので、
+    // 別の紙に不透明で描いて(線 + 継ぎ目の丸 + 待避所)、まとめて半透明で重ねる(2026-10-10、作者「切れ込みあり」)
+    {
+      const cv = ctx.canvas;
+      const snow = this.snowCanvas || (this.snowCanvas = document.createElement("canvas"));
+      if (snow.width !== cv.width || snow.height !== cv.height) {
+        snow.width = cv.width;
+        snow.height = cv.height;
+      }
+      const g = snow.getContext("2d");
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.clearRect(0, 0, snow.width, snow.height);
+      g.setTransform(ctx.getTransform());
+      g.translate(ox, oy);
+      const pts = ROAD_CURVE.map(([r, c]) => [(c + 0.5) * T, Math.max(8 * T, (r + 0.5) * T)]);
+      g.fillStyle = g.strokeStyle = "rgb(243, 246, 249)";
+      g.lineJoin = "round";
+      g.lineWidth = 90;
+      g.beginPath();
+      pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+      g.stroke();
+      g.beginPath();
+      for (const [x, y] of pts.slice(1, -1)) {
+        g.moveTo(x + 45, y);
+        g.arc(x, y, 45, 0, Math.PI * 2);
+      }
+      g.fill();
+      g.beginPath();
+      g.roundRect(LAYBY.c0 * T, LAYBY.r0 * T, (LAYBY.c1 - LAYBY.c0) * T, (LAYBY.r1 - LAYBY.r0) * T, 14);
+      g.fill();
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = 0.88;
+      ctx.drawImage(snow, 0, 0);
+      ctx.restore();
+    }
+    ctx.save();
+    ctx.translate(ox, oy);
+    // わだち
+    ctx.strokeStyle = "rgba(170, 190, 204, 0.5)";
+    ctx.lineWidth = 3;
+    for (const off of [-12, 12]) {
+      ctx.beginPath();
+      ROAD_CURVE.forEach(([r, c], i) => {
+        const x = (c + 0.5) * T + off;
+        const y = Math.max(8 * T, (r + 0.5) * T);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    }
+    ctx.restore();
+  } else {
+    centerLine(ctx, ox, oy, ROAD_CURVE.filter(([r]) => r > 10.9).map(([r, c]) => [(c + 0.5) * T, (r + 0.5) * T]));
+  }
+  // ガードレール: 待避所の崖側と、峠道のカーブの外側
+  guardrail(ctx, ox, oy, [[LAYBY.c0 * T - 2, 8.55 * T], [LAYBY.c1 * T + 2, 8.55 * T]]);
+  ROAD_RAILS.forEach((run) => guardrail(ctx, ox, oy, run));
+}
 const ROAD = {
   tile: T,
   bg: "#eef2f6",
@@ -409,101 +504,7 @@ const ROAD = {
     const inLayby = x > LAYBY.c0 * T && x < LAYBY.c1 * T && y > LAYBY.r0 * T && y < LAYBY.r1 * T;
     return inLayby || (roadMapGrid[r] && roadMapGrid[r][c] === "=") ? HOMEWARD_SLIP : false;
   },
-  drawGround(ctx, ox, oy, img, api) {
-    if (typeof img !== "function") return; // 古い rpg.js と混ざったとき(キャッシュ)に止まらないように
-    const tile = img("road_asphalt");
-    if (!tile) return;
-    // 谷の靄: 背景の森の裾をぼかし、崖の縁へつなぐ
-    const g = ctx.createLinearGradient(0, 6.9 * T + oy, 0, 8.05 * T + oy);
-    g.addColorStop(0, "rgba(238, 242, 246, 0)");
-    g.addColorStop(1, "rgba(238, 242, 246, 0.95)");
-    ctx.fillStyle = g;
-    ctx.fillRect(ox, 6.9 * T + oy, ROAD_COLS * T, 1.15 * T);
-    // 崖の縁(雪の土手)
-    ctx.fillStyle = "#d6e4ec";
-    ctx.fillRect(ox, 8 * T + oy, ROAD_COLS * T, 5);
-    ctx.fillStyle = "#b8ccd8";
-    ctx.fillRect(ox, 8 * T + 5 + oy, ROAD_COLS * T, 2);
-    // 待避所: 道からふくらんだ舗装
-    {
-      const { c0, c1, r0, r1 } = LAYBY;
-      ctx.save();
-      ctx.translate(ox, oy);
-      ctx.fillStyle = "#c4dae6";
-      ctx.beginPath();
-      ctx.roundRect(c0 * T - 4, r0 * T - 4, (c1 - c0) * T + 8, (r1 - r0) * T + 8, 18);
-      ctx.fill();
-      ctx.restore();
-      drawRoadVector(ctx, ox, oy, tile, this); // 道と待避所の舗装をつなげる
-      ctx.save();
-      ctx.translate(ox, oy);
-      ctx.fillStyle = this.pattern;
-      ctx.beginPath();
-      ctx.roundRect(c0 * T, r0 * T, (c1 - c0) * T, (r1 - r0) * T, 14);
-      ctx.fill();
-      ctx.restore();
-    }
-    if (api && homeward(api)) {
-      // 積もった雪: 道の上を白くなぞる(センターラインは雪の下)
-      // 半透明の線は継ぎ目の割れ(iPhone の Safari)を丸で埋めると重なって濃くなるので、
-      // 別の紙に不透明で描いて(線 + 継ぎ目の丸 + 待避所)、まとめて半透明で重ねる(2026-10-10、作者「切れ込みあり」)
-      {
-        const cv = ctx.canvas;
-        const snow = this.snowCanvas || (this.snowCanvas = document.createElement("canvas"));
-        if (snow.width !== cv.width || snow.height !== cv.height) {
-          snow.width = cv.width;
-          snow.height = cv.height;
-        }
-        const g = snow.getContext("2d");
-        g.setTransform(1, 0, 0, 1, 0, 0);
-        g.clearRect(0, 0, snow.width, snow.height);
-        g.setTransform(ctx.getTransform());
-        g.translate(ox, oy);
-        const pts = ROAD_CURVE.map(([r, c]) => [(c + 0.5) * T, Math.max(8 * T, (r + 0.5) * T)]);
-        g.fillStyle = g.strokeStyle = "rgb(243, 246, 249)";
-        g.lineJoin = "round";
-        g.lineWidth = 90;
-        g.beginPath();
-        pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
-        g.stroke();
-        g.beginPath();
-        for (const [x, y] of pts.slice(1, -1)) {
-          g.moveTo(x + 45, y);
-          g.arc(x, y, 45, 0, Math.PI * 2);
-        }
-        g.fill();
-        g.beginPath();
-        g.roundRect(LAYBY.c0 * T, LAYBY.r0 * T, (LAYBY.c1 - LAYBY.c0) * T, (LAYBY.r1 - LAYBY.r0) * T, 14);
-        g.fill();
-        ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.globalAlpha = 0.88;
-        ctx.drawImage(snow, 0, 0);
-        ctx.restore();
-      }
-      ctx.save();
-      ctx.translate(ox, oy);
-      // わだち
-      ctx.strokeStyle = "rgba(170, 190, 204, 0.5)";
-      ctx.lineWidth = 3;
-      for (const off of [-12, 12]) {
-        ctx.beginPath();
-        ROAD_CURVE.forEach(([r, c], i) => {
-          const x = (c + 0.5) * T + off;
-          const y = Math.max(8 * T, (r + 0.5) * T);
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        });
-        ctx.stroke();
-      }
-      ctx.restore();
-    } else {
-      centerLine(ctx, ox, oy, ROAD_CURVE.filter(([r]) => r > 10.9).map(([r, c]) => [(c + 0.5) * T, (r + 0.5) * T]));
-    }
-    // ガードレール: 待避所の崖側と、峠道のカーブの外側
-    guardrail(ctx, ox, oy, [[LAYBY.c0 * T - 2, 8.55 * T], [LAYBY.c1 * T + 2, 8.55 * T]]);
-    ROAD_RAILS.forEach((run) => guardrail(ctx, ox, oy, run));
-  },
+  drawGround: lakeRoadDrawGround,
   spawns: {
     start: { x: 7.5 * T, y: 58.5 * T, facing: "north" },
     pass: { x: 13.2 * T, y: 10.6 * T, facing: "west" },

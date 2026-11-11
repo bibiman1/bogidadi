@@ -611,6 +611,84 @@ const F_CREDITS_TAIL = [
   ["音", ["赤ちゃんの笑い声", "reinsamba（CC BY 3.0）", "公園の遊び場", "foongaz（CC0）", "Wikimedia Commons"]],
   ["スペシャルサンクス", ["あそんでくれた", "あなた"]],
 ];
+function fRollDrawOverlay(ctx, ox, oy, t, api) {
+  const P = window.bogiPix;
+  if (!P || fS.rollT0 == null) return;
+  const S = 2;
+  const VWc = ctx.canvas.width;
+  const VHc = ctx.canvas.height;
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const y0 = VHc - (fNow() - fS.rollT0) * 90;
+  const c = fS.ending === "c";
+  const title = "ぼぎだぢ";
+  P.text(ctx, title, Math.round((VWc - P.width(title) * S) / 2), Math.round(y0), S, "#ffffff");
+  if (!c) {
+    // B: 字だけ。C と同じ役目と名前を、絵を出さずに流して、おわり(D277、D287)
+    const lineH = 22 * S;
+    let yy = y0 + 70 * S;
+    F_CREDITS.concat(F_CREDITS_TAIL).forEach(([role, names]) => {
+      [[role, "#9a9aa6"], ...names.map((n) => [n, "#ffffff"])].forEach(([text, col], k) => {
+        const y = yy + k * lineH + (k ? 6 * S : 0);
+        if (y > -lineH && y < VHc + 10) P.text(ctx, text, Math.round((VWc - P.width(text) * S) / 2), Math.round(y), S, col);
+      });
+      yy += (names.length + 1) * lineH + 30 * S;
+    });
+    // おわりは、最後の名前が画面の上へ出きってから、まん中で止まる
+    const endB = yy + VHc / 2;
+    const owariB = "おわり";
+    P.text(ctx, owariB, Math.round((VWc - P.width(owariB) * S) / 2), Math.round(Math.max(VHc / 2 - 16, endB)), S, "#ffffff");
+    if (endB < VHc / 2 - 16) fS.rollDone = true;
+    ctx.restore();
+    return;
+  }
+  // C: 作者のイメージボード(手描き)だけを、額に入れて流す。断片の名も、最後の写真も出さない(D284、D285)
+  const fw = 160 * S;
+  const fh = 112 * S;
+  const items = F_ROLL_ITEMS.map((_, i) => `roll_${String(i).padStart(2, "0")}`); // 作者のスケッチは 12 枚(11、12 枚目は断片の絵でない漫画。D600)
+  items.forEach((key, i) => {
+    const y = y0 + 90 * S + i * (fh + 40 * S);
+    if (y < -fh - 40 * S || y > VHc + 10) return;
+    const x = Math.round((VWc - fw) / 2) + (i % 2 ? 40 : -40) * S;
+    ctx.fillStyle = "#e8e2d4";
+    ctx.fillRect(x, y, fw, fh);
+    const im = api && api.image(key);
+    if (im) {
+      // 絵はキャンバスの画素と 1 対 1 の大きさ(152×104 ドット × 2)。拡大しないので、元の線の細かさがそのまま出る
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(im, x + 4 * S, Math.round(y) + 4 * S, 152 * S, 104 * S);
+    }
+    // 絵の反対側に、役目と名前
+    const [role, names] = F_CREDITS[i] || ["", []];
+    const lines = [[role, "#9a9aa6"], ...names.map((n) => [n, "#ffffff"])];
+    const lh = 22 * S;
+    const ty = Math.round(y + fh / 2 - (lines.length * lh) / 2);
+    const left = i % 2 === 1; // 絵が右にあるときは、文字を左に
+    const area = left ? [16, x - 24] : [x + fw + 24, VWc - 16];
+    lines.forEach(([text, col], k) => {
+      const w = P.width(text) * S;
+      const tx = left ? area[1] - w : area[0];
+      P.text(ctx, text, Math.round(tx), ty + k * lh + (k ? 6 * S : 0), S, col);
+    });
+  });
+  // 絵のあとに、使った曲と音の出典と作者を、まん中に字だけで(todo 69、D301)
+  const lineH = 22 * S;
+  let yy = y0 + 90 * S + items.length * (fh + 40 * S) + 20 * S;
+  F_CREDITS_TAIL.forEach(([role, names]) => {
+    [[role, "#9a9aa6"], ...names.map((n) => [n, "#ffffff"])].forEach(([text, col], k) => {
+      const ty = yy + k * lineH + (k ? 6 * S : 0);
+      if (ty > -lineH && ty < VHc + 10) P.text(ctx, text, Math.round((VWc - P.width(text) * S) / 2), Math.round(ty), S, col);
+    });
+    yy += (names.length + 1) * lineH + 30 * S;
+  });
+  // おわりは、最後の字が画面の上へ出きってから、まん中で止まる(作者「おわり　でとめる。絵がはいらないように」)
+  const endY = yy + VHc / 2;
+  const owari = "おわり";
+  P.text(ctx, owari, Math.round((VWc - P.width(owari) * S) / 2), Math.round(Math.max(VHc / 2 - 16, endY)), S, "#ffffff");
+  if (endY < VHc / 2 - 16) fS.rollDone = true;
+  ctx.restore();
+}
 const F_ROLL = {
   tile: T,
   // C はまっ暗の無音から(笑い声のあとで公園の音にかえる D292)。B はいまのまま
@@ -648,84 +726,7 @@ const F_ROLL = {
       });
     } else api.later(600, go);
   },
-  drawOverlay(ctx, ox, oy, t, api) {
-    const P = window.bogiPix;
-    if (!P || fS.rollT0 == null) return;
-    const S = 2;
-    const VWc = ctx.canvas.width;
-    const VHc = ctx.canvas.height;
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    const y0 = VHc - (fNow() - fS.rollT0) * 90;
-    const c = fS.ending === "c";
-    const title = "ぼぎだぢ";
-    P.text(ctx, title, Math.round((VWc - P.width(title) * S) / 2), Math.round(y0), S, "#ffffff");
-    if (!c) {
-      // B: 字だけ。C と同じ役目と名前を、絵を出さずに流して、おわり(D277、D287)
-      const lineH = 22 * S;
-      let yy = y0 + 70 * S;
-      F_CREDITS.concat(F_CREDITS_TAIL).forEach(([role, names]) => {
-        [[role, "#9a9aa6"], ...names.map((n) => [n, "#ffffff"])].forEach(([text, col], k) => {
-          const y = yy + k * lineH + (k ? 6 * S : 0);
-          if (y > -lineH && y < VHc + 10) P.text(ctx, text, Math.round((VWc - P.width(text) * S) / 2), Math.round(y), S, col);
-        });
-        yy += (names.length + 1) * lineH + 30 * S;
-      });
-      // おわりは、最後の名前が画面の上へ出きってから、まん中で止まる
-      const endB = yy + VHc / 2;
-      const owariB = "おわり";
-      P.text(ctx, owariB, Math.round((VWc - P.width(owariB) * S) / 2), Math.round(Math.max(VHc / 2 - 16, endB)), S, "#ffffff");
-      if (endB < VHc / 2 - 16) fS.rollDone = true;
-      ctx.restore();
-      return;
-    }
-    // C: 作者のイメージボード(手描き)だけを、額に入れて流す。断片の名も、最後の写真も出さない(D284、D285)
-    const fw = 160 * S;
-    const fh = 112 * S;
-    const items = F_ROLL_ITEMS.map((_, i) => `roll_${String(i).padStart(2, "0")}`); // 作者のスケッチは 12 枚(11、12 枚目は断片の絵でない漫画。D600)
-    items.forEach((key, i) => {
-      const y = y0 + 90 * S + i * (fh + 40 * S);
-      if (y < -fh - 40 * S || y > VHc + 10) return;
-      const x = Math.round((VWc - fw) / 2) + (i % 2 ? 40 : -40) * S;
-      ctx.fillStyle = "#e8e2d4";
-      ctx.fillRect(x, y, fw, fh);
-      const im = api && api.image(key);
-      if (im) {
-        // 絵はキャンバスの画素と 1 対 1 の大きさ(152×104 ドット × 2)。拡大しないので、元の線の細かさがそのまま出る
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(im, x + 4 * S, Math.round(y) + 4 * S, 152 * S, 104 * S);
-      }
-      // 絵の反対側に、役目と名前
-      const [role, names] = F_CREDITS[i] || ["", []];
-      const lines = [[role, "#9a9aa6"], ...names.map((n) => [n, "#ffffff"])];
-      const lh = 22 * S;
-      const ty = Math.round(y + fh / 2 - (lines.length * lh) / 2);
-      const left = i % 2 === 1; // 絵が右にあるときは、文字を左に
-      const area = left ? [16, x - 24] : [x + fw + 24, VWc - 16];
-      lines.forEach(([text, col], k) => {
-        const w = P.width(text) * S;
-        const tx = left ? area[1] - w : area[0];
-        P.text(ctx, text, Math.round(tx), ty + k * lh + (k ? 6 * S : 0), S, col);
-      });
-    });
-    // 絵のあとに、使った曲と音の出典と作者を、まん中に字だけで(todo 69、D301)
-    const lineH = 22 * S;
-    let yy = y0 + 90 * S + items.length * (fh + 40 * S) + 20 * S;
-    F_CREDITS_TAIL.forEach(([role, names]) => {
-      [[role, "#9a9aa6"], ...names.map((n) => [n, "#ffffff"])].forEach(([text, col], k) => {
-        const ty = yy + k * lineH + (k ? 6 * S : 0);
-        if (ty > -lineH && ty < VHc + 10) P.text(ctx, text, Math.round((VWc - P.width(text) * S) / 2), Math.round(ty), S, col);
-      });
-      yy += (names.length + 1) * lineH + 30 * S;
-    });
-    // おわりは、最後の字が画面の上へ出きってから、まん中で止まる(作者「おわり　でとめる。絵がはいらないように」)
-    const endY = yy + VHc / 2;
-    const owari = "おわり";
-    P.text(ctx, owari, Math.round((VWc - P.width(owari) * S) / 2), Math.round(Math.max(VHc / 2 - 16, endY)), S, "#ffffff");
-    if (endY < VHc / 2 - 16) fS.rollDone = true;
-    ctx.restore();
-  },
+  drawOverlay: fRollDrawOverlay,
   objects: [
     {
       id: "rollend",

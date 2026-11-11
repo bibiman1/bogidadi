@@ -216,6 +216,97 @@ const pLeft = () => P_Q.filter((q) => q.up == null);
 const pSlot = (k) => [P_HEAD.x - k * P_GAP, P_HEAD.y];
 const pKiSlot = () => pSlot(pLeft().length);
 const pRise = (u) => Math.min(1, u) ** 2 * 170; // のぼる高さ
+function pCtlUpdate(dt, t, api) {
+  const now = pNow();
+  const p = api.player();
+  if (pS.phase === "seat") {
+    // みんなと、きーが、観客席へ歩く。そろったら(長くても 5 秒で)紙芝居
+    const [sx2, sy2] = pSeat(16);
+    const dx = sx2 - p.x, dy = sy2 - p.y, d = Math.hypot(dx, dy);
+    if (d > 1) api.place(p.x + (dx / d) * Math.min(d, 60 * dt), p.y + (dy / d) * Math.min(d, 60 * dt));
+    const ready = d < 2 && P_Q.every((q) => Math.hypot(q.x - pSeat(q.i)[0], q.y - pSeat(q.i)[1]) < 2);
+    if (ready || now - pS.t0 > 5) pStartShow(api);
+  }
+  if (pS.phase === "gather" && now - pS.t0 > 2.6) {
+    // 紙芝居のあと、きー以外のみんなが列をつくり、きーを待たずにのぼりはじめる(D438)
+    pS.phase = "ascend";
+    pS.kiMoved = false;
+    pS.lastUp = now - P_UP_SEC + 0.8;
+    api.bubble("padre", "カチ　カチ", 1400);
+  }
+  if (!pS.joined && (pS.phase === "ascend" || (pS.phase === "pi" && pS.pi && pS.pi.step === "wait"))) {
+    // きーが自分で列の最後尾にならぶと、そのあとは列についていく(D438)
+    const [kx, ky] = pKiSlot();
+    // 席に座ったままのきーに、短くなった列のうしろが届いても、ならんだことにはしない(自分で動いてからだけ)
+    if (Math.hypot(p.x - P_SEAT.x, p.y - P_SEAT.y) > 8) pS.kiMoved = true;
+    if (pS.phase === "ascend" && pS.kiMoved && Math.hypot(p.x - kx, p.y - ky) < 16) {
+      pS.joined = true;
+      api.freeze(999);
+      api.face("east");
+      api.setFlag("taken");
+    }
+  }
+  if (pS.phase === "ascend" && now - pS.lastUp > P_UP_SEC) {
+    const left = pLeft();
+    if (left.length) {
+      left[0].up = now;
+      pS.lastUp = now;
+      const v = P_VOICES[left[0].key];
+      if (v) api.bubble(left[0].key, v, 1200);
+    } else {
+      // きーの番(ならんでいなければ、みんながのぼったあと)。少しして、ぴーが突然かけこんでくる
+      pS.phase = "pi";
+      pS.t0 = now;
+      pS.pi = { x: -1 * T, y: P_HEAD.y, step: "run", t0: now, up: null };
+      api.mutter("……", 1400);
+    }
+  }
+  // ならんでいるあいだ、きーは列といっしょに前へ進む
+  if (pS.joined && (pS.phase === "ascend" || (pS.phase === "pi" && pS.pi.step === "run"))) {
+    const [kx, ky] = pKiSlot();
+    const dx = kx - p.x, dy = ky - p.y, d = Math.hypot(dx, dy);
+    if (d > 1) api.place(p.x + (dx / d) * Math.min(d, 50 * dt), p.y + (dy / d) * Math.min(d, 50 * dt));
+  }
+  if (pS.phase === "pi") {
+    const pi = pS.pi;
+    if (pi.step === "run" && now - pi.t0 > 1.4) {
+      // 西から、まっすぐ、きーへ
+      pi.x += 230 * dt;
+      if (!pS.joined) {
+        // きーが列にいないときは、押しのけずに、そのまま光の柱へ(D438)
+        if (pi.x >= P_HEAD.x) {
+          pi.x = P_HEAD.x;
+          pi.step = "up";
+          pi.up = now;
+        }
+      } else if (pi.x > p.x - 20) {
+        pi.step = "shove";
+        pi.t0 = now;
+        api.freeze(0);
+        api.knock(-320, 360); // 押しのけられて、南西へよろける(東の暗い霧の外へ)
+        api.sfx("knock");
+        api.bubble("pi", "どけ", 1400);
+        pS.joined = false;
+      }
+    } else if (pi.step === "shove" && now - pi.t0 > 0.5) {
+      pi.x += Math.min(P_HEAD.x - pi.x, 90 * dt);
+      if (P_HEAD.x - pi.x < 1) {
+        pi.step = "up";
+        pi.up = now;
+      }
+    } else if (pi.step === "up" && now - pi.up > P_RISE_SEC + 0.2) {
+      pS.phase = "leave";
+      pS.t0 = now;
+      api.bubble("padre", "カチ　カチ", 1400);
+    }
+  }
+  if (pS.phase === "leave" && now - pS.t0 > P_LEAVE_SEC) {
+    api.setFlag("gone");
+    pS.phase = "done";
+    pS.ameT0 = now; // 水あめのわりばしが、上から落ちてくる(D429)
+    api.later(800, () => kLearn(api, "funbaru", "ふんばる")); // 押しのけられても、ここに残った(D201、D425)
+  }
+}
 const P_AKICHI = {
   tile: T,
   bg: "#848c68",
@@ -311,97 +402,7 @@ const P_AKICHI = {
       w: 1,
       h: 1,
       draw() {},
-      update(dt, t, api) {
-        const now = pNow();
-        const p = api.player();
-        if (pS.phase === "seat") {
-          // みんなと、きーが、観客席へ歩く。そろったら(長くても 5 秒で)紙芝居
-          const [sx2, sy2] = pSeat(16);
-          const dx = sx2 - p.x, dy = sy2 - p.y, d = Math.hypot(dx, dy);
-          if (d > 1) api.place(p.x + (dx / d) * Math.min(d, 60 * dt), p.y + (dy / d) * Math.min(d, 60 * dt));
-          const ready = d < 2 && P_Q.every((q) => Math.hypot(q.x - pSeat(q.i)[0], q.y - pSeat(q.i)[1]) < 2);
-          if (ready || now - pS.t0 > 5) pStartShow(api);
-        }
-        if (pS.phase === "gather" && now - pS.t0 > 2.6) {
-          // 紙芝居のあと、きー以外のみんなが列をつくり、きーを待たずにのぼりはじめる(D438)
-          pS.phase = "ascend";
-          pS.kiMoved = false;
-          pS.lastUp = now - P_UP_SEC + 0.8;
-          api.bubble("padre", "カチ　カチ", 1400);
-        }
-        if (!pS.joined && (pS.phase === "ascend" || (pS.phase === "pi" && pS.pi && pS.pi.step === "wait"))) {
-          // きーが自分で列の最後尾にならぶと、そのあとは列についていく(D438)
-          const [kx, ky] = pKiSlot();
-          // 席に座ったままのきーに、短くなった列のうしろが届いても、ならんだことにはしない(自分で動いてからだけ)
-          if (Math.hypot(p.x - P_SEAT.x, p.y - P_SEAT.y) > 8) pS.kiMoved = true;
-          if (pS.phase === "ascend" && pS.kiMoved && Math.hypot(p.x - kx, p.y - ky) < 16) {
-            pS.joined = true;
-            api.freeze(999);
-            api.face("east");
-            api.setFlag("taken");
-          }
-        }
-        if (pS.phase === "ascend" && now - pS.lastUp > P_UP_SEC) {
-          const left = pLeft();
-          if (left.length) {
-            left[0].up = now;
-            pS.lastUp = now;
-            const v = P_VOICES[left[0].key];
-            if (v) api.bubble(left[0].key, v, 1200);
-          } else {
-            // きーの番(ならんでいなければ、みんながのぼったあと)。少しして、ぴーが突然かけこんでくる
-            pS.phase = "pi";
-            pS.t0 = now;
-            pS.pi = { x: -1 * T, y: P_HEAD.y, step: "run", t0: now, up: null };
-            api.mutter("……", 1400);
-          }
-        }
-        // ならんでいるあいだ、きーは列といっしょに前へ進む
-        if (pS.joined && (pS.phase === "ascend" || (pS.phase === "pi" && pS.pi.step === "run"))) {
-          const [kx, ky] = pKiSlot();
-          const dx = kx - p.x, dy = ky - p.y, d = Math.hypot(dx, dy);
-          if (d > 1) api.place(p.x + (dx / d) * Math.min(d, 50 * dt), p.y + (dy / d) * Math.min(d, 50 * dt));
-        }
-        if (pS.phase === "pi") {
-          const pi = pS.pi;
-          if (pi.step === "run" && now - pi.t0 > 1.4) {
-            // 西から、まっすぐ、きーへ
-            pi.x += 230 * dt;
-            if (!pS.joined) {
-              // きーが列にいないときは、押しのけずに、そのまま光の柱へ(D438)
-              if (pi.x >= P_HEAD.x) {
-                pi.x = P_HEAD.x;
-                pi.step = "up";
-                pi.up = now;
-              }
-            } else if (pi.x > p.x - 20) {
-              pi.step = "shove";
-              pi.t0 = now;
-              api.freeze(0);
-              api.knock(-320, 360); // 押しのけられて、南西へよろける(東の暗い霧の外へ)
-              api.sfx("knock");
-              api.bubble("pi", "どけ", 1400);
-              pS.joined = false;
-            }
-          } else if (pi.step === "shove" && now - pi.t0 > 0.5) {
-            pi.x += Math.min(P_HEAD.x - pi.x, 90 * dt);
-            if (P_HEAD.x - pi.x < 1) {
-              pi.step = "up";
-              pi.up = now;
-            }
-          } else if (pi.step === "up" && now - pi.up > P_RISE_SEC + 0.2) {
-            pS.phase = "leave";
-            pS.t0 = now;
-            api.bubble("padre", "カチ　カチ", 1400);
-          }
-        }
-        if (pS.phase === "leave" && now - pS.t0 > P_LEAVE_SEC) {
-          api.setFlag("gone");
-          pS.phase = "done";
-          pS.ameT0 = now; // 水あめのわりばしが、上から落ちてくる(D429)
-          api.later(800, () => kLearn(api, "funbaru", "ふんばる")); // 押しのけられても、ここに残った(D201、D425)
-        }
-      },
+      update: pCtlUpdate,
     },
     // ぴー(D425): きーの番に突然来て、押しのけ、先にのぼる。富士山の峠道のぴーは、このあと、いない
     {

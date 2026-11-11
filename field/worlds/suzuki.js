@@ -333,79 +333,80 @@ const sOut = (api) => {
 // 船殻は左上へ遠ざかって小さくなり、きーは右へただよいながら、引力に引かれてじわじわ右下へ落ちていく。最後は赤く光って流れ星の絵へ
 const SPACE_DUR = 9;
 let spaceT0 = 0;
+function sSpaceDrawGround(ctx, ox, oy, img) {
+  const get = (k) => (typeof img === "function" ? img(k) : null);
+  const t = Math.min(SPACE_DUR, performance.now() / 1000 - spaceT0);
+  const VWm = 15 * T;
+  const VHm = 300; // 画面の高さ(ドット)
+  const CX = 28 * T - VWm; // 衛星軌道のマップの右端で、カメラが見ていた範囲
+  const CY = 10 * T - VHm;
+  const orb = get("bg_orbit");
+  const sky = get("rise_sky");
+  // 星空(ゆっくり上へ流れる = きーが落ちていく)
+  const fall = ease((t - 2) / (SPACE_DUR - 2));
+  if (sky) ctx.drawImage(sky, 0, Math.round(40 * fall), VWm, VHm, ox, oy, VWm, VHm);
+  // カメラはきーを追って右へ動く(船殻と地球は左へ流れる)。きーは右下へ落ちていく
+  const pan = 240 * ease((t - 0.8) / 5);
+  // 地球: はじめは衛星軌道のマップの地球と同じ場所。落ちるにつれて大きく、上へ(遠いので、流れはゆっくり)
+  if (orb) {
+    const sx0 = CX, sy0 = 252, sw = VWm, sh = 10 * T - 252;
+    const k = 1 + 1.4 * fall;
+    const w = sw * k, h = sh * k;
+    const ex = ox + (VWm - w) / 2 - pan * 0.35;
+    const ey = oy + (sy0 - CY) - 120 * fall;
+    ctx.fillStyle = "#2a5a9e"; // 地球の下の海(大きくなっても下が抜けないように)
+    ctx.fillRect(Math.round(ex), Math.round(ey + h - 2), Math.round(w), VHm);
+    ctx.drawImage(orb, sx0, sy0, sw, sh, Math.round(ex), Math.round(ey), Math.round(w), Math.round(h));
+  }
+  // 船殻: はじめは衛星軌道のマップと同じ大きさ・位置。左上へ遠ざかって小さくなり、消える
+  const tube = get("rise_tube");
+  const lv = ease(t / 3.2);
+  if (tube && lv < 1) {
+    const sc = 2 * (1 - 0.8 * lv); // rise_tube は半分の大きさなので 2 倍から
+    const hx = ox + (27 * T - CX) - pan, hy = oy + (5 * T - CY); // 右の穴の位置
+    const px = hx - 120 * lv, py = hy - 90 * lv;
+    ctx.globalAlpha = 1 - ease((t - 2) / 1.4);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(tube, Math.round(px - tube.width * sc + 6 * sc), Math.round(py - (tube.height * sc) / 2), Math.round(tube.width * sc), Math.round(tube.height * sc));
+    ctx.globalAlpha = 1;
+  }
+  // 最初の一瞬は、衛星軌道のマップの絵そのものを重ねて、つなぎ目をなくす
+  if (orb && t < 0.7) {
+    ctx.globalAlpha = 1 - t / 0.7;
+    ctx.drawImage(orb, CX, CY, VWm, VHm, ox, oy, VWm, VHm);
+    ctx.globalAlpha = 1;
+  }
+  // きー: 穴を出たところから、右へただよい、だんだん右下へ落ちる
+  const ki = get("ki");
+  const x0 = ox + (26.8 * T - CX), y0 = oy + (6 * T - CY);
+  const drift = ease(t / 3);
+  const kx = x0 + 50 * drift + 110 * fall - pan + Math.sin(t * 1.1) * 4 * drift; // 右下がり(カメラが追う)
+  const ky = y0 + 6 * drift + 90 * fall + Math.sin(t * 0.8) * 3 * drift;
+  const glow = ease((t - (SPACE_DUR - 2.6)) / 2.2);
+  if (glow > 0) {
+    const gr = ctx.createRadialGradient(kx, ky - 8, 2, kx, ky - 8, 26 + 30 * glow);
+    gr.addColorStop(0, `rgba(255, 240, 200, ${0.9 * glow})`);
+    gr.addColorStop(0.4, `rgba(255, 140, 60, ${0.6 * glow})`);
+    gr.addColorStop(1, "rgba(255, 80, 30, 0)");
+    ctx.fillStyle = gr;
+    ctx.fillRect(kx - 70, ky - 78, 140, 140);
+  }
+  if (ki) {
+    ctx.save();
+    ctx.translate(Math.round(kx), Math.round(ky - 8));
+    ctx.rotate(0.9 * Math.max(0, t - 1.5) * (0.4 + 0.6 * fall)); // 穴を出てしばらくしてから、ゆっくり回りはじめる
+    const walk = t < 0.6 ? 1 + (Math.floor(t * 10) % 6) : 0; // 出た瞬間は歩いている
+    ctx.drawImage(ki, walk * 64, 2 * 64, 64, 64, -32, -64 + 17 + 8, 64, 64);
+    ctx.restore();
+  }
+}
 const S_SPACE = {
   tile: T,
   bg: "#04060f",
   hidePlayer: true,
   map: Array(10).fill(".".repeat(15)),
   legend: K_LEGEND,
-  drawGround(ctx, ox, oy, img) {
-    const get = (k) => (typeof img === "function" ? img(k) : null);
-    const t = Math.min(SPACE_DUR, performance.now() / 1000 - spaceT0);
-    const VWm = 15 * T;
-    const VHm = 300; // 画面の高さ(ドット)
-    const CX = 28 * T - VWm; // 衛星軌道のマップの右端で、カメラが見ていた範囲
-    const CY = 10 * T - VHm;
-    const orb = get("bg_orbit");
-    const sky = get("rise_sky");
-    // 星空(ゆっくり上へ流れる = きーが落ちていく)
-    const fall = ease((t - 2) / (SPACE_DUR - 2));
-    if (sky) ctx.drawImage(sky, 0, Math.round(40 * fall), VWm, VHm, ox, oy, VWm, VHm);
-    // カメラはきーを追って右へ動く(船殻と地球は左へ流れる)。きーは右下へ落ちていく
-    const pan = 240 * ease((t - 0.8) / 5);
-    // 地球: はじめは衛星軌道のマップの地球と同じ場所。落ちるにつれて大きく、上へ(遠いので、流れはゆっくり)
-    if (orb) {
-      const sx0 = CX, sy0 = 252, sw = VWm, sh = 10 * T - 252;
-      const k = 1 + 1.4 * fall;
-      const w = sw * k, h = sh * k;
-      const ex = ox + (VWm - w) / 2 - pan * 0.35;
-      const ey = oy + (sy0 - CY) - 120 * fall;
-      ctx.fillStyle = "#2a5a9e"; // 地球の下の海(大きくなっても下が抜けないように)
-      ctx.fillRect(Math.round(ex), Math.round(ey + h - 2), Math.round(w), VHm);
-      ctx.drawImage(orb, sx0, sy0, sw, sh, Math.round(ex), Math.round(ey), Math.round(w), Math.round(h));
-    }
-    // 船殻: はじめは衛星軌道のマップと同じ大きさ・位置。左上へ遠ざかって小さくなり、消える
-    const tube = get("rise_tube");
-    const lv = ease(t / 3.2);
-    if (tube && lv < 1) {
-      const sc = 2 * (1 - 0.8 * lv); // rise_tube は半分の大きさなので 2 倍から
-      const hx = ox + (27 * T - CX) - pan, hy = oy + (5 * T - CY); // 右の穴の位置
-      const px = hx - 120 * lv, py = hy - 90 * lv;
-      ctx.globalAlpha = 1 - ease((t - 2) / 1.4);
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(tube, Math.round(px - tube.width * sc + 6 * sc), Math.round(py - (tube.height * sc) / 2), Math.round(tube.width * sc), Math.round(tube.height * sc));
-      ctx.globalAlpha = 1;
-    }
-    // 最初の一瞬は、衛星軌道のマップの絵そのものを重ねて、つなぎ目をなくす
-    if (orb && t < 0.7) {
-      ctx.globalAlpha = 1 - t / 0.7;
-      ctx.drawImage(orb, CX, CY, VWm, VHm, ox, oy, VWm, VHm);
-      ctx.globalAlpha = 1;
-    }
-    // きー: 穴を出たところから、右へただよい、だんだん右下へ落ちる
-    const ki = get("ki");
-    const x0 = ox + (26.8 * T - CX), y0 = oy + (6 * T - CY);
-    const drift = ease(t / 3);
-    const kx = x0 + 50 * drift + 110 * fall - pan + Math.sin(t * 1.1) * 4 * drift; // 右下がり(カメラが追う)
-    const ky = y0 + 6 * drift + 90 * fall + Math.sin(t * 0.8) * 3 * drift;
-    const glow = ease((t - (SPACE_DUR - 2.6)) / 2.2);
-    if (glow > 0) {
-      const gr = ctx.createRadialGradient(kx, ky - 8, 2, kx, ky - 8, 26 + 30 * glow);
-      gr.addColorStop(0, `rgba(255, 240, 200, ${0.9 * glow})`);
-      gr.addColorStop(0.4, `rgba(255, 140, 60, ${0.6 * glow})`);
-      gr.addColorStop(1, "rgba(255, 80, 30, 0)");
-      ctx.fillStyle = gr;
-      ctx.fillRect(kx - 70, ky - 78, 140, 140);
-    }
-    if (ki) {
-      ctx.save();
-      ctx.translate(Math.round(kx), Math.round(ky - 8));
-      ctx.rotate(0.9 * Math.max(0, t - 1.5) * (0.4 + 0.6 * fall)); // 穴を出てしばらくしてから、ゆっくり回りはじめる
-      const walk = t < 0.6 ? 1 + (Math.floor(t * 10) % 6) : 0; // 出た瞬間は歩いている
-      ctx.drawImage(ki, walk * 64, 2 * 64, 64, 64, -32, -64 + 17 + 8, 64, 64);
-      ctx.restore();
-    }
-  },
+  drawGround: sSpaceDrawGround,
   spawns: { view: { x: 7 * T, y: 4 * T, facing: "south" } }, // カメラが画面のいちばん上(oy = 0)に来る位置
   onEnter(api) {
     spaceT0 = performance.now() / 1000;

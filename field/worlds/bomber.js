@@ -269,6 +269,249 @@ const bCrew = (id, img, x, y, phase, extra) =>
     },
     extra
   );
+const bTaxi = (api, now, u) => {
+  if (bS.phase === "taxi" && u > 8) {
+    bS.phase = "away";
+    bS.t0 = now;
+    // 爆撃は直接見せない(D206)。一枚絵で(D209): 山脈へ遠ざかる → 見えなくなる → 稜線の向こうの白い光、火の玉、煙の柱 → 迎撃レーザーの乱射、一本がボマーをかすめる(D210)
+    bS.seq = true;
+    const fr = (img, sec, fadeIn) => ({ img, sec, z0: 1, z1: 1.03, cx: 240, cy: 144, ease: "out", fadeIn });
+    api.burst(
+      [fr("v_fly1", 1.1, 0.6), fr("v_fly2", 1.1, 0.3), fr("v_fly3", 1.1, 0.3), fr("v_fly4", 1.2, 0.3), fr("v_fly5", 2, 0.4), fr("v_boom1", 0.35), fr("v_rain01", 0.42), fr("v_rain02", 0.42), fr("v_rain03", 0.42), fr("v_rain04", 0.42), fr("v_rain05", 0.42), fr("v_rain06", 0.42), fr("v_rain07", 0.42), fr("v_rain08", 0.3), fr("v_rain09", 0.3), fr("v_rain10", 0.3), fr("v_rain11", 0.3), fr("v_rain12", 0.3), fr("v_rain13", 0.3), fr("v_rain14", 0.3), fr("v_rain15", 0.3), fr("v_rain16", 0.3), fr("v_laser1", 0.35), fr("v_laser2", 0.35), fr("v_laser1", 0.3), fr("v_laser2", 0.3), fr("v_laser1", 0.3), fr("v_laser3", 1.6)],
+      () => {
+        bS.seq = false;
+        bS.t0 = bNow(); // 飛行場に戻ってから、遠い地ひびきの余韻
+      },
+      { white: false }
+    );
+    // 全弾投下(D217): 爆発の一つ一つに合わせて、光から少し遅れて(山の向こうの遠さ)、音と地ひびきが届く。
+    // 後ろほど大きく、間もつまって、さいごは画面ごと暴れる(作者「爆発に合わせて、ラグを設けて、画面を揺らしたい」)
+    const LAG = 0.55;
+    const hit = (sec, amp, len) => {
+      api.later(Math.round(sec * 1000), () => api.shake(len, amp));
+      api.later(Math.round(sec * 1000), () => api.sfx("boom"));
+    };
+    const t0 = 1.1 + 1.1 + 1.1 + 1.2 + 2; // v_boom1 が出るまで
+    hit(t0 + LAG + 0.15, 7, 1.4); // 最初の閃光。いちばん遠くから、重く
+    let at = t0 + 0.35;
+    B_RAIN_HITS.forEach(([n, size], f) => {
+      const dur = f < 7 ? 0.42 : 0.3;
+      for (let i = 0; i < n; i++) hit(at + LAG + (i * dur) / n, Math.min(12, 1.5 + (size / n) * 2.2 + f * 0.45), 0.5 + f * 0.03);
+      at += dur;
+    });
+    hit(at + LAG + 0.4, 10, 2.2); // 煙の壁の向こうから、さいごの地ひびき
+  }
+};
+const bDrawProps = (ctx, t, x0, ly, hurt, running) => {
+  B_PROPS.forEach(([px, py], i) => {
+    if (hurt > 0 && i === 2 && bS.phase !== "morning") {
+      // もげたプロペラの付け根から、黒い煙
+      if (bS.phase === "landing") {
+        for (let k = 0; k < 6; k++) {
+          const u = (t * 1.5 + k / 6) % 1;
+          ctx.fillStyle = `rgba(40, 36, 34, ${0.5 * (1 - u)})`;
+          ctx.beginPath();
+          ctx.arc(x0 + px - 6 - u * 60, ly + py + Math.sin(k + t) * 3, 4 + u * 10, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      return;
+    }
+    if (!running) return;
+    const cx = x0 + px;
+    const cy = ly + py;
+    // 回る円盤(うすい灰)と、ふちのにじみ。羽根の影が 3 枚、ちらちら回る。回転が上がるほど濃く
+    const rvk = bS.phase === "landing" ? 0.8 : Math.max(0.35, bRev());
+    ctx.fillStyle = `rgba(190, 194, 200, ${0.42 * rvk})`;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 4, 20, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(120, 124, 130, 0.5)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 4, 20, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(40, 40, 46, 0.55)";
+    ctx.lineWidth = 2;
+    for (let k = 0; k < 3; k++) {
+      const a = t * (14 + 30 * rvk) + i * 0.7 + (k * Math.PI * 2) / 3;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(a) * 4, cy + Math.sin(a) * 19);
+      ctx.stroke();
+    }
+  });
+};
+const bDrawLanding = (ctx, t, x0, ly) => {
+  if (bS.phase === "landing" || bS.phase === "back") {
+    // 裂け目に、撃ち返しと同じ白紫の光がまとわりついて明滅する。着地のあとで、ふっと消える(D204)
+    const ga = bS.phase === "landing" ? 1 : Math.max(0, 1 - (bNow() - bS.t0) / 1.4);
+    if (ga > 0) {
+      const fl = (0.55 + 0.45 * Math.abs(Math.sin(t * 17) * Math.sin(t * 5.3))) * ga;
+      const cx = x0 + 120;
+      const cy = ly + 175;
+      kGlowAt(ctx, cx, cy, 56, "200, 170, 255", 0.75 * fl);
+      kGlowAt(ctx, cx, cy, 16, "255, 255, 255", 1 * fl);
+      // 裂け目から走る、細い白紫のすじ(撃ち返しの光と同じ色)
+      ctx.strokeStyle = `rgba(245, 230, 255, ${fl})`;
+      ctx.lineWidth = 1;
+      for (let k = 0; k < 4; k++) {
+        if (Math.sin(t * 23 + k * 2.1) < 0.2) continue;
+        const a = k * 1.6 + Math.sin(t * 3 + k);
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(a) * 12 + Math.sin(t * 40 + k) * 3, cy + Math.sin(a) * 8);
+        ctx.lineTo(cx + Math.cos(a) * 24, cy + Math.sin(a) * 15 + Math.sin(t * 31 + k) * 3);
+        ctx.stroke();
+      }
+    }
+  }
+};
+function bCtlUpdate(dt, t, api) {
+  const now = bNow();
+  const u = now - bS.t0;
+  // 朝、きーが最初に近づくと、クルーは手を止めて敬礼する(D212)
+  if (bS.phase === "morning" && !bS.greeted) {
+    const pl = api.player();
+    const lead = B_KICHI.objects.find((o) => o.id === "crew1");
+    if (Math.hypot(pl.x - lead.x, pl.y - lead.y) < 3 * T) {
+      bS.greeted = true;
+      bS.salT0 = now;
+    }
+  }
+  // 回転が高まりきったら、先頭のクルーが「！」(旗を振る合図)
+  const pk = bPeak();
+  if (pk && !this._pk) api.bubble("crew1", "！", 700);
+  this._pk = pk;
+  // 発進の地ひびき: エンジンの回転につれて、地面がふるえる
+  const rv = bRev();
+  if (rv > 0.85 && (!this._sh || now - this._sh > 0.5)) {
+    this._sh = now;
+    api.shake(0.45, bS.phase === "taxi" ? 2.5 : 1);
+  }
+  // 砂ぼこり: プロペラのうしろ(西)へ流れる
+  if (rv > 0.2 && (bS.phase === "morning" || bS.phase === "taxi")) {
+    const bx = bPose().x;
+    const n = Math.random() < rv * 0.9 ? 1 + Math.floor(rv * 2) : 0;
+    for (let k = 0; k < n; k++) {
+      const [px, py] = B_PROPS[Math.floor(Math.random() * 4)];
+      bDust.push({ x: bx - 160 + px - 6, y: 16.5 * T - B_GROUND + py + 30 + Math.random() * 20, vx: -(60 + 160 * rv) * (0.7 + Math.random() * 0.6), r: 3, a: 0.5 * rv, t: 0 });
+    }
+  }
+  for (const d of bDust) {
+    d.t += dt;
+    d.x += d.vx * dt;
+    d.r += 14 * dt;
+    d.a -= 0.35 * dt;
+  }
+  while (bDust.length && (bDust[0].a <= 0 || bDust.length > 160)) bDust.shift();
+  // 去る場面(D211): 帽子を差し出されたまま、受け取らずに西へ歩きだすと、クルーは一列に並んで見送る。帽子は滑走路に残る
+  if (bS.phase === "back" && bS.offered && !api.flag("cap") && !bS.farewell && api.player().x < 12.5 * T) {
+    bS.farewell = true;
+    const lead = B_KICHI.objects.find((o) => o.id === "crew1");
+    bS.capAt = { x: lead.x + 8, y: lead.y };
+  }
+  bTaxi(api, now, u);
+  // 谷の向こうで、つづけざまに落とす(殺傷力は高め D182)
+  if (bS.phase === "away" && !bS.seq && u > 2.5 + bS.booms * 0.45 && bS.booms < 7) {
+    bS.booms += 1;
+    bS.boomed = true;
+    bS.boomAt = now;
+    api.shake(0.5, 2 + bS.booms * 0.6);
+    if (bS.booms === 1) api.bubble("valley", "ドォン　ドォン　ドォン……", 3400);
+  }
+  if (bS.phase === "away" && !bS.seq && bS.booms >= 7 && !bS.answered && u > 6) {
+    bS.answered = true;
+    api.shake(0.4, 2);
+    api.bubble("valley", "ブン……", 1600);
+  }
+  if (bS.phase === "away" && !bS.seq && u > 9) {
+    bS.phase = "landing";
+    bS.t0 = now;
+  }
+  // 着陸に切りかわった同じ瞬間に、古い経過時間で終わらないように、ここで測りなおす
+  if (bS.phase === "landing" && bNow() - bS.t0 > B_LAND_SEC) {
+    bS.phase = "back";
+    bS.t0 = now;
+    // 止まった機体の下にきーがいたら、南へよける
+    const p = api.player();
+    if (p.x > 12 * T && p.x < 22 * T && p.y > 10 * T && p.y < 16.9 * T) api.place(p.x, 17.4 * T);
+  }
+}
+function bBomberDraw(ctx, sx, sy, t, api) {
+  const im = api.image("bomber");
+  const sh = api.image("bomber_shadow");
+  if (!im) return;
+  const { lift } = bPose();
+  const x0 = Math.round(sx - im.width / 2);
+  const y0 = Math.round(sy + (B_Y - 10.5 * T) - B_GROUND);
+  if (sh) {
+    const shx = x0 + Math.round(lift * 0.3);
+    const shy = y0 + Math.round(lift * 0.6);
+    ctx.drawImage(sh, shx, shy);
+    // 影のプロペラ(D403): 止まっているときは羽根の影、回っているときは、うすい円。帰りは 1 基もげている
+    const spin = bS.phase === "taxi" || bS.phase === "landing" || (bS.phase === "morning" && bS.chocks);
+    const lost = bS.phase === "landing" || bS.phase === "back";
+    B_SHADOW_PROPS.forEach(([cx, cy, y0b, y1b], i) => {
+      if (lost && i === 2) return;
+      if (spin) {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.14)";
+        ctx.beginPath();
+        ctx.ellipse(shx + cx, shy + cy, 13, 13, 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        const pr = api.image("bomber_shadow_props");
+        if (pr) ctx.drawImage(pr, 0, y0b, 95, y1b - y0b + 1, shx, shy + y0b, 95, y1b - y0b + 1);
+      }
+    });
+  }
+  // ジュラルミン無塗装の XB-35(D205)。帰ってきたときはボロボロ(D206)。クルーがふさいでいくと、少しずつ元の銀にもどる
+  const ly = y0 - Math.round(lift);
+  const dmg = api.image("bomber_dmg");
+  const hurt = bS.phase === "landing" ? 1 : bS.phase === "back" ? Math.max(0, 1 - Math.max(0, bNow() - bS.t0 - 5) / 30) : 0; // みんなが翼に散ってから、30 秒ほどで傷がふさがる(D223)
+  // 浮き上がるとき、機首が少し上がる(主脚のあたりを軸に)
+  const pitch = bS.phase === "taxi" ? Math.min(0.1, lift * 0.004) : bS.phase === "landing" ? Math.min(0.06, lift * 0.002) : 0;
+  ctx.save();
+  if (pitch) {
+    const px0 = x0 + 160;
+    const py0 = ly + B_GROUND;
+    ctx.translate(px0, py0);
+    ctx.rotate(-pitch);
+    ctx.translate(-px0, -py0);
+  }
+  // 後ろ向きのプロペラ 4 基。エンジンが回っているあいだは、止まった羽根のない絵にして、回る円盤を描く。帰りは 1 基もげている
+  const running = bS.phase === "taxi" || bS.phase === "landing" || (bS.phase === "morning" && bS.chocks);
+  // 車輪止め(はめている間)は機体より先に描き、翼が上からかぶさるようにする(todo 125)。
+  // 手前の主脚の 2 つの車輪を、前とうしろからはさむ(todo 124)。くさびの斜めの面を車輪にあて、ロープは車輪の下を通す
+  const ck = api.image("chock");
+  if (ck && (bS.phase === "morning" || bS.phase === "back") && !bS.chocks) {
+    const lx = Math.round(sx + B_CHOCK.l), rx = Math.round(sx + B_CHOCK.r) - 11, ty = Math.round(sy + B_CHOCK.y);
+    ctx.drawImage(ck, 0, 0, 11, 14, lx, ty, 11, 14);
+    ctx.drawImage(ck, 11, 0, 11, 14, rx, ty, 11, 14);
+    ctx.fillStyle = "rgb(150, 120, 80)";
+    ctx.fillRect(lx + 4, ty + 14, rx + 7 - (lx + 4), 1);
+  }
+  ctx.drawImage((running && api.image("bomber_spin")) || im, x0, ly);
+  if (dmg && hurt > 0) {
+    ctx.save();
+    ctx.globalAlpha = hurt;
+    ctx.drawImage((running && api.image("bomber_dmg_spin")) || dmg, x0, ly);
+    ctx.restore();
+  }
+  bDrawProps(ctx, t, x0, ly, hurt, running);
+  bDrawLanding(ctx, t, x0, ly);
+  ctx.restore(); // 機首の上げ下げ、ここまで
+  if (bS.phase === "morning" || bS.phase === "back") {
+    // 安全ピンのリボンと、車輪止め(朝の手順)
+    const rb = api.image("i_ribbon");
+    if (rb && !bS.pin) ctx.drawImage(rb, Math.round(sx + B_GEAR.main - rb.width / 2), Math.round(sy + 5.6 * T - rb.height / 2)); // 主脚にさがっている
+    if (ck && bS.chocks) {
+      // 外した後は、脚のわきの地面に置く
+      const cx = sx + B_GEAR.nose + 1 * T;
+      ctx.drawImage(ck, Math.round(cx - ck.width / 2), Math.round(sy + 6.7 * T - ck.height / 2));
+    }
+  }
+}
 const B_KICHI = {
   tile: T,
   bg: "#62804e",
@@ -356,107 +599,7 @@ const B_KICHI = {
       w: 1,
       h: 1,
       draw() {},
-      update(dt, t, api) {
-        const now = bNow();
-        const u = now - bS.t0;
-        // 朝、きーが最初に近づくと、クルーは手を止めて敬礼する(D212)
-        if (bS.phase === "morning" && !bS.greeted) {
-          const pl = api.player();
-          const lead = B_KICHI.objects.find((o) => o.id === "crew1");
-          if (Math.hypot(pl.x - lead.x, pl.y - lead.y) < 3 * T) {
-            bS.greeted = true;
-            bS.salT0 = now;
-          }
-        }
-        // 回転が高まりきったら、先頭のクルーが「！」(旗を振る合図)
-        const pk = bPeak();
-        if (pk && !this._pk) api.bubble("crew1", "！", 700);
-        this._pk = pk;
-        // 発進の地ひびき: エンジンの回転につれて、地面がふるえる
-        const rv = bRev();
-        if (rv > 0.85 && (!this._sh || now - this._sh > 0.5)) {
-          this._sh = now;
-          api.shake(0.45, bS.phase === "taxi" ? 2.5 : 1);
-        }
-        // 砂ぼこり: プロペラのうしろ(西)へ流れる
-        if (rv > 0.2 && (bS.phase === "morning" || bS.phase === "taxi")) {
-          const bx = bPose().x;
-          const n = Math.random() < rv * 0.9 ? 1 + Math.floor(rv * 2) : 0;
-          for (let k = 0; k < n; k++) {
-            const [px, py] = B_PROPS[Math.floor(Math.random() * 4)];
-            bDust.push({ x: bx - 160 + px - 6, y: 16.5 * T - B_GROUND + py + 30 + Math.random() * 20, vx: -(60 + 160 * rv) * (0.7 + Math.random() * 0.6), r: 3, a: 0.5 * rv, t: 0 });
-          }
-        }
-        for (const d of bDust) {
-          d.t += dt;
-          d.x += d.vx * dt;
-          d.r += 14 * dt;
-          d.a -= 0.35 * dt;
-        }
-        while (bDust.length && (bDust[0].a <= 0 || bDust.length > 160)) bDust.shift();
-        // 去る場面(D211): 帽子を差し出されたまま、受け取らずに西へ歩きだすと、クルーは一列に並んで見送る。帽子は滑走路に残る
-        if (bS.phase === "back" && bS.offered && !api.flag("cap") && !bS.farewell && api.player().x < 12.5 * T) {
-          bS.farewell = true;
-          const lead = B_KICHI.objects.find((o) => o.id === "crew1");
-          bS.capAt = { x: lead.x + 8, y: lead.y };
-        }
-        if (bS.phase === "taxi" && u > 8) {
-          bS.phase = "away";
-          bS.t0 = now;
-          // 爆撃は直接見せない(D206)。一枚絵で(D209): 山脈へ遠ざかる → 見えなくなる → 稜線の向こうの白い光、火の玉、煙の柱 → 迎撃レーザーの乱射、一本がボマーをかすめる(D210)
-          bS.seq = true;
-          const fr = (img, sec, fadeIn) => ({ img, sec, z0: 1, z1: 1.03, cx: 240, cy: 144, ease: "out", fadeIn });
-          api.burst(
-            [fr("v_fly1", 1.1, 0.6), fr("v_fly2", 1.1, 0.3), fr("v_fly3", 1.1, 0.3), fr("v_fly4", 1.2, 0.3), fr("v_fly5", 2, 0.4), fr("v_boom1", 0.35), fr("v_rain01", 0.42), fr("v_rain02", 0.42), fr("v_rain03", 0.42), fr("v_rain04", 0.42), fr("v_rain05", 0.42), fr("v_rain06", 0.42), fr("v_rain07", 0.42), fr("v_rain08", 0.3), fr("v_rain09", 0.3), fr("v_rain10", 0.3), fr("v_rain11", 0.3), fr("v_rain12", 0.3), fr("v_rain13", 0.3), fr("v_rain14", 0.3), fr("v_rain15", 0.3), fr("v_rain16", 0.3), fr("v_laser1", 0.35), fr("v_laser2", 0.35), fr("v_laser1", 0.3), fr("v_laser2", 0.3), fr("v_laser1", 0.3), fr("v_laser3", 1.6)],
-            () => {
-              bS.seq = false;
-              bS.t0 = bNow(); // 飛行場に戻ってから、遠い地ひびきの余韻
-            },
-            { white: false }
-          );
-          // 全弾投下(D217): 爆発の一つ一つに合わせて、光から少し遅れて(山の向こうの遠さ)、音と地ひびきが届く。
-          // 後ろほど大きく、間もつまって、さいごは画面ごと暴れる(作者「爆発に合わせて、ラグを設けて、画面を揺らしたい」)
-          const LAG = 0.55;
-          const hit = (sec, amp, len) => {
-            api.later(Math.round(sec * 1000), () => api.shake(len, amp));
-            api.later(Math.round(sec * 1000), () => api.sfx("boom"));
-          };
-          const t0 = 1.1 + 1.1 + 1.1 + 1.2 + 2; // v_boom1 が出るまで
-          hit(t0 + LAG + 0.15, 7, 1.4); // 最初の閃光。いちばん遠くから、重く
-          let at = t0 + 0.35;
-          B_RAIN_HITS.forEach(([n, size], f) => {
-            const dur = f < 7 ? 0.42 : 0.3;
-            for (let i = 0; i < n; i++) hit(at + LAG + (i * dur) / n, Math.min(12, 1.5 + (size / n) * 2.2 + f * 0.45), 0.5 + f * 0.03);
-            at += dur;
-          });
-          hit(at + LAG + 0.4, 10, 2.2); // 煙の壁の向こうから、さいごの地ひびき
-        }
-        // 谷の向こうで、つづけざまに落とす(殺傷力は高め D182)
-        if (bS.phase === "away" && !bS.seq && u > 2.5 + bS.booms * 0.45 && bS.booms < 7) {
-          bS.booms += 1;
-          bS.boomed = true;
-          bS.boomAt = now;
-          api.shake(0.5, 2 + bS.booms * 0.6);
-          if (bS.booms === 1) api.bubble("valley", "ドォン　ドォン　ドォン……", 3400);
-        }
-        if (bS.phase === "away" && !bS.seq && bS.booms >= 7 && !bS.answered && u > 6) {
-          bS.answered = true;
-          api.shake(0.4, 2);
-          api.bubble("valley", "ブン……", 1600);
-        }
-        if (bS.phase === "away" && !bS.seq && u > 9) {
-          bS.phase = "landing";
-          bS.t0 = now;
-        }
-        // 着陸に切りかわった同じ瞬間に、古い経過時間で終わらないように、ここで測りなおす
-        if (bS.phase === "landing" && bNow() - bS.t0 > B_LAND_SEC) {
-          bS.phase = "back";
-          bS.t0 = now;
-          // 止まった機体の下にきーがいたら、南へよける
-          const p = api.player();
-          if (p.x > 12 * T && p.x < 22 * T && p.y > 10 * T && p.y < 16.9 * T) api.place(p.x, 17.4 * T);
-        }
-      },
+      update: bCtlUpdate,
     },
     {
       // 谷の向こう(東)の音の出どころ。きーの右上についてくる
@@ -522,139 +665,7 @@ const B_KICHI = {
       update() {
         this.x = bPose().x;
       },
-      draw(ctx, sx, sy, t, api) {
-        const im = api.image("bomber");
-        const sh = api.image("bomber_shadow");
-        if (!im) return;
-        const { lift } = bPose();
-        const x0 = Math.round(sx - im.width / 2);
-        const y0 = Math.round(sy + (B_Y - 10.5 * T) - B_GROUND);
-        if (sh) {
-          const shx = x0 + Math.round(lift * 0.3);
-          const shy = y0 + Math.round(lift * 0.6);
-          ctx.drawImage(sh, shx, shy);
-          // 影のプロペラ(D403): 止まっているときは羽根の影、回っているときは、うすい円。帰りは 1 基もげている
-          const spin = bS.phase === "taxi" || bS.phase === "landing" || (bS.phase === "morning" && bS.chocks);
-          const lost = bS.phase === "landing" || bS.phase === "back";
-          B_SHADOW_PROPS.forEach(([cx, cy, y0b, y1b], i) => {
-            if (lost && i === 2) return;
-            if (spin) {
-              ctx.fillStyle = "rgba(0, 0, 0, 0.14)";
-              ctx.beginPath();
-              ctx.ellipse(shx + cx, shy + cy, 13, 13, 0, 0, Math.PI * 2);
-              ctx.fill();
-            } else {
-              const pr = api.image("bomber_shadow_props");
-              if (pr) ctx.drawImage(pr, 0, y0b, 95, y1b - y0b + 1, shx, shy + y0b, 95, y1b - y0b + 1);
-            }
-          });
-        }
-        // ジュラルミン無塗装の XB-35(D205)。帰ってきたときはボロボロ(D206)。クルーがふさいでいくと、少しずつ元の銀にもどる
-        const ly = y0 - Math.round(lift);
-        const dmg = api.image("bomber_dmg");
-        const hurt = bS.phase === "landing" ? 1 : bS.phase === "back" ? Math.max(0, 1 - Math.max(0, bNow() - bS.t0 - 5) / 30) : 0; // みんなが翼に散ってから、30 秒ほどで傷がふさがる(D223)
-        // 浮き上がるとき、機首が少し上がる(主脚のあたりを軸に)
-        const pitch = bS.phase === "taxi" ? Math.min(0.1, lift * 0.004) : bS.phase === "landing" ? Math.min(0.06, lift * 0.002) : 0;
-        ctx.save();
-        if (pitch) {
-          const px0 = x0 + 160;
-          const py0 = ly + B_GROUND;
-          ctx.translate(px0, py0);
-          ctx.rotate(-pitch);
-          ctx.translate(-px0, -py0);
-        }
-        // 後ろ向きのプロペラ 4 基。エンジンが回っているあいだは、止まった羽根のない絵にして、回る円盤を描く。帰りは 1 基もげている
-        const running = bS.phase === "taxi" || bS.phase === "landing" || (bS.phase === "morning" && bS.chocks);
-        // 車輪止め(はめている間)は機体より先に描き、翼が上からかぶさるようにする(todo 125)。
-        // 手前の主脚の 2 つの車輪を、前とうしろからはさむ(todo 124)。くさびの斜めの面を車輪にあて、ロープは車輪の下を通す
-        const ck = api.image("chock");
-        if (ck && (bS.phase === "morning" || bS.phase === "back") && !bS.chocks) {
-          const lx = Math.round(sx + B_CHOCK.l), rx = Math.round(sx + B_CHOCK.r) - 11, ty = Math.round(sy + B_CHOCK.y);
-          ctx.drawImage(ck, 0, 0, 11, 14, lx, ty, 11, 14);
-          ctx.drawImage(ck, 11, 0, 11, 14, rx, ty, 11, 14);
-          ctx.fillStyle = "rgb(150, 120, 80)";
-          ctx.fillRect(lx + 4, ty + 14, rx + 7 - (lx + 4), 1);
-        }
-        ctx.drawImage((running && api.image("bomber_spin")) || im, x0, ly);
-        if (dmg && hurt > 0) {
-          ctx.save();
-          ctx.globalAlpha = hurt;
-          ctx.drawImage((running && api.image("bomber_dmg_spin")) || dmg, x0, ly);
-          ctx.restore();
-        }
-        B_PROPS.forEach(([px, py], i) => {
-          if (hurt > 0 && i === 2 && bS.phase !== "morning") {
-            // もげたプロペラの付け根から、黒い煙
-            if (bS.phase === "landing") {
-              for (let k = 0; k < 6; k++) {
-                const u = (t * 1.5 + k / 6) % 1;
-                ctx.fillStyle = `rgba(40, 36, 34, ${0.5 * (1 - u)})`;
-                ctx.beginPath();
-                ctx.arc(x0 + px - 6 - u * 60, ly + py + Math.sin(k + t) * 3, 4 + u * 10, 0, Math.PI * 2);
-                ctx.fill();
-              }
-            }
-            return;
-          }
-          if (!running) return;
-          const cx = x0 + px;
-          const cy = ly + py;
-          // 回る円盤(うすい灰)と、ふちのにじみ。羽根の影が 3 枚、ちらちら回る。回転が上がるほど濃く
-          const rvk = bS.phase === "landing" ? 0.8 : Math.max(0.35, bRev());
-          ctx.fillStyle = `rgba(190, 194, 200, ${0.42 * rvk})`;
-          ctx.beginPath();
-          ctx.ellipse(cx, cy, 4, 20, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = "rgba(120, 124, 130, 0.5)";
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.ellipse(cx, cy, 4, 20, 0, 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.strokeStyle = "rgba(40, 40, 46, 0.55)";
-          ctx.lineWidth = 2;
-          for (let k = 0; k < 3; k++) {
-            const a = t * (14 + 30 * rvk) + i * 0.7 + (k * Math.PI * 2) / 3;
-            ctx.beginPath();
-            ctx.moveTo(cx, cy);
-            ctx.lineTo(cx + Math.cos(a) * 4, cy + Math.sin(a) * 19);
-            ctx.stroke();
-          }
-        });
-        if (bS.phase === "landing" || bS.phase === "back") {
-          // 裂け目に、撃ち返しと同じ白紫の光がまとわりついて明滅する。着地のあとで、ふっと消える(D204)
-          const ga = bS.phase === "landing" ? 1 : Math.max(0, 1 - (bNow() - bS.t0) / 1.4);
-          if (ga > 0) {
-            const fl = (0.55 + 0.45 * Math.abs(Math.sin(t * 17) * Math.sin(t * 5.3))) * ga;
-            const cx = x0 + 120;
-            const cy = ly + 175;
-            kGlowAt(ctx, cx, cy, 56, "200, 170, 255", 0.75 * fl);
-            kGlowAt(ctx, cx, cy, 16, "255, 255, 255", 1 * fl);
-            // 裂け目から走る、細い白紫のすじ(撃ち返しの光と同じ色)
-            ctx.strokeStyle = `rgba(245, 230, 255, ${fl})`;
-            ctx.lineWidth = 1;
-            for (let k = 0; k < 4; k++) {
-              if (Math.sin(t * 23 + k * 2.1) < 0.2) continue;
-              const a = k * 1.6 + Math.sin(t * 3 + k);
-              ctx.beginPath();
-              ctx.moveTo(cx, cy);
-              ctx.lineTo(cx + Math.cos(a) * 12 + Math.sin(t * 40 + k) * 3, cy + Math.sin(a) * 8);
-              ctx.lineTo(cx + Math.cos(a) * 24, cy + Math.sin(a) * 15 + Math.sin(t * 31 + k) * 3);
-              ctx.stroke();
-            }
-          }
-        }
-        ctx.restore(); // 機首の上げ下げ、ここまで
-        if (bS.phase === "morning" || bS.phase === "back") {
-          // 安全ピンのリボンと、車輪止め(朝の手順)
-          const rb = api.image("i_ribbon");
-          if (rb && !bS.pin) ctx.drawImage(rb, Math.round(sx + B_GEAR.main - rb.width / 2), Math.round(sy + 5.6 * T - rb.height / 2)); // 主脚にさがっている
-          if (ck && bS.chocks) {
-            // 外した後は、脚のわきの地面に置く
-            const cx = sx + B_GEAR.nose + 1 * T;
-            ctx.drawImage(ck, Math.round(cx - ck.width / 2), Math.round(sy + 6.7 * T - ck.height / 2));
-          }
-        }
-      },
+      draw: bBomberDraw,
     },
     {
       id: "pin",

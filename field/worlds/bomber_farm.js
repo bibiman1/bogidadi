@@ -255,6 +255,151 @@ const BF_CARE = [
     }
   },
 }));
+function bfDrawOverlay(ctx, ox, oy, t, api) {
+  // 天井から下がる裸電球。通り道の上に、4 つ(奥の壁の 2 つは壁といっしょに描く)
+  for (const y of [270, 360]) {
+    for (const q of [1, 4]) {
+      const X = Math.round(ox + bfPathX(q, y)), Y = Math.round(oy + y);
+      const g = ctx.createRadialGradient(X, Y + 2 * T, 4, X, Y + 2 * T, 3 * T);
+      g.addColorStop(0, "rgba(255, 220, 140, 0.16)");
+      g.addColorStop(1, "rgba(255, 220, 140, 0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(X - 3 * T, Y - T, 6 * T, 6 * T);
+      ctx.fillStyle = "#28241f";
+      ctx.fillRect(X, Y - 18, 1, 18);
+      ctx.fillStyle = "#fff0b0";
+      ctx.fillRect(X - 3, Y, 6, 6);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(X - 1, Y + 1, 2, 2);
+    }
+  }
+  // 大爆発: 落ちたところから白い光がひろがって、画面が真っ白になる。白の中に「ゲームオーバー」(D415)
+  const b = bfS.boom;
+  if (b) {
+    const u = bNow() - b.t0;
+    // 誘爆のたびに、音とゆれ(D416)
+    while (b.hit < b.chain.length && u >= b.chain[b.hit].t) {
+      if (b.hit > 0 && window.bogiAudio && b.hit % 2 === 0) window.bogiAudio.sfx(b.hit % 6 ? "knock" : "boom");
+      if (b.chain[b.hit].R > 80 && api) api.shake(0.6, 16); // 大きな火の玉のたびに、画面ごと暴れる
+      b.hit++;
+    }
+    for (const c of b.chain) bfFireball(ctx, ox + c.x, oy + c.y, c.R, u - c.t, c.seed);
+    const W = ctx.canvas.width, H = ctx.canvas.height;
+    // 画面全体が白に飛ぶ(丸くひろげない)。はじめは明滅しながら、だんだん白く
+    const w = Math.max(0, Math.min(1, (u - BF_WHITE[0]) / (BF_WHITE[1] - BF_WHITE[0])));
+    // 閃光の瞬間と、大きな火の玉が上がるたびに、画面が一度白む
+    let flick = u < 0.12 ? 0.6 : 0;
+    for (const c of b.chain) if (c.R > 80 && u - c.t >= 0 && u - c.t < 0.07) flick = Math.max(flick, 0.45);
+    const al = Math.min(1, Math.max(flick, w * (0.85 + 0.15 * Math.sin(u * 40))));
+    if (al > 0) {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = `rgba(255, 255, 255, ${w >= 1 ? 1 : al})`;
+      ctx.fillRect(0, 0, W, H);
+      const P = window.bogiPix;
+      if (P && u > BF_OVER[0]) {
+        // 白の中から、じわじわ浮かぶ
+        const S = Math.max(2, Math.round(W / 320));
+        const text = "ゲームオーバー";
+        ctx.globalAlpha = Math.min(1, (u - BF_OVER[0]) / (BF_OVER[1] - BF_OVER[0]));
+        P.text(ctx, text, Math.round((W - P.width(text) * S) / 2), Math.round(H / 2 - 8 * S), S, "#28241f");
+        ctx.globalAlpha = 1;
+      }
+      // 真っ白のあいだは、音楽も止めて静かに
+      if (!b.quiet && window.bogiAudio) {
+        b.quiet = true;
+        window.bogiAudio.bgm("silence");
+      }
+      // ペナルティ: セーブを全部消して、タイトルへ(作者「セーブも消そう」「ペナルティをあたえたい」)
+      if (u > BF_TITLE && !b.leaving) {
+        b.leaving = true;
+        if (window.bogiGameOver) window.bogiGameOver();
+      }
+      ctx.restore();
+    }
+  }
+}
+function bfClockDraw(ctx, sx, sy, t, api) {
+  const cx = Math.round(sx), cy = Math.round(sy - 74), r = 23; // 奥の壁のまん中の柱に
+  ctx.fillStyle = "#28241f";
+  ctx.beginPath();
+  ctx.arc(cx, cy, r + 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#5a4632";
+  ctx.beginPath();
+  ctx.arc(cx, cy, r + 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#e8e2cc";
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#28241f";
+  for (let k = 0; k < 12; k++) {
+    const a = (k * Math.PI) / 6;
+    ctx.fillRect(Math.round(cx + Math.sin(a) * (r - 4)) - (k % 3 ? 0 : 1), Math.round(cy - Math.cos(a) * (r - 4)) - (k % 3 ? 0 : 1), k % 3 ? 1 : 2, k % 3 ? 1 : 2);
+  }
+  const m = t * Math.PI * 2; // 長針は 1 秒で 1 回り
+  const h = m / 3; // 短針は 3 秒で 1 回り
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "#28241f";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + Math.sin(h) * r * 0.45, cy - Math.cos(h) * r * 0.45);
+  ctx.stroke();
+  ctx.strokeStyle = "#962820";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + Math.sin(m) * r * 0.8, cy - Math.cos(m) * r * 0.8);
+  ctx.stroke();
+  ctx.fillStyle = "#28241f";
+  ctx.fillRect(cx - 1, cy - 1, 3, 3);
+  // 時計をはさんで、左にアルファ、右にオメガ(はじまりと、おわり。D417)。壁にペンキで手描きした字:
+  // 影はつけず、筆のはばがところどころ太く、はげて、下へたれている
+  const BF_GLYPH = {
+    a: ["...###....#", "..#...#..#.", ".#.....##..", ".#.....#...", ".#.....##..", "..#...#..#.", "...###....#"],
+    o: ["...#####...", "..#.....#..", ".#.......#.", ".#.......#.", "..#.....#..", "...#...#...", ".###...###."],
+  };
+  // 壁の凹凸に沿わせる: 背景の明るさを、ペンキの下で 1 ドットずつ読む。
+  // 出っぱり(明るい)ではペンキも明るく、くぼみ(暗い)では暗く、溝や柱のふちの黒い線には入らない
+  const lum = bfWallLum(api);
+  const ix = sx - 208, iy = sy - 6 * T; // 画面の座標 → 背景の絵の座標
+  for (const [g, gx, sd] of [["a", -52, 3], ["o", 52, 11]]) {
+    const rows = BF_GLYPH[g], G = 2;
+    const x0 = Math.round(cx + gx - (rows[0].length * G) / 2), y0 = Math.round(cy - (rows.length * G) / 2);
+    const dots = new Map(); // "x,y" → 濃さ
+    const put = (x, y, w, h, a) => {
+      for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) dots.set(`${xx},${yy}`, Math.max(a, dots.get(`${xx},${yy}`) || 0));
+    };
+    rows.forEach((r, j) =>
+      [...r].forEach((c, i) => {
+        if (c !== "#") return;
+        const h = bfRand(sd * 37 + i * 7 + j * 13);
+        // 筆のはばは 3 ドット(となりと重なる)。はげたところは消さずに、うすくなる
+        put(x0 + i * G, y0 + j * G, 3, 3, h < 0.18 ? 0.45 : 0.85);
+        if (h > 0.8) put(x0 + i * G - 1, y0 + j * G + 1, 1, 2, 0.85); // 筆のむら
+        if (j === rows.length - 1 && h > 0.5) put(x0 + i * G + 1, y0 + (j + 1) * G + 1, 1, 2 + Math.round(h * 6), 0.7); // たれ
+      })
+    );
+    for (const [k, al] of dots) {
+      const [x, y] = k.split(",").map(Number);
+      const L = lum ? lum(Math.round(x - ix), Math.round(y - iy)) : 0.5;
+      if (L < 0.16) continue; // 溝や柱のふちの黒い線
+      const sh = Math.min(1.08, 0.5 + L * 1.1);
+      ctx.fillStyle = `rgba(${Math.round(226 * sh)}, ${Math.round(214 * sh)}, ${Math.round(188 * sh)}, ${al})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+  // 奥の壁の裸電球(時計の左右)
+  for (const x of [-100, 100]) {
+    const X = Math.round(sx + x), Y = Math.round(sy - 70);
+    ctx.fillStyle = "#28241f";
+    ctx.fillRect(X, Y - 1.4 * T, 1, 1.4 * T);
+    ctx.fillStyle = "#fff0b0";
+    ctx.fillRect(X - 3, Y, 6, 6);
+  }
+}
 const BF_MAP = {
   tile: T,
   bg: "#2e2a26",
@@ -272,70 +417,7 @@ const BF_MAP = {
     return !!bfS.boom;
   },
   onLockedPress() {},
-  drawOverlay(ctx, ox, oy, t, api) {
-    // 天井から下がる裸電球。通り道の上に、4 つ(奥の壁の 2 つは壁といっしょに描く)
-    for (const y of [270, 360]) {
-      for (const q of [1, 4]) {
-        const X = Math.round(ox + bfPathX(q, y)), Y = Math.round(oy + y);
-        const g = ctx.createRadialGradient(X, Y + 2 * T, 4, X, Y + 2 * T, 3 * T);
-        g.addColorStop(0, "rgba(255, 220, 140, 0.16)");
-        g.addColorStop(1, "rgba(255, 220, 140, 0)");
-        ctx.fillStyle = g;
-        ctx.fillRect(X - 3 * T, Y - T, 6 * T, 6 * T);
-        ctx.fillStyle = "#28241f";
-        ctx.fillRect(X, Y - 18, 1, 18);
-        ctx.fillStyle = "#fff0b0";
-        ctx.fillRect(X - 3, Y, 6, 6);
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(X - 1, Y + 1, 2, 2);
-      }
-    }
-    // 大爆発: 落ちたところから白い光がひろがって、画面が真っ白になる。白の中に「ゲームオーバー」(D415)
-    const b = bfS.boom;
-    if (b) {
-      const u = bNow() - b.t0;
-      // 誘爆のたびに、音とゆれ(D416)
-      while (b.hit < b.chain.length && u >= b.chain[b.hit].t) {
-        if (b.hit > 0 && window.bogiAudio && b.hit % 2 === 0) window.bogiAudio.sfx(b.hit % 6 ? "knock" : "boom");
-        if (b.chain[b.hit].R > 80 && api) api.shake(0.6, 16); // 大きな火の玉のたびに、画面ごと暴れる
-        b.hit++;
-      }
-      for (const c of b.chain) bfFireball(ctx, ox + c.x, oy + c.y, c.R, u - c.t, c.seed);
-      const W = ctx.canvas.width, H = ctx.canvas.height;
-      // 画面全体が白に飛ぶ(丸くひろげない)。はじめは明滅しながら、だんだん白く
-      const w = Math.max(0, Math.min(1, (u - BF_WHITE[0]) / (BF_WHITE[1] - BF_WHITE[0])));
-      // 閃光の瞬間と、大きな火の玉が上がるたびに、画面が一度白む
-      let flick = u < 0.12 ? 0.6 : 0;
-      for (const c of b.chain) if (c.R > 80 && u - c.t >= 0 && u - c.t < 0.07) flick = Math.max(flick, 0.45);
-      const al = Math.min(1, Math.max(flick, w * (0.85 + 0.15 * Math.sin(u * 40))));
-      if (al > 0) {
-        ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.fillStyle = `rgba(255, 255, 255, ${w >= 1 ? 1 : al})`;
-        ctx.fillRect(0, 0, W, H);
-        const P = window.bogiPix;
-        if (P && u > BF_OVER[0]) {
-          // 白の中から、じわじわ浮かぶ
-          const S = Math.max(2, Math.round(W / 320));
-          const text = "ゲームオーバー";
-          ctx.globalAlpha = Math.min(1, (u - BF_OVER[0]) / (BF_OVER[1] - BF_OVER[0]));
-          P.text(ctx, text, Math.round((W - P.width(text) * S) / 2), Math.round(H / 2 - 8 * S), S, "#28241f");
-          ctx.globalAlpha = 1;
-        }
-        // 真っ白のあいだは、音楽も止めて静かに
-        if (!b.quiet && window.bogiAudio) {
-          b.quiet = true;
-          window.bogiAudio.bgm("silence");
-        }
-        // ペナルティ: セーブを全部消して、タイトルへ(作者「セーブも消そう」「ペナルティをあたえたい」)
-        if (u > BF_TITLE && !b.leaving) {
-          b.leaving = true;
-          if (window.bogiGameOver) window.bogiGameOver();
-        }
-        ctx.restore();
-      }
-    }
-  },
+  drawOverlay: bfDrawOverlay,
   triggers: [
     // 持ったままは外へ出られない。そっとはじき返す(D414)
     { id: "bfKeep", x: 150, y: 14.75 * T, w: 115, h: 0.5 * T, enabled: () => bfS.carry !== null, run: (api) => api.knock(0, -200) },
@@ -349,87 +431,7 @@ const BF_MAP = {
       y: 6 * T,
       w: 1,
       h: 1,
-      draw(ctx, sx, sy, t, api) {
-        const cx = Math.round(sx), cy = Math.round(sy - 74), r = 23; // 奥の壁のまん中の柱に
-        ctx.fillStyle = "#28241f";
-        ctx.beginPath();
-        ctx.arc(cx, cy, r + 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#5a4632";
-        ctx.beginPath();
-        ctx.arc(cx, cy, r + 3, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#e8e2cc";
-        ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#28241f";
-        for (let k = 0; k < 12; k++) {
-          const a = (k * Math.PI) / 6;
-          ctx.fillRect(Math.round(cx + Math.sin(a) * (r - 4)) - (k % 3 ? 0 : 1), Math.round(cy - Math.cos(a) * (r - 4)) - (k % 3 ? 0 : 1), k % 3 ? 1 : 2, k % 3 ? 1 : 2);
-        }
-        const m = t * Math.PI * 2; // 長針は 1 秒で 1 回り
-        const h = m / 3; // 短針は 3 秒で 1 回り
-        ctx.lineCap = "round";
-        ctx.strokeStyle = "#28241f";
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(cx + Math.sin(h) * r * 0.45, cy - Math.cos(h) * r * 0.45);
-        ctx.stroke();
-        ctx.strokeStyle = "#962820";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(cx + Math.sin(m) * r * 0.8, cy - Math.cos(m) * r * 0.8);
-        ctx.stroke();
-        ctx.fillStyle = "#28241f";
-        ctx.fillRect(cx - 1, cy - 1, 3, 3);
-        // 時計をはさんで、左にアルファ、右にオメガ(はじまりと、おわり。D417)。壁にペンキで手描きした字:
-        // 影はつけず、筆のはばがところどころ太く、はげて、下へたれている
-        const BF_GLYPH = {
-          a: ["...###....#", "..#...#..#.", ".#.....##..", ".#.....#...", ".#.....##..", "..#...#..#.", "...###....#"],
-          o: ["...#####...", "..#.....#..", ".#.......#.", ".#.......#.", "..#.....#..", "...#...#...", ".###...###."],
-        };
-        // 壁の凹凸に沿わせる: 背景の明るさを、ペンキの下で 1 ドットずつ読む。
-        // 出っぱり(明るい)ではペンキも明るく、くぼみ(暗い)では暗く、溝や柱のふちの黒い線には入らない
-        const lum = bfWallLum(api);
-        const ix = sx - 208, iy = sy - 6 * T; // 画面の座標 → 背景の絵の座標
-        for (const [g, gx, sd] of [["a", -52, 3], ["o", 52, 11]]) {
-          const rows = BF_GLYPH[g], G = 2;
-          const x0 = Math.round(cx + gx - (rows[0].length * G) / 2), y0 = Math.round(cy - (rows.length * G) / 2);
-          const dots = new Map(); // "x,y" → 濃さ
-          const put = (x, y, w, h, a) => {
-            for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) dots.set(`${xx},${yy}`, Math.max(a, dots.get(`${xx},${yy}`) || 0));
-          };
-          rows.forEach((r, j) =>
-            [...r].forEach((c, i) => {
-              if (c !== "#") return;
-              const h = bfRand(sd * 37 + i * 7 + j * 13);
-              // 筆のはばは 3 ドット(となりと重なる)。はげたところは消さずに、うすくなる
-              put(x0 + i * G, y0 + j * G, 3, 3, h < 0.18 ? 0.45 : 0.85);
-              if (h > 0.8) put(x0 + i * G - 1, y0 + j * G + 1, 1, 2, 0.85); // 筆のむら
-              if (j === rows.length - 1 && h > 0.5) put(x0 + i * G + 1, y0 + (j + 1) * G + 1, 1, 2 + Math.round(h * 6), 0.7); // たれ
-            })
-          );
-          for (const [k, al] of dots) {
-            const [x, y] = k.split(",").map(Number);
-            const L = lum ? lum(Math.round(x - ix), Math.round(y - iy)) : 0.5;
-            if (L < 0.16) continue; // 溝や柱のふちの黒い線
-            const sh = Math.min(1.08, 0.5 + L * 1.1);
-            ctx.fillStyle = `rgba(${Math.round(226 * sh)}, ${Math.round(214 * sh)}, ${Math.round(188 * sh)}, ${al})`;
-            ctx.fillRect(x, y, 1, 1);
-          }
-        }
-        // 奥の壁の裸電球(時計の左右)
-        for (const x of [-100, 100]) {
-          const X = Math.round(sx + x), Y = Math.round(sy - 70);
-          ctx.fillStyle = "#28241f";
-          ctx.fillRect(X, Y - 1.4 * T, 1, 1.4 * T);
-          ctx.fillStyle = "#fff0b0";
-          ctx.fillRect(X - 3, Y, 6, 6);
-        }
-      },
+      draw: bfClockDraw,
     },
     // うね(歩けない)
     ...BF_RX.flatMap((_, k) => [0, 1, 2, 3, 4].map((m) => ({ id: `ridge${k}_${m}`, x: bfRidgeX(k, 230 + m * 40), y: 230 + m * 40, w: 1, h: 1, solid: { w: 28, h: 40 }, sortDy: -40, draw() {} }))),

@@ -425,6 +425,143 @@ const ngEFrame = (t) => {
   if (t < NG_E.swap0 + NG_E.swap) return n1 + Math.min(n2 - 1, Math.floor(((t - NG_E.swap0) / NG_E.swap) * n2));
   return n1 + n2 - 1;
 };
+const ngSeihaCut1 = (ctx, img, api, t, g, X, Y) => {
+  // ---- カット 1 ----
+  const bg = api.image("bg_seiha");
+  if (bg) ctx.drawImage(bg, X, Y);
+  // 黒煙(A は左の砲、B は右の砲。どちらも 4 門ずつ)と、その上に炎
+  NG_E.muz.forEach(([mx, my], i) => {
+    ngSmoke(g, mx, my, t - NG_E.fireA - i * 0.05, i * 17);
+    ngSmoke(g, mx + 3, my + 2, t - NG_E.fireB - i * 0.05, i * 17 + 200);
+  });
+  const blasting = [NG_E.fireA, NG_E.fireB].some((tf) => t >= tf && t < tf + 0.8 + 0.4 * ngFlashP());
+  if (blasting) {
+    const img = g.getImageData(0, 0, 480, 288);
+    NG_E.muz.forEach(([mx, my], i) => {
+      // 前の 2 砲塔(0、1)は大きく、艦橋のうしろの 2 砲塔(2、3)は遠いので小さく
+      ngBlast(img, mx, my, t - NG_E.fireA - i * 0.05, i * 37, i < 2);
+      ngBlast(img, mx, my, t - NG_E.fireB - i * 0.05, i * 37 + 500, i < 2);
+    });
+    g.putImageData(img, 0, 0);
+  }
+  // 煙の映り(水面で上下を返す)
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(X, Y + NG_E.water + 1, 480, 288 - NG_E.water - 1);
+  ctx.clip();
+  ctx.globalAlpha = 0.35;
+  ctx.translate(X, Y + NG_E.water * 2 + 1);
+  ctx.scale(1, -1);
+  ctx.drawImage(ngE.off, 0, 0);
+  ctx.restore();
+  // 水面の衝撃波(作者「斉射の波紋はもっと激しく」D569): 円盤としぶきの奥の半分は艦のうしろ、手前は艦の映りの上
+  const pow = 1.6; // 強さ(作者「２でいい。激しさがつたわるから。」)
+  const wg = ngE.wave || (ngE.wave = document.createElement("canvas"));
+  wg.width = 480;
+  wg.height = 288;
+  const w2 = wg.getContext("2d");
+  const wi = w2.getImageData(0, 0, 480, 288);
+  ngWaveHard(wi, t - NG_E.fireA, pow);
+  ngWaveHard(wi, t - NG_E.fireB, pow);
+  w2.putImageData(wi, 0, 0);
+  const sg = ngE.spray || (ngE.spray = document.createElement("canvas"));
+  const s2 = sg.getContext("2d");
+  const spray = (half) => {
+    sg.width = 480;
+    sg.height = 288;
+    ngSpray(s2, t - NG_E.fireA, pow, half);
+    ngSpray(s2, t - NG_E.fireB, pow, half);
+    ctx.drawImage(sg, X, Y);
+  };
+  const wave = (y0, h) => {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(X, Y + y0, 480, h);
+    ctx.clip();
+    ctx.drawImage(wg, X, Y);
+    ctx.restore();
+  };
+  wave(182, 25);
+  spray("far");
+  const sh = api.image("ng_e_ship");
+  if (sh) {
+    const f = ngEFrame(t);
+    const c = f % NG_E.cols;
+    const r = Math.floor(f / NG_E.cols);
+    ctx.drawImage(sh, c * NG_E.fw, r * 288, NG_E.fw, 288, X + NG_E.x0, Y, NG_E.fw, 288);
+  }
+  wave(207, 81);
+  spray("near"); // 手前のしぶきと霧は水面より上にも立つ
+  ctx.drawImage(ngE.off, X, Y);
+  // 撃った瞬間、夕日の色で画面が明るむ
+  const FP = ngFlashP();
+  for (const tf of [NG_E.fireA, NG_E.fireB]) {
+    const u = (t - tf) / (0.5 * (0.6 + 0.4 * FP));
+    if (u >= 0 && u < 1) {
+      ctx.fillStyle = `rgba(255,214,150,${Math.min(0.8, 0.5 * FP) * (1 - u)})`;
+      ctx.fillRect(X, Y, 480, 288);
+    }
+    // 激しいときは、撃った最初の一瞬だけ白くひらめく
+    const w = (t - tf) / 0.09;
+    if (FP > 1 && w >= 0 && w < 1) {
+      ctx.fillStyle = `rgba(255,250,235,${Math.min(0.85, 0.6 * (FP - 1)) * (1 - w)})`;
+      ctx.fillRect(X, Y, 480, 288);
+    }
+  }
+};
+const ngSeihaCut2 = (ctx, api, t, g, X, Y) => {
+  // ---- カット 2: 夕焼け空を見上げる ----
+  const t2 = t - NG_E.cut;
+  // 裏の画面に描いてから、EMP のノイズをのせて映す
+  if (!ngE.c2) {
+    ngE.c2 = document.createElement("canvas");
+    ngE.c2.width = 480;
+    ngE.c2.height = 288;
+  }
+  const outer = ctx;
+  const OX = X;
+  const OY = Y;
+  {
+  const ctx = ngE.c2.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  const X = 0;
+  const Y = 0;
+  const sky = api.image("bg_sora");
+  if (sky) ctx.drawImage(sky, X, Y);
+  NG_BURST.forEach((set, s) => {
+    const t0 = s === 0 ? NG_E.burst1 : NG_E.burst2;
+    set.forEach(([bx, by], i) => ngBurst(g, bx, by, t2 - t0 - i * 0.18));
+  });
+  // 空が赤くそまる
+  let tint = 0;
+  for (const t0 of [NG_E.burst1, NG_E.burst2]) {
+    const a = t2 - t0;
+    if (a >= 0) tint = Math.max(tint, 0.3 * Math.max(0, 1 - a / 4));
+  }
+  if (tint > 0) {
+    ctx.fillStyle = `rgba(255,110,70,${tint})`;
+    ctx.fillRect(X, Y, 480, 288);
+  }
+  ctx.drawImage(ngE.off, X, Y);
+  // 爆発の光(空いっぱい)
+  for (const t0 of [NG_E.burst1, NG_E.burst2]) {
+    for (let i = 0; i < 4; i++) {
+      const u = (t2 - t0 - i * 0.18) / 0.25;
+      if (u >= 0 && u < 1) {
+        ctx.fillStyle = `rgba(255,255,240,${0.6 * (1 - u)})`;
+        ctx.fillRect(X, Y, 480, 288);
+      }
+    }
+  }
+  // 終わりは暗くなる
+  const e = (t2 - (NG_E.end - 1.5)) / 1.5;
+  if (e > 0) {
+    ctx.fillStyle = `rgba(0,0,0,${Math.min(1, e)})`;
+    ctx.fillRect(X, Y, 480, 288);
+  }
+  }
+  ngEmp(outer, ngE.c2, OX, OY, ngEmpPower(t2));
+};
 const NG_SEIHA = {
   tile: T,
   bg: "#000",
@@ -488,140 +625,9 @@ const NG_SEIHA = {
     const X = Math.round(ox);
     const Y = Math.round(oy);
     if (t < NG_E.cut) {
-      // ---- カット 1 ----
-      const bg = api.image("bg_seiha");
-      if (bg) ctx.drawImage(bg, X, Y);
-      // 黒煙(A は左の砲、B は右の砲。どちらも 4 門ずつ)と、その上に炎
-      NG_E.muz.forEach(([mx, my], i) => {
-        ngSmoke(g, mx, my, t - NG_E.fireA - i * 0.05, i * 17);
-        ngSmoke(g, mx + 3, my + 2, t - NG_E.fireB - i * 0.05, i * 17 + 200);
-      });
-      const blasting = [NG_E.fireA, NG_E.fireB].some((tf) => t >= tf && t < tf + 0.8 + 0.4 * ngFlashP());
-      if (blasting) {
-        const img = g.getImageData(0, 0, 480, 288);
-        NG_E.muz.forEach(([mx, my], i) => {
-          // 前の 2 砲塔(0、1)は大きく、艦橋のうしろの 2 砲塔(2、3)は遠いので小さく
-          ngBlast(img, mx, my, t - NG_E.fireA - i * 0.05, i * 37, i < 2);
-          ngBlast(img, mx, my, t - NG_E.fireB - i * 0.05, i * 37 + 500, i < 2);
-        });
-        g.putImageData(img, 0, 0);
-      }
-      // 煙の映り(水面で上下を返す)
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(X, Y + NG_E.water + 1, 480, 288 - NG_E.water - 1);
-      ctx.clip();
-      ctx.globalAlpha = 0.35;
-      ctx.translate(X, Y + NG_E.water * 2 + 1);
-      ctx.scale(1, -1);
-      ctx.drawImage(ngE.off, 0, 0);
-      ctx.restore();
-      // 水面の衝撃波(作者「斉射の波紋はもっと激しく」D569): 円盤としぶきの奥の半分は艦のうしろ、手前は艦の映りの上
-      const pow = 1.6; // 強さ(作者「２でいい。激しさがつたわるから。」)
-      const wg = ngE.wave || (ngE.wave = document.createElement("canvas"));
-      wg.width = 480;
-      wg.height = 288;
-      const w2 = wg.getContext("2d");
-      const wi = w2.getImageData(0, 0, 480, 288);
-      ngWaveHard(wi, t - NG_E.fireA, pow);
-      ngWaveHard(wi, t - NG_E.fireB, pow);
-      w2.putImageData(wi, 0, 0);
-      const sg = ngE.spray || (ngE.spray = document.createElement("canvas"));
-      const s2 = sg.getContext("2d");
-      const spray = (half) => {
-        sg.width = 480;
-        sg.height = 288;
-        ngSpray(s2, t - NG_E.fireA, pow, half);
-        ngSpray(s2, t - NG_E.fireB, pow, half);
-        ctx.drawImage(sg, X, Y);
-      };
-      const wave = (y0, h) => {
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(X, Y + y0, 480, h);
-        ctx.clip();
-        ctx.drawImage(wg, X, Y);
-        ctx.restore();
-      };
-      wave(182, 25);
-      spray("far");
-      const sh = api.image("ng_e_ship");
-      if (sh) {
-        const f = ngEFrame(t);
-        const c = f % NG_E.cols;
-        const r = Math.floor(f / NG_E.cols);
-        ctx.drawImage(sh, c * NG_E.fw, r * 288, NG_E.fw, 288, X + NG_E.x0, Y, NG_E.fw, 288);
-      }
-      wave(207, 81);
-      spray("near"); // 手前のしぶきと霧は水面より上にも立つ
-      ctx.drawImage(ngE.off, X, Y);
-      // 撃った瞬間、夕日の色で画面が明るむ
-      const FP = ngFlashP();
-      for (const tf of [NG_E.fireA, NG_E.fireB]) {
-        const u = (t - tf) / (0.5 * (0.6 + 0.4 * FP));
-        if (u >= 0 && u < 1) {
-          ctx.fillStyle = `rgba(255,214,150,${Math.min(0.8, 0.5 * FP) * (1 - u)})`;
-          ctx.fillRect(X, Y, 480, 288);
-        }
-        // 激しいときは、撃った最初の一瞬だけ白くひらめく
-        const w = (t - tf) / 0.09;
-        if (FP > 1 && w >= 0 && w < 1) {
-          ctx.fillStyle = `rgba(255,250,235,${Math.min(0.85, 0.6 * (FP - 1)) * (1 - w)})`;
-          ctx.fillRect(X, Y, 480, 288);
-        }
-      }
+      ngSeihaCut1(ctx, img, api, t, g, X, Y);
     } else {
-      // ---- カット 2: 夕焼け空を見上げる ----
-      const t2 = t - NG_E.cut;
-      // 裏の画面に描いてから、EMP のノイズをのせて映す
-      if (!ngE.c2) {
-        ngE.c2 = document.createElement("canvas");
-        ngE.c2.width = 480;
-        ngE.c2.height = 288;
-      }
-      const outer = ctx;
-      const OX = X;
-      const OY = Y;
-      {
-      const ctx = ngE.c2.getContext("2d");
-      ctx.imageSmoothingEnabled = false;
-      const X = 0;
-      const Y = 0;
-      const sky = api.image("bg_sora");
-      if (sky) ctx.drawImage(sky, X, Y);
-      NG_BURST.forEach((set, s) => {
-        const t0 = s === 0 ? NG_E.burst1 : NG_E.burst2;
-        set.forEach(([bx, by], i) => ngBurst(g, bx, by, t2 - t0 - i * 0.18));
-      });
-      // 空が赤くそまる
-      let tint = 0;
-      for (const t0 of [NG_E.burst1, NG_E.burst2]) {
-        const a = t2 - t0;
-        if (a >= 0) tint = Math.max(tint, 0.3 * Math.max(0, 1 - a / 4));
-      }
-      if (tint > 0) {
-        ctx.fillStyle = `rgba(255,110,70,${tint})`;
-        ctx.fillRect(X, Y, 480, 288);
-      }
-      ctx.drawImage(ngE.off, X, Y);
-      // 爆発の光(空いっぱい)
-      for (const t0 of [NG_E.burst1, NG_E.burst2]) {
-        for (let i = 0; i < 4; i++) {
-          const u = (t2 - t0 - i * 0.18) / 0.25;
-          if (u >= 0 && u < 1) {
-            ctx.fillStyle = `rgba(255,255,240,${0.6 * (1 - u)})`;
-            ctx.fillRect(X, Y, 480, 288);
-          }
-        }
-      }
-      // 終わりは暗くなる
-      const e = (t2 - (NG_E.end - 1.5)) / 1.5;
-      if (e > 0) {
-        ctx.fillStyle = `rgba(0,0,0,${Math.min(1, e)})`;
-        ctx.fillRect(X, Y, 480, 288);
-      }
-      }
-      ngEmp(outer, ngE.c2, OX, OY, ngEmpPower(t2));
+      ngSeihaCut2(ctx, api, t, g, X, Y);
     }
 
     // 切りかえの前後は暗くつなぐ
