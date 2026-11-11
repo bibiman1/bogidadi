@@ -383,17 +383,24 @@ window.BOGI_WORLDS = {
           ["crew_wagtail", "./assets/worlds/kasumi/crew_wagtail.png"],
           ["crew_rooster", "./assets/worlds/kasumi/crew_rooster.png"],
           ["matryo", "./assets/worlds/keiji/matryo.png"],
+          // 秋の凍った湖への寄り道(D674、D675)。形は冬の湖の部品、絵は秋
+          ...["aki_houtou", "aki_wang_road", "aki_wang_ice", "aki_pine", "aki_maple", "aki_fire", "aki_imo", "aki_tires", "aki_poster", "aki_v_poster", "aki_fuji", "aki_police", "aki_tansu"].map((k) => [k, `${k}.png`]),
+          ...["road_asphalt", "s_sign_r", "s_sign_l", "wang_floor", "k_wall", "k_stove", "k_irori", "k_table", "k_zabuton", "k_zabuton_s", "k_tansu", "k_post", "i_radio", "v_pot", "pi_walk"].map((k) => [k === "pi_walk" ? "pi" : k, `./assets/worlds/lake/${k}.png`]),
+          ["fueler", "./assets/worlds/noroi/fueler.png"],
+          ...["ponpon_e", "tori_e", "akabeko_e", "kokeshi_e"].map((k) => [k, `./assets/worlds/noroi/${k}.png`]), // 暴走する野犬の車たち(D677)
         ])
     ),
     // 水兵帽をかぶっているあいだは、帽子つきの歩きの絵(D571)
     playerSprite: { get img() { return ngKiImg(); }, cell: 64, frames: 7, footY: 17 },
     start: "kohan",
     startSpawn: "start",
-    maps: { kohan: NG_KOHAN, mise: NG_MISE, kojo: NG_KOJO, kansen: NG_KANSEN, hotou: NG_HOTOU, souten: NG_SOUTEN, seiha: NG_SEIHA },
+    maps: { kohan: NG_KOHAN, mise: NG_MISE, kojo: NG_KOJO, kansen: NG_KANSEN, hotou: NG_HOTOU, souten: NG_SOUTEN, seiha: NG_SEIHA, akiLake: NA_LAKE, akiShop: NA_SHOP, akiRoad: NA_ROAD },
     onEnterWorld(api) {
-      for (const f of ["hat", "fired", "hatBack", "bought"]) api.setFlag(f, false); // 毎回はじめから(D571)
+      for (const f of ["hat", "fired", "hatBack", "bought", "akiCar", "akiOpen"]) api.setFlag(f, false); // 毎回はじめから(D571)
       ngHat.on = false;
       ngReset();
+      akiReset(); // 秋の峠の落ち葉焚き(D674)
+      Object.assign(akiCar, { on: false, clearT: -1 }); // 東へ走る車と霧(D677)
       ngDrill(api); // 入るたびに、こめるところから訓練をやり直す(作者「装填後にきーがハンドルの位置を調べても何も起こらない」)
     },
   },

@@ -318,10 +318,10 @@ const ASSET_V = (() => {
           }
           host.save();
         },
-        // 懲罰空間へ戻る
-        exit() {
+        // 懲罰空間へ戻る。id を渡すと、その断片の台座の前に出る(長門の秋の峠道は、凍った湖の台座の前へ D674)
+        exit(id) {
           host.save();
-          host.exit(w.id);
+          host.exit(id || w.id);
         },
       };
       return api;
