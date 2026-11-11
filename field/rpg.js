@@ -700,9 +700,7 @@ const ASSET_V = (() => {
       return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, z: a.z + (b.z - a.z) * k };
     }
 
-    function update(dt, t, input) {
-      if (!world) return;
-      clock += dt;
+    function updateFlakes(dt, t) {
       for (const f of flakes) {
         f.y += f.v * dt;
         f.x += Math.sin(clock * 0.8 + f.p) * 12 * dt;
@@ -720,61 +718,36 @@ const ASSET_V = (() => {
         const next = toastQueue.shift();
         toast = next ? { text: next.text, until: clock + next.sec } : null;
       }
+    }
 
-      if (camPath) {
-        const ks = camPath.keys;
-        if (clock - camPath.t0 > ks[ks.length - 1].t + CAM_BACK) {
-          const done = camPath.onDone;
-          camPath = null;
-          if (done) done();
+    function updateAutoWalk(dt) {
+      // 演出の歩き: 点から点へ、まっすぐ同じ速さで。向きは進む方へ
+      const w = autoWalk;
+      let step = w.speed * dt;
+      while (step > 0 && w.i < w.pts.length) {
+        const q = w.pts[w.i];
+        const dx = q.x - player.x, dy = q.y - player.y, d = Math.hypot(dx, dy);
+        if (d > 0.01) player.facing = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "east" : "west") : dy > 0 ? "south" : "north";
+        if (d <= step) {
+          player.x = q.x;
+          player.y = q.y;
+          step -= d;
+          w.i++;
+        } else {
+          player.x += (dx / d) * step;
+          player.y += (dy / d) * step;
+          step = 0;
         }
-        return;
       }
-      if (pan) {
-        const el = clock - pan.t0;
-        if (el > pan.hold + 2.4) {
-          const done = pan.onDone;
-          pan = null;
-          if (done) done();
-        }
-        return;
+      player.vx = player.vy = 0;
+      player.moving = w.i < w.pts.length;
+      if (!player.moving) {
+        autoWalk = null;
+        if (w.onDone) w.onDone();
       }
-      if (held && clock - held.t0 >= held.sec) {
-        const done = held.onDone;
-        held = null;
-        if (done) done();
-      }
-      if (cutscene) return;
-      if (map.input) map.input(world.api, dt, { a: aHeld, b: bHeld, x: input.x, y: input.y }); // 押し続け(ピンボール)
-      if (autoWalk) {
-        // 演出の歩き: 点から点へ、まっすぐ同じ速さで。向きは進む方へ
-        const w = autoWalk;
-        let step = w.speed * dt;
-        while (step > 0 && w.i < w.pts.length) {
-          const q = w.pts[w.i];
-          const dx = q.x - player.x, dy = q.y - player.y, d = Math.hypot(dx, dy);
-          if (d > 0.01) player.facing = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "east" : "west") : dy > 0 ? "south" : "north";
-          if (d <= step) {
-            player.x = q.x;
-            player.y = q.y;
-            step -= d;
-            w.i++;
-          } else {
-            player.x += (dx / d) * step;
-            player.y += (dy / d) * step;
-            step = 0;
-          }
-        }
-        player.vx = player.vy = 0;
-        player.moving = w.i < w.pts.length;
-        if (!player.moving) {
-          autoWalk = null;
-          if (w.onDone) w.onDone();
-        }
-        return;
-      }
-      if (clock < freezeUntil) return;
+    }
 
+    function updateWalk(dt, input) {
       // すべる床: 氷のタイル、または map.slippery(true か、追従の強さの数値。小さいほどつるつる)
       const slip = map.slippery ? map.slippery(world.api, player.x, player.y) : false;
       const iceTile = !!(tileAt(player.x, player.y) || {}).ice;
@@ -833,6 +806,68 @@ const ASSET_V = (() => {
         if (Math.abs(input.x) > Math.abs(input.y)) player.facing = input.x > 0 ? "east" : "west";
         else player.facing = input.y > 0 ? "south" : "north";
       }
+    }
+
+    function updateNear() {
+      nearObj = null;
+      let best = Infinity;
+      for (const o of visibleObjects()) {
+        if (!o.interact && !o.near) continue;
+        if (o.canInteract && !o.canInteract(world.api)) continue;
+        // 距離は足もと(描画の基準点)からはかる
+        const ix = o.x + (o.ix || 0);
+        const iy = o.y + (o.iy != null ? o.iy : o.sortDy || 0);
+        const d = Math.hypot(ix - player.x, iy - player.y);
+        const r = o.range || 60;
+        if (o.near) {
+          const was = !!o._wasNear;
+          o._wasNear = d <= (o.nearRange || r);
+          if (o._wasNear && !was) o.near(world.api);
+        }
+        if (o.interact && d <= r && d < best) {
+          best = d;
+          nearObj = o;
+        }
+      }
+    }
+
+    function update(dt, t, input) {
+      if (!world) return;
+      clock += dt;
+      updateFlakes(dt, t);
+
+      if (camPath) {
+        const ks = camPath.keys;
+        if (clock - camPath.t0 > ks[ks.length - 1].t + CAM_BACK) {
+          const done = camPath.onDone;
+          camPath = null;
+          if (done) done();
+        }
+        return;
+      }
+      if (pan) {
+        const el = clock - pan.t0;
+        if (el > pan.hold + 2.4) {
+          const done = pan.onDone;
+          pan = null;
+          if (done) done();
+        }
+        return;
+      }
+      if (held && clock - held.t0 >= held.sec) {
+        const done = held.onDone;
+        held = null;
+        if (done) done();
+      }
+      if (cutscene) return;
+      if (map.input) map.input(world.api, dt, { a: aHeld, b: bHeld, x: input.x, y: input.y }); // 押し続け(ピンボール)
+      if (autoWalk) {
+        updateAutoWalk(dt);
+        return;
+      }
+      if (clock < freezeUntil) return;
+
+      updateWalk(dt, input);
 
       // 範囲に入ると発火する仕掛け(出入口、景色が開ける場所など)
       for (const tr of map.triggers || []) {
@@ -854,26 +889,7 @@ const ASSET_V = (() => {
         }
       }
 
-      nearObj = null;
-      let best = Infinity;
-      for (const o of visibleObjects()) {
-        if (!o.interact && !o.near) continue;
-        if (o.canInteract && !o.canInteract(world.api)) continue;
-        // 距離は足もと(描画の基準点)からはかる
-        const ix = o.x + (o.ix || 0);
-        const iy = o.y + (o.iy != null ? o.iy : o.sortDy || 0);
-        const d = Math.hypot(ix - player.x, iy - player.y);
-        const r = o.range || 60;
-        if (o.near) {
-          const was = !!o._wasNear;
-          o._wasNear = d <= (o.nearRange || r);
-          if (o._wasNear && !was) o.near(world.api);
-        }
-        if (o.interact && d <= r && d < best) {
-          best = d;
-          nearObj = o;
-        }
-      }
+      updateNear();
     }
 
     // 体のすぐそばの、調べられる物: 調べる点から遠いはし(横に長い車など)に立っても、その物を調べる。
@@ -1001,29 +1017,7 @@ const ASSET_V = (() => {
       return { sx: Math.round((Math.random() * 2 - 1) * a), sy: Math.round((Math.random() * 2 - 1) * a) };
     }
 
-    function draw(t) {
-      if (!world) return;
-      ctx.imageSmoothingEnabled = false;
-      ctx.fillStyle = map.bg || "#1b1a22";
-      ctx.fillRect(0, 0, VW, VH);
-      ctx.save();
-      // 見せ場のカメラ(寄り・引き)。ふつうのカメラの中心は、寄りなしの広さで決める
-      vw = VW / ZOOM;
-      vh = VH / ZOOM;
-      lastCam = { x: map.w <= vw ? map.w / 2 : clamp(player.x, vw / 2, map.w - vw / 2), y: map.h <= vh ? map.h / 2 : clamp(player.y - 12, vh / 2, map.h - vh / 2) };
-      const shot = camShot(lastCam);
-      const cz = shot ? shot.z : 1;
-      vw = VW / (ZOOM * cz);
-      vh = VH / (ZOOM * cz);
-      ctx.scale(ZOOM * cz, ZOOM * cz);
-      const { ox, oy } = camera(shot);
-      const T = map.tile;
-
-      if (map.backdrop) {
-        const b = map.backdrop;
-        const im = img(b.img);
-        if (im) ctx.drawImage(im, b.x + ox, b.y + oy, im.width * b.scale, im.height * b.scale);
-      }
+    function drawTiles(ox, oy, T) {
 
       const r0 = Math.max(0, Math.floor(-oy / T));
       const r1 = Math.min(map.rows - 1, Math.floor((vh - oy) / T));
@@ -1054,19 +1048,9 @@ const ASSET_V = (() => {
           }
         }
       }
+    }
 
-      if (map.drawGround) map.drawGround(ctx, ox, oy, img, world.api);
-
-      // y順に並べて、手前のものほど後に描く
-      const drawables = visibleObjects().map((o) => ({ y: o.y + (o.sortDy || 0), o }));
-      if (!map.hidePlayer) drawables.push({ y: player.y, player: true });
-      drawables.sort((a, b) => a.y - b.y);
-      for (const d of drawables) {
-        if (d.player) drawPlayer(ox, oy, t);
-        else drawObject(d.o, ox, oy, t);
-      }
-      for (const d of drawables) if (d.o && d.o.drawOver) d.o.drawOver(ctx, Math.round(d.o.x + ox), Math.round(d.o.y + oy), t, world.api);
-      if (held) drawHeld(ox, oy);
+    function drawObserveFx(ox, oy) {
       if (observeFx) {
         // 見届けたしるし: 白い光の粒が上から、きーに降りてきて、とける
         const u = (clock - observeFx.t0) / 1.6;
@@ -1083,12 +1067,9 @@ const ASSET_V = (() => {
           ctx.fillRect(px - 30, y - 30, 60, 60);
         }
       }
+    }
 
-      if (map.drawOverlay) map.drawOverlay(ctx, ox, oy, t, world.api);
-      if (map.dark) drawDark(ox, oy);
-      // 闇の上に描くもの(drawLit。暗い部屋で光る見届けなど)
-      if (map.dark) for (const d of drawables) if (d.o && d.o.drawLit) d.o.drawLit(ctx, Math.round(d.o.x + ox), Math.round(d.o.y + oy), t, world.api);
-      if (map.wind) drawWind(ox, oy);
+    function drawTint() {
       // 夕方などの色: tintMul は掛け合わせ(暗く、色をのせる)、tint は上から薄く重ねる
       if (map.tintMul) {
         ctx.globalCompositeOperation = "multiply";
@@ -1100,6 +1081,53 @@ const ASSET_V = (() => {
         ctx.fillStyle = map.tint;
         ctx.fillRect(0, 0, vw, vh);
       }
+    }
+
+    function draw(t) {
+      if (!world) return;
+      ctx.imageSmoothingEnabled = false;
+      ctx.fillStyle = map.bg || "#1b1a22";
+      ctx.fillRect(0, 0, VW, VH);
+      ctx.save();
+      // 見せ場のカメラ(寄り・引き)。ふつうのカメラの中心は、寄りなしの広さで決める
+      vw = VW / ZOOM;
+      vh = VH / ZOOM;
+      lastCam = { x: map.w <= vw ? map.w / 2 : clamp(player.x, vw / 2, map.w - vw / 2), y: map.h <= vh ? map.h / 2 : clamp(player.y - 12, vh / 2, map.h - vh / 2) };
+      const shot = camShot(lastCam);
+      const cz = shot ? shot.z : 1;
+      vw = VW / (ZOOM * cz);
+      vh = VH / (ZOOM * cz);
+      ctx.scale(ZOOM * cz, ZOOM * cz);
+      const { ox, oy } = camera(shot);
+      const T = map.tile;
+
+      if (map.backdrop) {
+        const b = map.backdrop;
+        const im = img(b.img);
+        if (im) ctx.drawImage(im, b.x + ox, b.y + oy, im.width * b.scale, im.height * b.scale);
+      }
+      drawTiles(ox, oy, T);
+
+      if (map.drawGround) map.drawGround(ctx, ox, oy, img, world.api);
+
+      // y順に並べて、手前のものほど後に描く
+      const drawables = visibleObjects().map((o) => ({ y: o.y + (o.sortDy || 0), o }));
+      if (!map.hidePlayer) drawables.push({ y: player.y, player: true });
+      drawables.sort((a, b) => a.y - b.y);
+      for (const d of drawables) {
+        if (d.player) drawPlayer(ox, oy, t);
+        else drawObject(d.o, ox, oy, t);
+      }
+      for (const d of drawables) if (d.o && d.o.drawOver) d.o.drawOver(ctx, Math.round(d.o.x + ox), Math.round(d.o.y + oy), t, world.api);
+      if (held) drawHeld(ox, oy);
+      drawObserveFx(ox, oy);
+
+      if (map.drawOverlay) map.drawOverlay(ctx, ox, oy, t, world.api);
+      if (map.dark) drawDark(ox, oy);
+      // 闇の上に描くもの(drawLit。暗い部屋で光る見届けなど)
+      if (map.dark) for (const d of drawables) if (d.o && d.o.drawLit) d.o.drawLit(ctx, Math.round(d.o.x + ox), Math.round(d.o.y + oy), t, world.api);
+      if (map.wind) drawWind(ox, oy);
+      drawTint();
       if (map.snow) drawSnow();
       bubblePlaced.length = 0; // 重なる吹き出しは上へ積む(このフレームで置いた位置)
       for (const b of bubbles) drawBubble(b, ox, oy);
