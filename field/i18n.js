@@ -210,6 +210,7 @@
     "デン　デン": "dun  dun",
     "ポー": "pooo",
     "まだ帰れない。": "Can't go back yet.",
+    "とまります": "Stopping", // 都電の降車ボタン(D669)
     "ガシャン ガシャン": "clank clank",
     "シューッ！": "hissss!",
     "ポイッ！": "Out you go!",

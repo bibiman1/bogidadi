@@ -155,14 +155,14 @@ window.BOGI_WORLDS = {
     name: "荒川の鈴木商店",
     assetBase: "./assets/worlds/suzuki/",
     images: Object.fromEntries(
-      ["bg_stop", "bg_alley", "bg_shop", "bg_river", "bg_crater", "fg_river", "fg_crater", "fg_alley", "bg_orbit", "fg_orbit", "tetsubin", "v_inside", "v_rise3", "v_fall", "rise_sky", "rise_tube", "rise_earth", "rise_cloud", "v_denpyo", "v_nifuda", "v_nouhin", "bg_print"]
+      ["bg_board", "bg_car", "car_town", "tram_side", "bg_stop", "bg_alley", "bg_shop", "bg_river", "bg_crater", "fg_river", "fg_crater", "fg_alley", "bg_orbit", "fg_orbit", "tetsubin", "v_inside", "v_rise3", "v_fall", "rise_sky", "rise_tube", "rise_earth", "rise_cloud", "v_denpyo", "v_nifuda", "v_nouhin", "bg_print"]
         .map((k) => [k, `${k}.png`])
         .concat([["ki", "./assets/worlds/lake/ki_walk.png"], ["matryo", "./assets/worlds/keiji/matryo.png"], ["pi", "./assets/worlds/lake/pi_walk.png"]]) // pi: 納品先の担当者の体(D655)
     ),
     playerSprite: { img: "ki", cell: 64, frames: 7, footY: 17 },
-    start: "stop",
+    start: "board", // 都電で着く(D669)
     startSpawn: "start",
-    maps: { stop: S_STOP, alley: S_ALLEY, print: S_PRINT, katsuji: S_KATSUJI, shop: S_SHOP, river: S_RIVER, rise: S_RISE, orbit: S_ORBIT, space: S_SPACE, crater: S_CRATER },
+    maps: { board: S_BOARD, car: S_CAR, stop: S_STOP, alley: S_ALLEY, print: S_PRINT, katsuji: S_KATSUJI, shop: S_SHOP, river: S_RIVER, rise: S_RISE, orbit: S_ORBIT, space: S_SPACE, crater: S_CRATER },
     // 着地のあと、鉄瓶にお湯を注いでもらうまで、きーは真っ黒
     playerTint: (api) => (api.flag("charred") ? "rgba(22, 18, 18, 0.97)" : null),
     // 単結晶に入ってから流れ星になるまでの途中でやめていたら、入るところからやり直せるようにする

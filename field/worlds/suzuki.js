@@ -114,13 +114,8 @@ const S_STOP = sMap("stop", 28, 10, {
     north: { x: 13.5 * T, y: 1.2 * T, facing: "south" },
   },
   triggers: [{ id: "toAlley", x: 12 * T, y: -T, w: 3 * T, h: 1.3 * T, warp: { map: "alley", spawn: "south" } }],
-  objects: [
-    // 都電は、納品書を持つまで乗れない(D75)
-    sSpot("tram", 11 * T, 5.4 * T, (api) => {
-      if (api.hasItem("納品書")) api.exit();
-      else api.mutter("まだ帰れない。", 1600); // 仮
-    }),
-  ],
+  // 都電(納品書を持つまで乗れない D75。持っていれば乗って帰る D673)は suzuki_tram.js で足す
+  objects: [],
 });
 
 // B 町工場と長屋の路地(北の階段の先が土手。入口はどれも南の小道に向く)
