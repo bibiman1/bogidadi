@@ -50,7 +50,21 @@ NG_KOHAN.drawOverlay = (ctx, ox, oy, t, api) => {
 
 // ---- 一階(15 × 10 マス、北を向いて見る。手前の南が暖簾)----
 // 下から: 土間と下足箱、上がり框、左に広間、まん中に階段(奥へ上がる)、右に帳場。奥の壁に調理場と湯殿ののれん
-const NG_RYO1_WALK = (c, r) => (r >= 7 && r <= 9 && c >= 1 && c <= 13 && !(r === 9 && (c <= 1 || c >= 13))) || (c >= 7 && c <= 8 && r >= 4 && r <= 6);
+// 階段の右の小さな床(c9〜10 の r5〜6)も歩ける(todo 295、D715)。その奥は壁で、奥の廊下へは行けない
+const NG_RYO1_WALK = (c, r) =>
+  (r >= 7 && r <= 9 && c >= 1 && c <= 13 && !(r === 9 && (c <= 1 || c >= 13))) || (c >= 7 && c <= 8 && r >= 4 && r <= 6) || (c >= 9 && c <= 10 && r >= 5 && r <= 6);
+// 前後(todo 295): 背景の柱を切り出して、きーの足もとと比べて描きなおす。base は柱の根もとの y
+const ngRyoCut = (id, key, x0, y0, w, base) => ({
+  id,
+  x: x0,
+  y: base,
+  w: 1,
+  h: 1,
+  draw(ctx, sx, sy, t, api) {
+    const im = api.image(key);
+    if (im) ctx.drawImage(im, x0, y0, w, base - y0, sx, sy - (base - y0), w, base - y0);
+  },
+});
 const ngRyoBg = (key) => (ctx, ox, oy, img, api) => {
   const bg = api.image(key);
   if (bg) ctx.drawImage(bg, Math.round(ox), Math.round(oy));
@@ -82,16 +96,17 @@ const NG_RYO1 = {
     door: { x: 7.5 * T, y: 9.3 * T, facing: "north" },
     stairs: { x: 8.0 * T, y: 6.6 * T, facing: "south" }, // 二階から下りてきた所
   },
-  objects: [],
+  objects: [ngRyoCut("post", "bg_ryokan1", 349, 40, 7, 222)], // 帳場の左の柱
   triggers: [
     { id: "out", x: 5 * T, y: 9.75 * T, w: 5 * T, h: T, run: (api) => api.warp("kohan", "ryokan") },
     { id: "up", x: 7 * T, y: 4.0 * T, w: 2 * T, h: 0.5 * T, run: (api) => api.warp("ryo2", "stairs") },
   ],
 };
 
-// ---- 二階(15 × 10 マス)。まん中が階段の口(一階とそろえる D690)、右の踊り場から手前の広縁へ ----
+// ---- 二階(15 × 10 マス)。まん中が階段の口(一階とそろえる D690)。階段は左の 1 本(D714。右の階段は床に描きかえた)----
+// 一階から上がると奥の廊下(r3)に着く。右の廊下(c9〜10)を通って手前の広縁へ。奥の廊下は右奥ののれんの前まで(D715)
 // 左は床の間の客室(襖が開いている)、右は襖の閉じた客室。広縁に籐椅子 2 脚。籐椅子に座ると、花火の場面
-const NG_RYO2_WALK = (c, r) => (c >= 9 && c <= 10 && r >= 4 && r <= 6) || (r === 7 && c >= 0 && c <= 14);
+const NG_RYO2_WALK = (c, r) => (r === 3 && c >= 7 && c <= 13) || (r === 4 && c >= 7 && c <= 8) || (c >= 9 && c <= 10 && r >= 4 && r <= 6) || (r === 7 && c >= 0 && c <= 14);
 const NG_RYO2 = {
   tile: T,
   bg: "#1a1210",
@@ -100,10 +115,14 @@ const NG_RYO2 = {
   legend: K_LEGEND,
   drawGround: ngRyoBg("bg_ryokan2"),
   spawns: {
-    stairs: { x: 10.0 * T, y: 5.6 * T, facing: "south" }, // 一階から上がってきた所
+    stairs: { x: 7.6 * T, y: 3.35 * T, facing: "east" }, // 一階から上がってきた所(階段の上の奥の廊下)
     chair: { x: 10.4 * T, y: 7.6 * T, facing: "west" }, // 花火を見て泊まった朝(D705)
   },
   objects: [
+    // 奥の廊下の右は、床が y 112 まで(その下は右の客室の畳)。足もとをそこで止める
+    { id: "tatamiEdge", x: 402, y: 120, w: 1, h: 1, solid: { w: 92, h: 16 }, draw() {} },
+    ngRyoCut("newel", "bg_ryokan2", 277, 60, 7, 112), // 階段の上の親柱
+    ngRyoCut("post", "bg_ryokan2", 346, 40, 11, 150), // 右の客室の角の柱
     // 籐椅子(絵に描いてある)。上を歩かない。右の椅子に座ると、花火の場面
     { id: "chairL", x: 202, y: 246, w: 1, h: 1, solid: { w: 30, h: 14, dy: -6 }, draw() {} },
     { id: "table", x: 241, y: 246, w: 1, h: 1, solid: { w: 18, h: 10, dy: -5 }, draw() {} },
@@ -120,7 +139,7 @@ const NG_RYO2 = {
       interact: (api) => api.warp("hanabi", "view"),
     },
   ],
-  triggers: [{ id: "down", x: 9 * T, y: 4.0 * T, w: 2 * T, h: 0.5 * T, run: (api) => api.warp("ryo1", "stairs") }],
+  triggers: [{ id: "down", x: 7 * T, y: 4.0 * T, w: 2 * T, h: 0.5 * T, run: (api) => api.warp("ryo1", "stairs") }],
 };
 
 // ---- 花火の場面(動く一枚。カメラの決まりの外)。縁側から南を向き、湖の向こうの長門と富士 ----
@@ -142,9 +161,16 @@ const NG_HB = {
   end: 30.0, // 暗くなりきる秒
   sleep: 2.0, // 暗いまま待つ(泊まる)
   bursts: [
-    [[150, 70], [262, 44], [352, 86], [420, 50]],
-    [[196, 46], [300, 90], [392, 60], [100, 56]],
+    // 一つの目標に集める(todo 294、D713)。散布界の分だけずれて重なる。y は今の画面の上の外
+    [[258, -98], [276, -104], [266, -88], [284, -94]],
+    [[268, -100], [254, -106], [280, -90], [272, -110]],
   ],
+};
+// 見上げる(D713): 尾を追って眺めを上へ 200 ドットずらし、画面の外の高空で開く火球を見上げる。
+// 上にいるまま 2 回目(尾は下から入る)。22 秒から下へ戻り、湖と富士で暗転。軒は画面の上に止めたまま
+const ngHbCam = (t) => {
+  const ez = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
+  return Math.round(200 * (ez((t - 3.4) / 3.4) - ez((t - 22) / 6)));
 };
 const ngHbT0 = (s) => NG_HB.fire[s] + NG_HB.rise + NG_HB.pause; // 開く秒
 // 光の尾の頭の位置(砲口 i から火球へ。昇るほど遅くなり、少し弓なりに)
@@ -199,11 +225,31 @@ const NG_HANABI = {
   drawGround(ctx, ox, oy, img, api) {
     const t = ngHb.t;
     const X = Math.round(ox);
-    const Y = Math.round(oy);
+    const Y0 = Math.round(oy);
+    const cam = ngHbCam(t);
+    const Y = Y0 + cam;
     ctx.save();
     ctx.imageSmoothingEnabled = false;
     const bg = api.image("bg_ryokan_view");
-    if (bg) ctx.drawImage(bg, X, Y);
+    if (cam > 0) {
+      ctx.fillStyle = "#14193e";
+      ctx.fillRect(X, Y0, 480, cam + 15);
+      // 上の空: 高いほど少し暗く(ディザ)、星をまく
+      for (let yy = 0; yy < cam; yy += 2) {
+        const u = yy / 200;
+        for (let xx = (yy / 2) % 2; xx < 480; xx += 2) if (((xx * 7 + yy * 3) % 10) / 10 < u * 0.6) {
+          ctx.fillStyle = "#0e1230";
+          ctx.fillRect(X + xx, Y + 15 - yy - 1, 1, 1);
+        }
+      }
+      for (let k = 0; k < 90; k++) {
+        const sy = 15 - ((k * 61 + k * k * 7) % 215);
+        if (sy + cam < 15) continue;
+        ctx.fillStyle = k % 4 ? "#4a5080" : k % 8 ? "#9aa0c8" : "#e0e4f4";
+        ctx.fillRect(X + ((k * 137 + k * k) % 480), Y + sy, 1, 1);
+      }
+    }
+    if (bg) ctx.drawImage(bg, 0, 15, 480, 273, X, Y + 15, 480, 273);
     // 火球は斉射の場面の絵(ngBurst)を、裏の画面に 2 倍の座標で描いて、半分に縮めて重ねる
     if (!ngHb.off) {
       ngHb.off = document.createElement("canvas");
@@ -212,6 +258,8 @@ const NG_HANABI = {
     }
     const g = ngHb.off.getContext("2d");
     g.clearRect(0, 0, 960, 576);
+    g.save();
+    g.translate(0, cam * 2);
     let tint = 0;
     let flash = 0;
     NG_HB.fire.forEach((f, s) => {
@@ -233,11 +281,12 @@ const NG_HANABI = {
         if (u >= 0 && u < 1) flash = Math.max(flash, 0.35 * (1 - u));
       }
     });
+    g.restore();
     if (tint > 0) {
       ctx.fillStyle = `rgba(255, 110, 70, ${tint})`;
-      ctx.fillRect(X, Y, 480, 228); // 空と湖(手すりの上)
+      ctx.fillRect(X, Y0, 480, 228 + cam);
     }
-    ctx.drawImage(ngHb.off, 0, 0, 960, 576, X, Y, 480, 288);
+    ctx.drawImage(ngHb.off, 0, 0, 960, 576, X, Y0, 480, 288);
     const dot = (x, y, w, h, c) => {
       ctx.fillStyle = c;
       ctx.fillRect(X + Math.round(x), Y + Math.round(y), w, h);
@@ -258,7 +307,7 @@ const NG_HANABI = {
           const tk = tau - k * 0.045;
           if (tk < 0) continue;
           const [x, y, v] = ngHbTrail(s, i, tk);
-          const al = (1 - k / 25) * (1 - 0.35 * v);
+          const al = (1 - k / 25) * (1 - 0.1 * v);
           if (k === 0) {
             dot(x - 1, y - 1, 3, 3, `rgba(255, 200, 120, ${0.45 * al})`); // 頭のにじみ
             dot(x, y, 2, 2, `rgba(255, 250, 230, ${al})`);
@@ -293,16 +342,17 @@ const NG_HANABI = {
         });
       });
     });
+    if (bg) ctx.drawImage(bg, 0, 0, 480, 15, X, Y0, 480, 15);
     if (flash > 0) {
       ctx.fillStyle = `rgba(255, 250, 235, ${flash})`;
-      ctx.fillRect(X, Y, 480, 288);
+      ctx.fillRect(X, Y0, 480, 288);
     }
     // きーも籐椅子も描かない。縁側からの眺めだけ(D706)
     // 入りと終わりは暗くつなぐ
     const e = Math.max(1 - t / 0.8, (t - (NG_HB.end - 1.5)) / 1.5);
     if (e > 0) {
       ctx.fillStyle = `rgba(0, 0, 0, ${Math.min(1, e)})`;
-      ctx.fillRect(X, Y, 480, 288);
+      ctx.fillRect(X, Y0, 480, 288);
     }
     ctx.restore();
   },
