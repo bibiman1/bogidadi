@@ -124,23 +124,41 @@ const NG_RYO2 = {
 };
 
 // ---- 花火の場面(動く一枚。カメラの決まりの外)。縁側から南を向き、湖の向こうの長門と富士 ----
-// 長門が撃つ(湖の上に小さな火)→ 2 秒ほどで、空に火球が 4 つ、また 4 つ。光が先で、音は遅れて届く(D592)。
+// 花火の打ち上げの溜めを借りる(todo 293、D711): 静かな夜 → 砲口が光り、遅れて低いドン → 光の尾が 4 本ゆっくり昇る →
+// 尾が消えて 1 秒の間 → 火球 4 つが音のないままふくらむ → 3 秒遅れて地鳴り 4 回(D592、D603)。これを 4 門ずつ 2 回(8 門、D541)。
+// 1 回目は溜めの回、2 回目は余韻の回(火の粉がしだれ、湖に光の道、煙がたなびき、赤みがゆっくり引く)。
 // 遠いので EMP の砂あらしはなし、画面が少しゆらぐだけ。ぴーの顔は出さない(D685)。きーも椅子も描かず、眺めだけ(D706)
 // 終わりは暗転を長めにして一晩たち、朝(D704、D705)
 const NG_HB = {
   ship: [214, 186], // 長門の砲(夜景の絵の上)
-  fire: [2.0, 7.0], // 長門が撃つ秒
-  rise: 2.0, // 撃ってから空で開くまで
-  boom: 3.0, // 開いてから音が届くまで
-  gap: 0.45,
-  end: 17.0, // 暗くなりきる秒
+  fire: [3.0, 15.5], // 長門が撃つ秒
+  thud: 0.9, // 砲口が光ってから、低いドンが届くまで
+  rise: 3.0, // 光の尾が昇る秒
+  pause: 1.0, // 尾が消えてから開くまでの間
+  boom: 3.0, // 開いてから音が届くまで(D592)
+  gap: 0.45, // 地鳴りの間(D603)
+  tint: [4, 9], // 空の赤みが引く秒(1 回目、2 回目)
+  lake: 200, // 湖の光の道の高さのまん中(夜景の絵の湖は y 180〜228)
+  end: 30.0, // 暗くなりきる秒
   sleep: 2.0, // 暗いまま待つ(泊まる)
-  k: 0.5, // 火球の大きさ(斉射の場面の半分。遠くから見る)
   bursts: [
     [[150, 70], [262, 44], [352, 86], [420, 50]],
     [[196, 46], [300, 90], [392, 60], [100, 56]],
   ],
 };
+const ngHbT0 = (s) => NG_HB.fire[s] + NG_HB.rise + NG_HB.pause; // 開く秒
+// 光の尾の頭の位置(砲口 i から火球へ。昇るほど遅くなり、少し弓なりに)
+const ngHbTrail = (s, i, tau) => {
+  const [sx, sy] = NG_HB.ship;
+  const [bx, by] = NG_HB.bursts[s][i];
+  const x0 = sx + i * 7 + 1;
+  const y0 = sy - 3;
+  const v = Math.max(0, Math.min(1, tau / NG_HB.rise));
+  const u = 1 - (1 - v) * (1 - v);
+  return [x0 + (bx - x0) * u - Math.sin(u * Math.PI) * 8, y0 + (by - y0) * u, v];
+};
+// 火の粉(しだれ): 火球から広がって、ゆっくり落ちながら消える
+const NG_HB_EMBER = Array.from({ length: 22 }, (_, k) => [((k * 137.5) % 360) * (Math.PI / 180), 0.55 + ((k * 53) % 45) / 100]);
 const ngHb = { t: 0, done: {}, off: null };
 const NG_HANABI = {
   tile: T,
@@ -170,7 +188,8 @@ const NG_HANABI = {
       }
     };
     NG_HB.fire.forEach((f, s) => {
-      for (let i = 0; i < 4; i++) once(`b${s}_${i}`, f + NG_HB.rise + NG_HB.boom + i * NG_HB.gap, () => (api.sfx("nuke"), api.shake(0.8, 1)));
+      once(`d${s}`, f + NG_HB.thud, () => api.sfx("boom")); // 遠くの砲声(低いドン)
+      for (let i = 0; i < 4; i++) once(`b${s}_${i}`, ngHbT0(s) + NG_HB.boom + i * NG_HB.gap, () => (api.sfx("nuke"), api.shake(0.8, 1)));
     });
     once("end", NG_HB.end + NG_HB.sleep, () => {
       api.setFlag("night", false); // 朝。旅館の中は今の絵のまま、通りは西日に戻る(D705)
@@ -196,20 +215,22 @@ const NG_HANABI = {
     let tint = 0;
     let flash = 0;
     NG_HB.fire.forEach((f, s) => {
-      const t0 = f + NG_HB.rise;
+      const t0 = ngHbT0(s);
+      // 煙: 開いたあと、火球のうしろでたなびいて右へ流れる(2 回目は長く)
+      const life = s ? 12 : 8;
+      NG_HB.bursts[s].forEach(([bx, by], i) => {
+        const a = t - t0 - i * 0.18 - 1.5;
+        if (a <= 0 || a >= life) return;
+        g.globalAlpha = 0.45 * (1 - a / life);
+        ngDither(g, bx * 2 + a * 7, by * 2 + a * 3, 26 + a * 4, "#5a4a66", 0.3);
+        g.globalAlpha = 1;
+      });
       NG_HB.bursts[s].forEach(([bx, by], i) => ngBurst(g, bx * 2, by * 2, t - t0 - i * 0.18));
       const a = t - t0;
-      if (a >= 0) tint = Math.max(tint, 0.22 * Math.max(0, 1 - a / 4));
+      if (a >= 0) tint = Math.max(tint, 0.22 * Math.max(0, 1 - a / NG_HB.tint[s]));
       for (let i = 0; i < 4; i++) {
         const u = (t - t0 - i * 0.18) / 0.25;
         if (u >= 0 && u < 1) flash = Math.max(flash, 0.35 * (1 - u));
-      }
-      // 湖の上の長門が撃つ(小さな火が 2 度またたく)
-      const w = t - f;
-      if (w >= 0 && w < 0.5) {
-        const [sx, sy] = NG_HB.ship;
-        ctx.fillStyle = `rgba(255, 200, 110, ${1 - w * 2})`;
-        for (let i = 0; i < 4; i++) ctx.fillRect(X + sx + i * 7, Y + sy - 2 - (i % 2), 3, 2);
       }
     });
     if (tint > 0) {
@@ -217,6 +238,61 @@ const NG_HANABI = {
       ctx.fillRect(X, Y, 480, 228); // 空と湖(手すりの上)
     }
     ctx.drawImage(ngHb.off, 0, 0, 960, 576, X, Y, 480, 288);
+    const dot = (x, y, w, h, c) => {
+      ctx.fillStyle = c;
+      ctx.fillRect(X + Math.round(x), Y + Math.round(y), w, h);
+    };
+    NG_HB.fire.forEach((f, s) => {
+      const t0 = ngHbT0(s);
+      // 湖の上の長門が撃つ(砲口が 4 つ光る)
+      const w = t - f;
+      if (w >= 0 && w < 0.5) {
+        const [sx, sy] = NG_HB.ship;
+        for (let i = 0; i < 4; i++) dot(sx + i * 7, sy - 2 - (i % 2), 3, 2, `rgba(255, 200, 110, ${1 - w * 2})`);
+      }
+      // 光の尾: 4 本がゆっくり昇り、昇るほど細く淡くなって、頂で消える(そのあと 1 秒の間)
+      for (let i = 0; i < 4; i++) {
+        const tau = w - i * 0.06;
+        if (tau < 0 || tau > NG_HB.rise) continue;
+        for (let k = 24; k >= 0; k--) {
+          const tk = tau - k * 0.045;
+          if (tk < 0) continue;
+          const [x, y, v] = ngHbTrail(s, i, tk);
+          const al = (1 - k / 25) * (1 - 0.35 * v);
+          if (k === 0) {
+            dot(x - 1, y - 1, 3, 3, `rgba(255, 200, 120, ${0.45 * al})`); // 頭のにじみ
+            dot(x, y, 2, 2, `rgba(255, 250, 230, ${al})`);
+          } else dot(x, y, k < 8 ? 2 : 1, 1, `rgba(255, ${180 - k * 3}, ${100 - k * 2}, ${al * 0.9})`);
+        }
+      }
+      // 湖の光の道: 開いた火球の下の湖面に、横にちぎれた光がゆれる
+      NG_HB.bursts[s].forEach(([bx], i) => {
+        const a = t - t0 - i * 0.18;
+        if (a < 0 || a > (s ? 9 : 6)) return;
+        const al = 0.5 * Math.max(0, 1 - a / (s ? 9 : 6));
+        for (let r = 0; r < 9; r++) {
+          const y = NG_HB.lake - 16 + r * 4;
+          const wv = Math.sin(t * 3 + r * 1.7 + i) * 3;
+          const len = 4 + ((r * 5 + i * 3) % 7);
+          dot(bx - len / 2 + wv, y, len, 1, `rgba(255, 190, 120, ${al * (1 - r / 12)})`);
+        }
+      });
+      // 火の粉(しだれ): 2 回目は多く、長く
+      NG_HB.bursts[s].forEach(([bx, by], i) => {
+        const a = t - t0 - i * 0.18 - 0.8;
+        const life = s ? 6.5 : 4;
+        if (a < 0 || a > life) return;
+        NG_HB_EMBER.forEach(([ang, sp], k) => {
+          if (!s && k % 2) return;
+          const r = 34 * sp * (1 - Math.exp(-a * 1.4));
+          const x = bx + Math.cos(ang) * r;
+          const y = by + Math.sin(ang) * r * 0.85 + 4 * a * a;
+          if (y > 176) return; // 向こう岸より下には落とさない
+          const al = Math.min(1, 1.3 * (1 - a / life) * (0.6 + 0.4 * Math.sin(t * 9 + k)));
+          dot(x, y, 1, 1, `rgba(255, 228, 160, ${al})`);
+        });
+      });
+    });
     if (flash > 0) {
       ctx.fillStyle = `rgba(255, 250, 235, ${flash})`;
       ctx.fillRect(X, Y, 480, 288);
