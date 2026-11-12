@@ -353,11 +353,11 @@ const NG_KANSEN = {
         ctx.drawImage(im, Math.round(sx - im.width / 2), Math.round(sy - im.height - hop));
         // まだ渡していない帽子を手に持っている
         const hat = api.image("ng_hat");
-        if (hat && !api.flag("hat") && !api.flag("fired")) ctx.drawImage(hat, Math.round(sx - 14 - hat.width / 2), Math.round(sy - 22 + Math.sin(t * 3)));
+        if (hat && !api.flag("hat")) ctx.drawImage(hat, Math.round(sx - 14 - hat.width / 2), Math.round(sy - 22 + Math.sin(t * 3)));
       },
       interact(api) {
-        if (!api.flag("hat") && !api.flag("fired")) {
-          // 水兵帽を受け取って、かぶる
+        if (!api.flag("hat")) {
+          // 水兵帽を受け取って、かぶる(返したあとも、また受け取って砲塔へ入り直せる D683)
           api.hold("ng_hat", 1.6, () => {
             api.sfx("item");
             ngHatSet(api, true);

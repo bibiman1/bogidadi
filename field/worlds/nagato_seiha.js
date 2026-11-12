@@ -417,6 +417,24 @@ const ngBurst = (g, x, y, age) => {
   if (age < 1.4) ngDisc(g, x, y, R * 0.42 * (1 - age / 1.4) + 1, "#ffffff");
   g.globalAlpha = 1;
 };
+// 空に浮かぶぴーの顔(漫画でよくある、空に浮かぶ顔 作者)。今のドット絵(正面の立ち姿)を引き伸ばし、半分すけて火球に重なる。
+// 火球がふくらむと浮かび、火球といっしょに消える
+const NG_PIFACE = { k: 5, y: 64, in0: 0.5, in1: 1.4, out0: 3.4, out1: 6.0, a: 0.6 }; // EMP の砂あらしが晴れるころ(4 秒ほど)にいちばんよく見える
+const ngPiFace = (g, api, bx, by, age) => {
+  const F = NG_PIFACE;
+  if (age < F.in0 || age > F.out1) return;
+  const pi = api.image("pi");
+  if (!pi) return;
+  const u = age < F.in1 ? (age - F.in0) / (F.in1 - F.in0) : age < F.out0 ? 1 : 1 - (age - F.out0) / (F.out1 - F.out0);
+  const w = 32 * F.k;
+  const h = 22 * F.k;
+  const cy = Math.max(by, F.y) - age * 2; // ゆっくり昇る
+  g.save();
+  g.imageSmoothingEnabled = false;
+  g.globalAlpha = F.a * ngOut(Math.max(0, Math.min(1, u)));
+  g.drawImage(pi, 16, 25, 32, 22, Math.round(bx - w / 2), Math.round(cy - h / 2), w, h);
+  g.restore();
+};
 const ngEFrame = (t) => {
   const { n1, n2 } = NG_E;
   if (t < NG_E.move0) return 0;
@@ -532,6 +550,12 @@ const ngSeihaCut2 = (ctx, api, t, g, X, Y) => {
     const t0 = s === 0 ? NG_E.burst1 : NG_E.burst2;
     set.forEach(([bx, by], i) => ngBurst(g, bx, by, t2 - t0 - i * 0.18));
   });
+  // ぴーをこめた砲の火球に、ぴーの顔が浮かぶ(D682、D684)。2 番砲塔の砲は、それぞれの斉射の 2 つ目の火球
+  if (ngE.pi) {
+    const s = ngE.pi === "L" ? 0 : 1;
+    const [bx, by] = NG_BURST[s][1];
+    ngPiFace(g, api, bx, by, t2 - (s === 0 ? NG_E.burst1 : NG_E.burst2) - 0.18);
+  }
   // 空が赤くそまる
   let tint = 0;
   for (const t0 of [NG_E.burst1, NG_E.burst2]) {
@@ -576,6 +600,7 @@ const NG_SEIHA = {
   onEnter() {
     ngE.t = 0;
     ngE.done = {};
+    ngE.pi = ngPi.gun; // この斉射でぴーをこめた砲(D684)
   },
   onA: () => true,
   onB: () => true,

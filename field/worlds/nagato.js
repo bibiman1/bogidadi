@@ -7,8 +7,17 @@
 // 砲口は南(手前の画面の外)。尾栓は北の奥を向くので、こめるところは上からは見えない。
 // 砲尾を調べると、横から見た寄りの絵(souten)に切りかわる(D558)
 const ngS = { gun: "L", step: { L: 0, R: 0 }, anim: null, t: 0, ki: { x: 104, face: "e", go: null } };
+// 斉射は何度でもできる(D683)。2 回目から、揚弾機の砲弾がまれにぴーになる(D684。5 回に 1 回ほど、左右のどちらか 1 門)。
+// gun はこの斉射でぴーが上がってくる砲(なければ null)。試しのときだけ globalThis.ngPiForce("L" か "R")で決める
+const ngPi = { shots: 0, gun: null };
+const ngPiRoll = () => {
+  const f = globalThis.ngPiForce;
+  ngPi.gun = ngPi.shots < 1 ? null : f === "L" || f === "R" ? f : Math.random() < 0.2 ? (Math.random() < 0.5 ? "L" : "R") : null;
+};
 const ngReset = () => {
   ngS.step = { L: 0, R: 0 };
+  ngPi.shots = 0;
+  ngPi.gun = null;
   ngS.anim = null;
   if (typeof ngD !== "undefined") {
     ngD.sit = null;
@@ -20,6 +29,8 @@ const ngReset = () => {
 const ngDrill = (api) => {
   for (const f of ["loadedL", "loadedR", "turned", "elevated"]) api.setFlag(f, false);
   ngS.step = { L: 0, R: 0 };
+  ngPi.shots++;
+  ngPiRoll();
 };
 const NG_WALK = (c, r) => r >= 3 && r <= 9 && c >= 6 && c <= 9; // まん中の床(左右の砲のあいだ)
 const ngBreech = (gun, x) => ({
@@ -89,8 +100,8 @@ const ngSeat = (side) => ({
       NG_HOTOU.hidePlayer = false;
       api.place(S.x, 7.0 * T);
       api.face("south");
-      // 2 つの席がすむと、伝声管で注水の号令(音だけ D564)。電鈴は E 斉射の中へ移した
-      if (api.flag("turned") && api.flag("elevated") && !api.flag("fired")) {
+      // 2 つの席がすむと、伝声管で注水の号令(音だけ D564)。電鈴は E 斉射の中へ移した。撃ったあとも、こめ直せばまた撃てる(D683)
+      if (api.flag("turned") && api.flag("elevated")) {
         api.later(500, () => {
           api.sfx("tube");
           api.freeze(3.2);
@@ -297,7 +308,13 @@ const ngScene = (ctx, ox, oy, api) => {
   };
   at("bg_souten", 0, 0);
   const p = ngPose();
-  const shellAt = (x, y) => at("ng_shell", x - 1, y - 1);
+  // この砲の砲弾がぴーのときは、砲弾の代わりにぴー(歩きの絵の東向き、立ち姿。砲弾の下にそろえる D684)
+  const piShell = ngPi.gun === ngS.gun;
+  const shellAt = (x, y) => {
+    if (!piShell) return at("ng_shell", x - 1, y - 1);
+    const pi = im("pi");
+    if (pi) ctx.drawImage(pi, 15, 2 * 64 + 26, 37, 21, Math.round(ox + x + 4), Math.round(oy + y - 4), 37, 21);
+  };
   const bagsAt = (x, y) => {
     for (let i = 0; i < 4; i++) at("ng_bag", x + i * NG.bagStep - 1, y - 1);
   };
