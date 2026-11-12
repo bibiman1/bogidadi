@@ -375,7 +375,7 @@ window.BOGI_WORLDS = {
     bgm: "canon", // パッヘルベルの「カノン」(D542、todo 222)。斉射の場面だけ止める
     assetBase: "./assets/worlds/nagato/",
     images: Object.fromEntries(
-      ["bg_kohan", "bg_mise", "bg_kojo2", "ng_kojo2_bridge", "ng_ladder", "ng_post", "bg_kansen", "ng_swan", "ng_far", "ng_hat", "ki_hat", "ng_ki_e_hat", "ng_ki_w_hat", "bg_hotou", "bg_souten", "ng_cage_back", "ng_cage_front", "ng_shell", "ng_bag", "ng_plug_out", "ng_plug_open", "ng_ram", "fg_souten_drum", "fg_souten_beam", "fg_souten_floor", "ng_ki_e", "ng_ki_w", "ng_dial_turn", "ng_dial_elev", "ng_wheel_L", "ng_wheel_R", "fg_hotou_wall", "fg_hotou_dialL", "fg_hotou_dialR", "fg_hotou_stoolL", "fg_hotou_stoolR", "ng_ring", "bg_seiha", "bg_sora", "ng_e_ship"]
+      ["bg_kohan", "bg_mise", "bg_ryokan1", "bg_ryokan2", "bg_ryokan_view", "bg_kojo2", "ng_kojo2_bridge", "ng_ladder", "ng_post", "bg_kansen", "ng_swan", "ng_far", "ng_hat", "ki_hat", "ng_ki_e_hat", "ng_ki_w_hat", "bg_hotou", "bg_souten", "ng_cage_back", "ng_cage_front", "ng_shell", "ng_bag", "ng_plug_out", "ng_plug_open", "ng_ram", "fg_souten_drum", "fg_souten_beam", "fg_souten_floor", "ng_ki_e", "ng_ki_w", "ng_dial_turn", "ng_dial_elev", "ng_wheel_L", "ng_wheel_R", "fg_hotou_wall", "fg_hotou_dialL", "fg_hotou_dialR", "fg_hotou_stoolL", "fg_hotou_stoolR", "ng_ring", "bg_seiha", "bg_sora", "ng_e_ship"]
         .map((k) => [k, `${k}.png`])
         .concat([
           ["ki", "./assets/worlds/lake/ki_walk.png"],
@@ -394,9 +394,9 @@ window.BOGI_WORLDS = {
     playerSprite: { get img() { return ngKiImg(); }, cell: 64, frames: 7, footY: 17 },
     start: "kohan",
     startSpawn: "start",
-    maps: { kohan: NG_KOHAN, mise: NG_MISE, kojo: NG_KOJO, kansen: NG_KANSEN, hotou: NG_HOTOU, souten: NG_SOUTEN, seiha: NG_SEIHA, akiLake: NA_LAKE, akiShop: NA_SHOP, akiRoad: NA_ROAD, akiWhite: NA_WHITE, akiWind: NA_WIND },
+    maps: { kohan: NG_KOHAN, mise: NG_MISE, kojo: NG_KOJO, kansen: NG_KANSEN, hotou: NG_HOTOU, souten: NG_SOUTEN, seiha: NG_SEIHA, akiLake: NA_LAKE, akiShop: NA_SHOP, akiRoad: NA_ROAD, akiWhite: NA_WHITE, akiWind: NA_WIND, ryo1: NG_RYO1, ryo2: NG_RYO2, hanabi: NG_HANABI },
     onEnterWorld(api) {
-      for (const f of ["hat", "fired", "hatBack", "bought", "akiCar", "akiOpen"]) api.setFlag(f, false); // 毎回はじめから(D571)
+      for (const f of ["hat", "fired", "hatBack", "bought", "akiCar", "akiOpen", "night"]) api.setFlag(f, false); // 毎回はじめから(D571)
       ngHat.on = false;
       ngReset();
       akiReset(); // 秋の峠の落ち葉焚き(D674)
