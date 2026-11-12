@@ -1,7 +1,8 @@
 // 断片: 本栖湖の長門(湖畔の旅館。todo 282、D685〜D692)
-// 絵葉書を買ったあと、湖畔の通りの旅館の暖簾をくぐると夜。一階(土間、帳場、広間、階段)→ 二階(階段の口、客室、広縁)→
+// はじめから(斉射の前でも D703)、湖畔の通りの旅館の暖簾をくぐると夜。一階(土間、帳場、広間、階段)→ 二階(階段の口、客室、広縁)→
 // 広縁の籐椅子に座ると、縁側から湖の向こうに、長門の斉射の高空の爆発が花火のように開く(クルーが習慣で撃つ D534)。
 // 中にはだれもいない。音楽は止める。旅館を出ると、湖畔の通りも夜になる(D686)。湯殿はのれんから湯気だけ(D687)
+// 花火を見終えると、きーは泊まって朝。暗転のあと二階の広縁に戻り、夜の色が外れる(D704、D705)
 // 絵は docs/record/2026-11-12/ryokan/(Pro 3 回、75 回分)
 // field/worlds/ のファイルは index.html の順に読む。上のファイルで決めた名前(T、kGrid、ngBurst など)をそのまま使う
 "use strict";
@@ -18,8 +19,10 @@ NG_KOHAN.objects.push({
   headY: 40,
   range: 1.4 * T,
   draw() {},
-  canInteract: (api) => api.flag("bought"), // 絵葉書を買ってから(D685)
-  interact: (api) => api.warp("ryo1", "door"),
+  interact: (api) => {
+    api.setFlag("night"); // 暖簾をくぐると夜。出ると通りも夜(D686)。いつでも入れる(D703)
+    api.warp("ryo1", "door");
+  },
 });
 // 夜の通り: 全体を青く暗くし、店と旅館の灯りをともす(今の絵に色を重ねるだけ。PixelLab 0 回 D686)
 const NG_NIGHT_LIGHTS = [
@@ -79,9 +82,6 @@ const NG_RYO1 = {
     door: { x: 7.5 * T, y: 9.3 * T, facing: "north" },
     stairs: { x: 8.0 * T, y: 6.6 * T, facing: "south" }, // 二階から下りてきた所
   },
-  onEnter(api) {
-    api.setFlag("night"); // 旅館に入ると夜。出ると通りも夜(D686)
-  },
   objects: [],
   triggers: [
     { id: "out", x: 5 * T, y: 9.75 * T, w: 5 * T, h: T, run: (api) => api.warp("kohan", "ryokan") },
@@ -101,7 +101,7 @@ const NG_RYO2 = {
   drawGround: ngRyoBg("bg_ryokan2"),
   spawns: {
     stairs: { x: 10.0 * T, y: 5.6 * T, facing: "south" }, // 一階から上がってきた所
-    chair: { x: 10.4 * T, y: 7.6 * T, facing: "west" }, // 花火を見たあと
+    chair: { x: 10.4 * T, y: 7.6 * T, facing: "west" }, // 花火を見て泊まった朝(D705)
   },
   objects: [
     // 籐椅子(絵に描いてある)。上を歩かない。右の椅子に座ると、花火の場面
@@ -125,14 +125,16 @@ const NG_RYO2 = {
 
 // ---- 花火の場面(動く一枚。カメラの決まりの外)。縁側から南を向き、湖の向こうの長門と富士 ----
 // 長門が撃つ(湖の上に小さな火)→ 2 秒ほどで、空に火球が 4 つ、また 4 つ。光が先で、音は遅れて届く(D592)。
-// 遠いので EMP の砂あらしはなし、画面が少しゆらぐだけ。ぴーの顔は出さない(D685)。きーは手すりの前に後ろ姿で座る
+// 遠いので EMP の砂あらしはなし、画面が少しゆらぐだけ。ぴーの顔は出さない(D685)。きーも椅子も描かず、眺めだけ(D706)
+// 終わりは暗転を長めにして一晩たち、朝(D704、D705)
 const NG_HB = {
   ship: [214, 186], // 長門の砲(夜景の絵の上)
   fire: [2.0, 7.0], // 長門が撃つ秒
   rise: 2.0, // 撃ってから空で開くまで
   boom: 3.0, // 開いてから音が届くまで
   gap: 0.45,
-  end: 17.0,
+  end: 17.0, // 暗くなりきる秒
+  sleep: 2.0, // 暗いまま待つ(泊まる)
   k: 0.5, // 火球の大きさ(斉射の場面の半分。遠くから見る)
   bursts: [
     [[150, 70], [262, 44], [352, 86], [420, 50]],
@@ -170,7 +172,10 @@ const NG_HANABI = {
     NG_HB.fire.forEach((f, s) => {
       for (let i = 0; i < 4; i++) once(`b${s}_${i}`, f + NG_HB.rise + NG_HB.boom + i * NG_HB.gap, () => (api.sfx("nuke"), api.shake(0.8, 1)));
     });
-    once("end", NG_HB.end, () => api.warp("ryo2", "chair"));
+    once("end", NG_HB.end + NG_HB.sleep, () => {
+      api.setFlag("night", false); // 朝。旅館の中は今の絵のまま、通りは西日に戻る(D705)
+      api.warp("ryo2", "chair");
+    });
   },
   drawGround(ctx, ox, oy, img, api) {
     const t = ngHb.t;
@@ -216,9 +221,7 @@ const NG_HANABI = {
       ctx.fillStyle = `rgba(255, 250, 235, ${flash})`;
       ctx.fillRect(X, Y, 480, 288);
     }
-    // きー(手すりの前に、後ろ姿で座る)
-    const ki = api.image("ki");
-    if (ki) ctx.drawImage(ki, 0, 64, 64, 64, X + 208, Y + 236, 64, 64);
+    // きーも籐椅子も描かない。縁側からの眺めだけ(D706)
     // 入りと終わりは暗くつなぐ
     const e = Math.max(1 - t / 0.8, (t - (NG_HB.end - 1.5)) / 1.5);
     if (e > 0) {
