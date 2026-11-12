@@ -394,7 +394,7 @@ window.BOGI_WORLDS = {
     playerSprite: { get img() { return ngKiImg(); }, cell: 64, frames: 7, footY: 17 },
     start: "kohan",
     startSpawn: "start",
-    maps: { kohan: NG_KOHAN, mise: NG_MISE, kojo: NG_KOJO, kansen: NG_KANSEN, hotou: NG_HOTOU, souten: NG_SOUTEN, seiha: NG_SEIHA, akiLake: NA_LAKE, akiShop: NA_SHOP, akiRoad: NA_ROAD },
+    maps: { kohan: NG_KOHAN, mise: NG_MISE, kojo: NG_KOJO, kansen: NG_KANSEN, hotou: NG_HOTOU, souten: NG_SOUTEN, seiha: NG_SEIHA, akiLake: NA_LAKE, akiShop: NA_SHOP, akiRoad: NA_ROAD, akiWhite: NA_WHITE, akiWind: NA_WIND },
     onEnterWorld(api) {
       for (const f of ["hat", "fired", "hatBack", "bought", "akiCar", "akiOpen"]) api.setFlag(f, false); // 毎回はじめから(D571)
       ngHat.on = false;

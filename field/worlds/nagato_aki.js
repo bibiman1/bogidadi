@@ -130,9 +130,11 @@ function akiRoadGround(ctx, ox, oy, img) {
 
 // 峠の待避所の落ち葉焚き(D674): ぴーとお世話係が、いっしょに落ち葉を燃やしている。
 // きーが近づくと、お世話係が枝にさしたイモを差し出すが、ぴーが横から奪っていく(毎回。イモは道具にしない)
-const AKI_FIRE = { x: 7.6 * T, y: 9.95 * T };
-const AKI_SEWA = { x: 9.3 * T, y: 9.85 * T }; // お世話係(呪いの野犬の木の葉のぼぎ)。焚き火の東、きーの来るほう
-const AKI_PI = { x: 5.9 * T, y: 9.95 * T }; // ぴーは焚き火の西
+// 焚き火は、冬に古タイヤが積んであった所(作者「古タイヤのとこにして。古タイヤは消して焚き火にする」D680)。
+// 上の待避所(富士山を見上げる所)と離して、二つの出来事が混ざらないようにする
+const AKI_FIRE = { x: 7.4 * T, y: 45.6 * T };
+const AKI_SEWA = { x: 9.1 * T, y: 45.5 * T }; // お世話係(呪いの野犬の木の葉のぼぎ)。焚き火の東
+const AKI_PI = { x: 5.7 * T, y: 45.6 * T }; // ぴーは焚き火の西(道のきわ)
 const AKI_NEAR = 1.9 * T; // ここまで寄ると、イモを差し出す
 const AKI_AWAY = 3.6 * T; // ここまで離れると、また差し出す
 const aki = { phase: "idle", t0: 0, armed: true, pi: { x: AKI_PI.x, y: AKI_PI.y }, imo: null, hand: null };
@@ -332,12 +334,138 @@ const NA_ROAD = {
   ],
   objects: [
     ...ROAD.objects.filter((o) => o.img === "s_sign_r" || o.img === "s_sign_l"),
-    akiAt("tires", 7 * T, 45.5 * T),
     { id: "lookout", x: 8 * T, y: 8.6 * T, w: 4 * T, h: 8, range: 60, interact: (api) => api.pan(0, 2600) },
     akiBonfire(),
     akiSewa(),
     akiPi(),
-  ].concat(forest(roadMapGrid, 8, [[8, 0, 13, 14], [44, 5, 46, 10]]).map(akiTree)),
+  ].concat(forest(roadMapGrid, 8, [[8, 0, 13, 14], [43, 4, 48, 11]]).map(akiTree)),
+};
+
+// ---- 秋の湖ぞいの道(D680、todo 280): 長門の湖畔の通りの東のはし(霧が晴れたあと)から、秋の湖畔の東のはしへ下る、曲がりくねった道 ----
+// 北から入って S 字に 2 回曲がり、南西で西へ折れて秋の湖畔へ。下りきる手前で、木のあいだから茅葺きの屋根と開いたゲートが先に見える
+// (作者「あ、ここにつながるのね！という体験をさせたい」)。言葉は出さない。絵は秋の峠道の地面・木・落ち葉を使う
+const WIND_COLS = 15;
+const WIND_ROWS = 30;
+const WIND_POINTS = [[-2, 7], [3, 7], [6, 10.5], [9.5, 11], [12.5, 8], [14.5, 4.5], [17.5, 3.5], [20.5, 6], [23, 9.5], [25.5, 8.5], [26.8, 5], [27, 1], [27, -3]];
+const WIND_CURVE = catmullRom(WIND_POINTS, 0.05);
+const windGrid = (() => {
+  const g = [];
+  for (let r = 0; r < WIND_ROWS; r++) {
+    let row = "";
+    for (let c = 0; c < WIND_COLS; c++) row += WIND_CURVE.some(([pr, pc]) => Math.hypot(pr - r, pc - c) <= ROAD_WIDTH) ? "=" : ".";
+    g.push(row);
+  }
+  return g;
+})();
+const WIND_PX = WIND_CURVE.map(([r, c]) => [(c + 0.5) * T, (r + 0.5) * T]);
+// ガードレール: カーブの外側にだけ(峠道の ROAD_RAILS と同じ考え)
+const WIND_RAILS = (() => {
+  const off = ROAD_WIDTH * T + 10;
+  const runs = [];
+  let cur = [];
+  const K = 5;
+  for (let i = K; i < WIND_PX.length - K; i++) {
+    const [ax, ay] = WIND_PX[i - K];
+    const [bx, by] = WIND_PX[i];
+    const [cx, cy] = WIND_PX[i + K];
+    const tl = Math.hypot(cx - ax, cy - ay) || 1;
+    const nx = -(cy - ay) / tl;
+    const ny = (cx - ax) / tl;
+    const l1 = Math.hypot(bx - ax, by - ay) || 1;
+    const l2 = Math.hypot(cx - bx, cy - by) || 1;
+    const turn = ((bx - ax) * (cy - by) - (by - ay) * (cx - bx)) / (l1 * l2);
+    const outer = turn > 0 ? -1 : 1;
+    if (by > 2 * T && by < 25 * T && Math.abs(turn) > 0.12) {
+      if (cur.length && cur.side !== outer) {
+        runs.push(cur);
+        cur = [];
+      }
+      cur.side = outer;
+      cur.push([bx + nx * off * outer, by + ny * off * outer]);
+    } else if (cur.length) {
+      runs.push(cur);
+      cur = [];
+    }
+  }
+  if (cur.length) runs.push(cur);
+  return runs.filter((r) => r.length > 4);
+})();
+const WIND_HOUTOU = { x: 0.6 * T, y: 24.9 * T }; // 茅葺きの屋根(秋の湖畔のほうとう屋。西のはしから右半分がのぞく)
+const WIND_GATE_X = 0.7 * T; // 開いたゲート(秋の湖畔のゲートと同じ形)
+const NA_WIND = {
+  tile: T,
+  bgm: "silence",
+  bg: AKI_BG,
+  map: windGrid,
+  legend: {
+    ".": { wang: "road", solid: true }, // 道の外の枯れ草(道からは出ない)
+    "=": { wang: "road" },
+  },
+  wang: { road: { img: "aki_wang_road", size: 32, lookup: WANG16 } },
+  drawGround(ctx, ox, oy, img) {
+    if (typeof img !== "function") return;
+    const tile = img("road_asphalt");
+    if (!tile) return;
+    if (!this.pattern) this.pattern = ctx.createPattern(tile, "repeat");
+    ctx.save();
+    ctx.translate(ox, oy);
+    ctx.lineCap = "butt";
+    ctx.lineJoin = "round";
+    const line = (w, style) => {
+      ctx.strokeStyle = style;
+      ctx.lineWidth = w;
+      ctx.beginPath();
+      WIND_PX.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      ctx.stroke();
+    };
+    const dots = (rad, style) => {
+      ctx.fillStyle = style;
+      ctx.beginPath();
+      for (const [x, y] of WIND_PX.slice(1, -1)) {
+        ctx.moveTo(x + rad, y);
+        ctx.arc(x, y, rad, 0, Math.PI * 2);
+      }
+      ctx.fill();
+    };
+    line(96, AKI_GRASS);
+    dots(48, AKI_GRASS);
+    line(88, this.pattern);
+    dots(44, this.pattern);
+    ctx.restore();
+    centerLine(ctx, ox, oy, WIND_PX);
+    if (!this.leaves) this.leaves = akiLeaves(windGrid, "", { ".": 22, "=": 8 });
+    ctx.drawImage(this.leaves, Math.round(ox), Math.round(oy));
+    // 木のあいだから見える茅葺きの屋根(木はこのあとに描くので、手前にかかる)
+    const h = img("aki_houtou");
+    if (h) ctx.drawImage(h, Math.round(WIND_HOUTOU.x + ox - h.width / 2), Math.round(WIND_HOUTOU.y + oy - h.height + 8));
+    // 開いたゲート: 支柱だけが道の両わきに立ち、バーは上がっている
+    const gx = WIND_GATE_X + ox;
+    const y0 = 25.6 * T + oy;
+    const y1 = 28.4 * T + oy;
+    for (const py of [y0, y1]) {
+      ctx.fillStyle = "#8a9099";
+      ctx.fillRect(gx - 4, py - 16, 8, 18);
+      ctx.fillStyle = "#b8bec6";
+      ctx.fillRect(gx - 4, py - 16, 2, 18);
+    }
+    for (let y = y0 - 52; y < y0 - 12; y += 8) {
+      ctx.fillStyle = Math.floor((y - y0) / 8) % 2 ? "#1e1e22" : "#f0c020";
+      ctx.fillRect(gx - 3, y, 6, 8);
+    }
+    ctx.strokeStyle = "#1a1a1e";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(gx - 3.5, y0 - 52.5, 7, 41);
+    WIND_RAILS.forEach((run) => guardrail(ctx, ox, oy, run));
+  },
+  spawns: {
+    top: { x: 7.5 * T, y: 1.2 * T, facing: "south" }, // 長門の湖畔の通りから来た所
+    bottom: { x: 1.6 * T, y: 27.5 * T, facing: "east" }, // 秋の湖畔から戻ってきた所
+  },
+  triggers: [
+    { id: "toNagato", x: 4 * T, y: -T, w: 7 * T, h: 1.5 * T, warp: { map: "kohan", spawn: "east" } },
+    { id: "toLake", x: -T, y: 25 * T, w: 1.5 * T, h: 4 * T, warp: { map: "akiLake", spawn: "east" } },
+  ],
+  objects: forest(windGrid, 0, [[21, 0, 26, 4]]).map(akiTree),
 };
 
 // ---- 秋の湖畔(冬の LAKE と同じ形)。湖は凍っていない。ちゃんの車は置かない(D674)。通行止めのゲートは開いている ----
@@ -397,7 +525,7 @@ const NA_LAKE = {
   },
   triggers: [
     { id: "toRoad", x: -T, y: 16.5 * T, w: 1.6 * T, h: 3 * T, warp: { map: "akiRoad", spawn: "pass" } },
-    { id: "toNagato", x: 14.5 * T, y: 16.5 * T, w: 1.6 * T, h: 3 * T, warp: { map: "kohan", spawn: "east" } },
+    { id: "toNagato", x: 14.5 * T, y: 16.5 * T, w: 1.6 * T, h: 3 * T, warp: { map: "akiWind", spawn: "bottom" } }, // 湖ぞいの道を上って長門へ(D680)
   ],
   objects: [
     akiAt("houtou", 12 * T, 16.4 * T, { id: "houtou" }),
@@ -449,7 +577,7 @@ const NA_SHOP = Object.assign({}, SHOP, {
 
 // 長門の湖畔の通りの東のはし: 絵葉書を買ったあとだけ、秋の湖畔へ続く(D674)
 NG_KOHAN.spawns.east = { x: 48.3 * T, y: 12.6 * T, facing: "west" };
-NG_KOHAN.triggers.push({ id: "toAki", x: 49.2 * T, y: 10.5 * T, w: 1.6 * T, h: 5 * T, enabled: (api) => api.flag("bought"), warp: { map: "akiLake", spawn: "east" } });
+NG_KOHAN.triggers.push({ id: "toAki", x: 49.2 * T, y: 10.5 * T, w: 1.6 * T, h: 5 * T, enabled: (api) => api.flag("bought"), warp: { map: "akiWind", spawn: "top" } }); // 湖ぞいの道へ(D680)
 
 // 東のはしの霧と、暴走する野犬の車たち、追いかけるパトカー(D677)。
 // 絵葉書を買って店を出ると、呪いの野犬の 5 台が通りを東へ蛇行しながら暴走し、少しおくれてサイレンを鳴らしたパトカーが追う。
@@ -474,6 +602,61 @@ const akiCarAt = (c, t) => {
   if (x > AKI_FOG_X + 3.4 * T) return null;
   return { x, y: AKI_ROAD_Y + c.lane + Math.sin(e * c.f * 2.2 + c.d * 3) * c.sw, e };
 };
+// 霧の奥の真っ白な世界(D679): 霧が晴れる前に霧の奥(AKI_WHITE_X0 から X1)へ入ると、画面が白くなり、真っ白な世界に移る。
+// 右へいくら歩いても何もない(霧だけにキリがない)。左を押すと、白がほどけて通りの霧の手前に戻る。言葉も音楽も出さない
+const AKI_WHITE_X0 = 47.4 * T; // 白くなりはじめ
+const AKI_WHITE_X1 = 48.6 * T; // 真っ白になって移る
+const AKI_WHITE = "#eff0f1";
+const akiWhite = { k: 0, back: false, backT: -9 };
+// 画面全体を白でおおう(入るときは奥へ進むほど濃く、戻ったときは 0.9 秒でほどける)
+const akiWhiteVeil = (ctx, t) => {
+  const k = Math.max(akiWhite.k, 1 - (t - akiWhite.backT) / 0.9);
+  if (k <= 0) return;
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = Math.min(1, k);
+  ctx.fillStyle = AKI_WHITE;
+  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  ctx.restore();
+};
+NG_KOHAN.spawns.fog = { x: 45.6 * T, y: 12.6 * T, facing: "west" }; // 真っ白な世界から戻った所(霧の手前)
+const AKI_LOOP = 20 * T; // 真っ白な世界の、ひと回りの長さ(ここで黙って巻き戻すので、どこまでも続く)
+const NA_WHITE = {
+  tile: T,
+  bgm: "silence",
+  bg: AKI_WHITE,
+  map: kGrid(48, 12, (c, r) => r < 4 || r > 7),
+  legend: { "#": { solid: true, none: true }, ".": {} },
+  spawns: { in: { x: 14 * T, y: 6 * T, facing: "east" } },
+  objects: [],
+  triggers: [],
+  // 薄い霧のかたまりが、ゆっくり西へ流れる(歩いていることだけがわかる)
+  drawGround(ctx, ox, oy) {
+    const t = ngNow();
+    for (let i = 0; i < 11; i++) {
+      const bx = (((i * 173 - t * 14) % AKI_LOOP) + AKI_LOOP) % AKI_LOOP;
+      const by = 1.5 * T + ((i * 97) % (9 * T));
+      const r = 16 + (i % 4) * 7;
+      ctx.fillStyle = `rgba(206, 210, 216, ${0.22 + (i % 3) * 0.06})`;
+      for (let k = -1; k <= 2; k++) {
+        ctx.beginPath();
+        ctx.ellipse(Math.round(bx + k * AKI_LOOP + ox), Math.round(by + oy), r * 1.7, r * 0.6, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  },
+  input(api, dt, inp) {
+    const p = api.player();
+    if (inp.x < -0.3) {
+      akiWhite.back = true;
+      akiWhite.k = 0;
+      api.cut("kohan", "fog");
+      return;
+    }
+    if (p.x > 14 * T + AKI_LOOP) api.place(p.x - AKI_LOOP, p.y);
+  },
+};
+
 function akiFog() {
   return {
     id: "aki_fog",
@@ -485,6 +668,21 @@ function akiFog() {
       if (api.flag("akiOpen")) {
         if (akiCar.clearT < 0) akiCar.clearT = t;
       } else akiCar.clearT = -1;
+      // 霧が晴れる前に霧の奥へ入ると、画面が白くなって真っ白な世界へ(D679)。戻ってきたら白がほどける
+      if (akiWhite.back) {
+        akiWhite.back = false;
+        akiWhite.backT = t;
+      }
+      akiWhite.k = 0;
+      if (!api.flag("akiOpen") && !akiCar.on) {
+        const px = api.player().x;
+        akiWhite.k = Math.max(0, Math.min(1, (px - AKI_WHITE_X0) / (AKI_WHITE_X1 - AKI_WHITE_X0)));
+        if (px >= AKI_WHITE_X1) {
+          akiWhite.k = 1;
+          api.cut("akiWhite", "in");
+          return;
+        }
+      }
       // 絵葉書を買って、店から通りへ出てきたら、少しおいて暴走が来る(遠くのエンジン音から)
       if (api.flag("bought") && !akiCar.on && !api.flag("akiCar")) {
         api.setFlag("akiCar");
@@ -588,20 +786,22 @@ function akiFog() {
       let a = 1;
       if (api.flag("akiOpen")) a = akiCar.clearT < 0 ? 0 : Math.max(0, 1 - (t - akiCar.clearT) / 2.5);
       if (a <= 0) return;
+      // 霧は通りの上の家並みと木までかける(作者「上の方が切れてる」D679)
       const g = ctx.createLinearGradient(AKI_FOG_X + ox, 0, AKI_FOG_X + 2.4 * T + ox, 0);
       g.addColorStop(0, "rgba(226, 228, 230, 0)");
       g.addColorStop(1, `rgba(226, 228, 230, ${0.96 * a})`);
       ctx.fillStyle = g;
-      ctx.fillRect(AKI_FOG_X + ox, 8.5 * T + oy, 4.6 * T, 9 * T);
-      for (let i = 0; i < 9; i++) {
+      ctx.fillRect(AKI_FOG_X + ox, -T + oy, 5.6 * T, 20 * T);
+      for (let i = 0; i < 16; i++) {
         const px = AKI_FOG_X + ((i * 53 + t * 9) % (3.6 * T)) + 0.4 * T;
-        const py = 9.5 * T + ((i * 37) % (6.5 * T));
+        const py = 0.5 * T + ((i * 71) % (17 * T));
         const r = 18 + (i % 3) * 8;
         ctx.fillStyle = `rgba(236, 238, 240, ${0.45 * a * Math.min(1, (px - AKI_FOG_X) / (1.2 * T))})`;
         ctx.beginPath();
         ctx.ellipse(px + ox, py + oy, r * 1.6, r * 0.7, 0, 0, Math.PI * 2);
         ctx.fill();
       }
+      akiWhiteVeil(ctx, t);
     },
   };
 }
