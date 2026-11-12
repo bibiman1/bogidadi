@@ -631,6 +631,7 @@ const NG_SEIHA = {
     once("end", c2 + NG_E.end, () => {
       api.setFlag("fired");
       ngDrill(api);
+      ngDemo.on = false; // お手本は、はじめての 1 回だけ(D698)
       api.warp("kansen", "door"); // 斉射のあとは甲板へ。クルーに帽子を返す(D571)
       api.later(1200, () => api.observe()); // 見届け(斉射のあと D573)
     });

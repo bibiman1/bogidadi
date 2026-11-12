@@ -6,7 +6,7 @@
 // ======== D 2 番砲塔の中(16 × 10 マス、北を向いて見る D545)========
 // 砲口は南(手前の画面の外)。尾栓は北の奥を向くので、こめるところは上からは見えない。
 // 砲尾を調べると、横から見た寄りの絵(souten)に切りかわる(D558)
-const ngS = { gun: "L", step: { L: 0, R: 0 }, anim: null, t: 0, ki: { x: 104, face: "e", go: null } };
+const ngS = { gun: "L", step: { L: 0, R: 0 }, anim: null, t: 0, ki: { x: 104, face: "e", go: null }, demo: false, crew: null, wait: 0 };
 // 斉射は何度でもできる(D683)。2 回目から、揚弾機の砲弾がまれにぴーになる(D684。5 回に 1 回ほど、左右のどちらか 1 門)。
 // gun はこの斉射でぴーが上がってくる砲(なければ null)。試しのときだけ globalThis.ngPiForce("L" か "R")で決める
 const ngPi = { shots: 0, gun: null };
@@ -14,9 +14,16 @@ const ngPiRoll = () => {
   const f = globalThis.ngPiForce;
   ngPi.gun = ngPi.shots < 1 ? null : f === "L" || f === "R" ? f : Math.random() < 0.2 ? (Math.random() < 0.5 ? "L" : "R") : null;
 };
+// はじめての 1 回のお手本(D698、D699): 甲板で帽子をくれたお鷹ぽっぽ(crew_hawk)がきーについて砲塔に入り、
+// 左の砲をこめてみせ、きーが右の砲をこめたあと、左の席で回してみせる。世界に入るたびに on、1 回撃つと off(撃ち直し D683 では見せない)
+// crew: 砲塔の中で動いているときの { x, y, to, t0, dur }(なければ立っている所 NG_DEMO.stand)。sat: 左の席に座っている
+const ngDemo = { on: false, crew: null, sat: false };
 const ngReset = () => {
   ngS.step = { L: 0, R: 0 };
-  ngPi.shots = 0;
+  ngPi.shots = -1; // 入ったときの ngDrill で 0 になる。ぴーは 2 回目の斉射から(D684。前は 1 回目にも出ることがあった)
+  ngDemo.on = true;
+  ngDemo.crew = null;
+  ngDemo.sat = false;
   ngPi.gun = null;
   ngS.anim = null;
   if (typeof ngD !== "undefined") {
@@ -87,7 +94,8 @@ const ngSeat = (side) => ({
   interact(api) {
     const S = NG_SEAT[side];
     if (ngD.sit || ngD.bell) return;
-    if (!api.flag("loadedL") || !api.flag("loadedR") || api.flag(S.flag)) return; // 2 門こめるまで、席は使えない
+    if (ngDemo.on && side === "L") return; // お手本のときは、左の席はお鷹ぽっぽの席(D699)
+    if (!api.flag("loadedL") || !api.flag("loadedR") || api.flag(S.flag)) return api.sfx("clang"); // 2 門こめるまで、席は使えない(前は音もしなかった)
     const SIT = 3.0;
     api.freeze(SIT + 0.2);
     NG_HOTOU.hidePlayer = true;
@@ -100,18 +108,75 @@ const ngSeat = (side) => ({
       NG_HOTOU.hidePlayer = false;
       api.place(S.x, 7.0 * T);
       api.face("south");
-      // 2 つの席がすむと、伝声管で注水の号令(音だけ D564)。電鈴は E 斉射の中へ移した。撃ったあとも、こめ直せばまた撃てる(D683)
-      if (api.flag("turned") && api.flag("elevated")) {
-        api.later(500, () => {
-          api.sfx("tube");
-          api.freeze(3.2);
-          api.later(900, () => (api.sfx("flood"), api.shake(2.0, 1)));
-          api.later(3000, () => api.warp("seiha", "view"));
-        });
-      }
+      ngSeatsDone(api);
     });
   },
 });
+// 2 つの席がすむと、伝声管で注水の号令(音だけ D564)。電鈴は E 斉射の中へ移した。撃ったあとも、こめ直せばまた撃てる(D683)
+const ngSeatsDone = (api) => {
+  if (!api.flag("turned") || !api.flag("elevated")) return;
+  api.later(500, () => {
+    api.sfx("tube");
+    api.freeze(3.2);
+    api.later(900, () => (api.sfx("flood"), api.shake(2.0, 1)));
+    api.later(3000, () => api.warp("seiha", "view"));
+  });
+};
+// ---- お手本(D698、D699)の、砲塔の中のお鷹ぽっぽ ----
+// door: 奥の戸の下(きーについて入ってくる)、stand: こめてみせたあと立って待つ所(左の丸椅子の下)
+const NG_DEMO = { door: [7.7 * T, 3.6 * T], toL: [6.2 * T, 6.9 * T], stand: [6.1 * T, 8.7 * T], hop: 0.42 };
+// 今いる所(動いているときは、跳ねながら to へ)
+const ngCrewAt = () => {
+  const c = ngDemo.crew;
+  if (!c) return { x: NG_DEMO.stand[0], y: NG_DEMO.stand[1], z: 0 };
+  const u = Math.min(1, (ngNow() - c.t0) / c.dur);
+  const z = u < 1 ? Math.abs(Math.sin((u * c.dur * Math.PI) / NG_DEMO.hop)) * 7 : 0;
+  return { x: ngLerp(c.x, c.to[0], u), y: ngLerp(c.y, c.to[1], u), z };
+};
+const ngCrewGo = (from, to, dur) => (ngDemo.crew = { x: from[0], y: from[1], to, t0: ngNow(), dur });
+// 砲塔に入ったとき: お手本の流れを進める
+const ngDemoEnter = (api) => {
+  if (!ngDemo.on) return;
+  if (!api.flag("loadedL")) {
+    // きーについて入ってきて、左の砲へ跳ねていき、寄りの絵でこめてみせる
+    ngCrewGo(NG_DEMO.door, NG_DEMO.toL, 1.6);
+    api.freeze(2.6);
+    api.later(2300, () => {
+      ngS.gun = "L";
+      api.warp("souten", "view");
+    });
+  } else if (api.flag("loadedR") && !api.flag("turned")) {
+    // 右の砲をこめて戻ると、左の席に跳び乗って回してみせる
+    const S = NG_SEAT.L;
+    ngCrewGo(NG_DEMO.stand, [S.x, NG_SEAT_Y], 1.0);
+    const SIT = 3.0;
+    api.freeze(1.2 + SIT + 0.2);
+    api.later(1100, () => {
+      ngDemo.sat = true;
+      ngD.sit = { side: "L", t0: ngNow(), crew: true };
+      api.sfx("whir");
+    });
+    api.later(2300, () => api.sfx("whir"));
+    api.later(1100 + SIT * 1000, () => {
+      ngD.sit = null;
+      api.setFlag("turned");
+      ngSeatsDone(api);
+    });
+  } else ngDemo.crew = null;
+};
+// 次にすることの ▼(こめる場面と同じ印 D698)。お手本のあいだは、お鷹ぽっぽの番の所には出さない
+const ngNextMark = (api) => {
+  const o = (id) => NG_HOTOU.objects.find((x) => x.id === id);
+  let id = null;
+  if (!api.flag("loadedL")) id = ngDemo.on ? null : "breechL";
+  else if (!api.flag("loadedR")) id = "breechR";
+  else if (!api.flag("turned")) id = ngDemo.on ? null : "seatL";
+  else if (!api.flag("elevated")) id = "seatR";
+  const ob = id && o(id);
+  if (!ob) return null;
+  if (id.startsWith("seat")) return [ob.x, 157]; // 丸椅子のすぐ上(計器の箱の下)
+  return [ob.x, ob.y - (ob.headY || 0) - 6];
+};
 // D の前景(todo 217 オ)。背景から切り抜いた物を、きーと前後を比べて描きなおす(docs/record/2026-11-01/nagato_depth/cut.py)
 const NG_FG = { wall: [234, 90], dialL: [196, 122], dialR: [276, 122], stoolL: [198, 164], stoolR: [278, 164] };
 // ax, ay は物の x, y(描く場所 sx, sy から、背景の原点を出す)
@@ -139,11 +204,25 @@ const NG_HOTOU = {
     const bg = api.image("bg_hotou");
     if (bg) ctx.drawImage(bg, Math.round(ox), Math.round(oy));
   },
-  // 座ったきーと計器の小窓
+  onEnter(api) {
+    ngDemoEnter(api);
+  },
+  // 座ったきー(またはお鷹ぽっぽ)と計器の小窓、次にすることの ▼
   drawOverlay(ctx, ox, oy, t, api) {
+    // 左の席に座ったお鷹ぽっぽ(お手本 D699)。回しているあいだは小さくはずむ
+    if (ngDemo.on && ngDemo.sat) {
+      const im = api.image("crew_hawk");
+      const S = NG_SEAT.L;
+      const bob = ngD.sit && ngD.sit.crew && Math.sin(t * 14) > 0 ? 1 : 0;
+      if (im) ctx.drawImage(im, Math.round(ox + S.x - im.width / 2), Math.round(oy + NG_SEAT_Y - im.height + 4 - bob));
+    }
+    if (!ngD.sit && !ngD.bell && !(ngDemo.crew && ngNow() - ngDemo.crew.t0 < ngDemo.crew.dur)) {
+      const m = ngNextMark(api);
+      if (m) ngMark(ctx, Math.round(ox + m[0]), Math.round(oy + m[1]), t);
+    }
     if (ngD.sit) {
       const S = NG_SEAT[ngD.sit.side];
-      const ki = api.image(ngKiImg());
+      const ki = ngD.sit.crew ? null : api.image(ngKiImg());
       if (ki) ctx.drawImage(ki, 0, 64, 64, 64, Math.round(ox + S.x - 32), Math.round(oy + NG_SEAT_Y - 47), 64, 64); // 向こう向き(D134)
       const d = api.image(S.dial);
       const dx = Math.round(ox + S.dx);
@@ -163,6 +242,26 @@ const NG_HOTOU = {
     ngBreech("R", 11.3 * T),
     ngSeat("L"),
     ngSeat("R"),
+    // お鷹ぽっぽ(お手本のあいだだけ。座ったあとは drawOverlay で描く)
+    {
+      id: "crewD",
+      x: NG_DEMO.stand[0],
+      y: NG_DEMO.stand[1],
+      w: 1,
+      h: 1,
+      hidden: () => !ngDemo.on || ngDemo.sat,
+      draw(ctx, sx, sy, t, api) {
+        const p = ngCrewAt();
+        sx += p.x - this.x; // 並べる順はこの前の位置で決まるので、描く所だけ今の位置に
+        sy += p.y - this.y;
+        this.x = p.x;
+        this.y = p.y;
+        const im = api.image("crew_hawk");
+        if (!im) return;
+        const hop = p.z || ((t % 1.6) < 0.12 ? 2 : 0);
+        ctx.drawImage(im, Math.round(sx - im.width / 2), Math.round(sy - im.height - hop));
+      },
+    },
     // 奥の戸(C 甲板へ)。前は出口がなく、斉射のあとにもう一度入ると出られなかった(作者「斉射した後、砲塔にもう一度入ると装填できるが出られなくなる」)
     { id: "exit", x: 7.0 * T, y: 3.1 * T, w: 1, h: 1, headY: 30, range: 1.0 * T, draw() {}, interact: (api) => api.warp("kansen", "door") },
     // まん中の仕切り。戸の前のいちばん上の列だけ、左右に通れる(D562)。絵はきーよりいつも手前(todo 217 オ)
@@ -215,7 +314,13 @@ const NG_KI = { feet: 273, speed: 90, start: 104 };
 // 縦は下にそろえる(尾栓の ▼ から床のきーまでが一つの画面に入る)
 const NG_Z = 1.5;
 const NG_VIEW = { w: 480, h: 288 };
-const ngCamX = () => Math.max(0, Math.min(480 * NG_Z - NG_VIEW.w, ngS.ki.x * NG_Z - NG_VIEW.w / 2));
+// お手本のあいだは、お鷹ぽっぽと見ているきーのまん中を映す(D698)
+const ngCamX = () => {
+  const f = ngS.demo ? (ngS.crew.x + ngS.ki.x) / 2 : ngS.ki.x;
+  return Math.max(0, Math.min(480 * NG_Z - NG_VIEW.w, f * NG_Z - NG_VIEW.w / 2));
+};
+// お手本(D698): お鷹ぽっぽが持ち場をまわり、きーは尾栓の右で見ている。wait は手順のあいだの間(秒)
+const NG_DEMO_S = { kiX: 306, wait: 0.7, scale: 1.5 };
 const NG_CAMY = 288 * NG_Z - NG_VIEW.h;
 let ngOff = null;
 const ngLen = { open: NG.open, hoist: NG.hoist, ram1: NG.ram, ram2: NG.lower + NG.ram, close: NG.close };
@@ -289,6 +394,20 @@ const ngDraw = (ctx, ox, oy, api, t) => {
   ctx.restore();
   const sx = (x) => Math.round(ox + x * NG_Z - cx);
   const sy = (y) => Math.round(oy + y * NG_Z - NG_CAMY);
+  // お手本のお鷹ぽっぽ(今の絵をきーと同じ 1.5 倍に。民芸品なので体ごとはねて動く)
+  if (ngS.demo) {
+    const c = ngS.crew;
+    const im = api.image("crew_hawk");
+    if (im) {
+      const w = im.width * NG_DEMO_S.scale;
+      const h = im.height * NG_DEMO_S.scale;
+      const hop = c.go ? Math.round(Math.abs(Math.sin(t * 7.5)) * 9) : (t % 1.6) < 0.12 ? 2 : 0;
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(im, Math.round(sx(c.x) - w / 2), sy(NG_KI.feet) - h - hop, w, h);
+      ctx.restore();
+    }
+  }
   // きー(床の上、いちばん手前)。歩くあいだは 1 ドットはずむ
   const ki = ngS.ki;
   const kim = api.image((ki.face === "w" ? "ng_ki_w" : "ng_ki_e") + (ngHat.on ? "_hat" : "")); // 水兵帽(D571)
@@ -298,7 +417,7 @@ const ngDraw = (ctx, ox, oy, api, t) => {
   }
   // 次に動かす所
   const st = ngS.step[ngS.gun];
-  if (!ngS.anim && !ki.go && st < NG_STEPS.length) ngMark(ctx, sx(NG_STEPS[st].mark[0]), sy(NG_STEPS[st].mark[1]), t);
+  if (!ngS.demo && !ngS.anim && !ki.go && st < NG_STEPS.length) ngMark(ctx, sx(NG_STEPS[st].mark[0]), sy(NG_STEPS[st].mark[1]), t);
 };
 const ngScene = (ctx, ox, oy, api) => {
   const im = (k) => api.image(k);
@@ -360,14 +479,22 @@ const NG_SOUTEN = {
   objects: [],
   triggers: [],
   debug: () => ngS,
-  onEnter() {
+  onEnter(api) {
     ngS.anim = null;
     ngS.ki = { x: NG_KI.start, face: "e", go: null };
+    // お手本(D698): はじめての 1 回、左の砲はお鷹ぽっぽがこめ、きーは見ている
+    ngS.demo = ngDemo.on && ngS.gun === "L" && !api.flag("loadedL");
+    if (ngS.demo) {
+      ngS.step.L = 0;
+      ngS.crew = { x: NG_KI.start, go: null };
+      ngS.ki = { x: NG_DEMO_S.kiX, face: "w", go: null };
+      ngS.wait = NG_DEMO_S.wait + 0.5;
+    }
   },
   // A: きーが持ち場へ歩き、着いたら動かす
   onA(api) {
     const st = ngS.step[ngS.gun];
-    if (ngS.anim || ngS.ki.go) return true;
+    if (ngS.demo || ngS.anim || ngS.ki.go) return true; // お手本のあいだは見ているだけ
     // 手順が全部すんでいたら、A でも D へもどる
     if (st >= NG_STEPS.length) return api.warp("hotou", ngS.gun === "L" ? "fromL" : "fromR"), true;
     ngS.ki.go = { x: NG_STEPS[st].at[0], face: NG_STEPS[st].at[1] };
@@ -375,13 +502,25 @@ const NG_SOUTEN = {
   },
   // B で D へもどる(動いている間はもどらない)。手順はそのまま残る
   onB(api) {
-    if (!ngS.anim && !ngS.ki.go) api.warp("hotou", ngS.gun === "L" ? "fromL" : "fromR");
+    if (!ngS.demo && !ngS.anim && !ngS.ki.go) api.warp("hotou", ngS.gun === "L" ? "fromL" : "fromR");
     return true;
   },
   input(api, dt) {
     ngS.t += dt;
     api.place(7 * T, 4 * T);
-    const ki = ngS.ki;
+    // 動くのは、ふだんはきー、お手本のあいだはお鷹ぽっぽ。きーはお鷹ぽっぽのほうを向いて見ている
+    const ki = ngS.demo ? ngS.crew : ngS.ki;
+    if (ngS.demo) {
+      ngS.ki.face = ngS.crew.x < ngS.ki.x ? "w" : "e";
+      if (!ngS.anim && !ki.go && ngS.step.L < NG_STEPS.length) {
+        ngS.wait -= dt;
+        if (ngS.wait <= 0) {
+          const s0 = NG_STEPS[ngS.step.L];
+          ki.go = { x: s0.at[0], face: s0.at[1] };
+          ngS.wait = NG_DEMO_S.wait;
+        }
+      }
+    }
     if (ki.go) {
       const d = ki.go.x - ki.x;
       const step = NG_KI.speed * dt;

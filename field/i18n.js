@@ -27,6 +27,12 @@
     "安全ピンのリボン": "Safety-pin ribbon",
     "白紙の解答札": "Blank answer card",
     "絵葉書": "Picture postcard",
+    // 長門の帽子の輪(D701)
+    "月曜日": "Monday",
+    "火曜日": "Tuesday",
+    "水曜日": "Wednesday",
+    "木曜日": "Thursday",
+    "金曜日": "Friday",
     "ピザ": "Pizza",
     "スタンプ台紙": "Stamp card",
     "金星の天気予報": "Venus weather forecast",

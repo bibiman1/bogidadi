@@ -6,6 +6,7 @@
 // 流れ: A 湖畔に来る → 桟橋のスワンボートで B 湖の上へ(湖のまん中で遠景の一枚絵)→ C 甲板で地上ぼぎクルーから水兵帽を受け取り、かぶる
 //   → D 砲塔(こめる、席)→ E 斉射 → C 甲板でクルーに帽子を返す → B を戻る → A の土産物屋で絵葉書を買って終わり
 // 旗: hat(かぶっている)、fired(撃った)、hatBack(返した)、bought(買った)。世界に入るたびに消す(毎回はじめから)
+// 帽子は入隊と退役(D700): かぶったまま縄梯子を下りようとすると、同じ一日をくり返す
 // 背景はまだ半分を 2 倍(D563。原寸で頼み直すときは 1 枚 25 回、そのつど了承)
 const NG_CARD = "絵葉書";
 const ngHat = { on: false };
@@ -308,7 +309,36 @@ const ngCrewBlock = (id, img, x, y) => ({
   interact: (api) => api.bubble(id, "……", 1200),
 });
 const NG_CREW = { x: 17.2 * T, y: 13.4 * T };
+// 帽子の輪の曜日(D701)。n は輪に入った回数(世界に入るたびに 0)、fx は暗転の { t0, day }
+const NG_WEEK = ["月曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "金曜日"];
+const ngLoop = { n: 0, fx: null };
+// 秒: 暗くなる → 字が出る → (暗いうちに戸の前へ) → 字が消える → 明るくなる
+const NG_LOOPFX = { dark: 0.5, textIn: 0.7, warp: 1.3, textOut: 2.6, light: 2.8, end: 3.4 };
+const ngLoopDraw = (ctx) => {
+  const f = ngLoop.fx;
+  if (!f) return;
+  const L = NG_LOOPFX;
+  const e = ngNow() - f.t0;
+  if (e > L.end) return void (ngLoop.fx = null);
+  const a = e < L.dark ? e / L.dark : e < L.light ? 1 : 1 - (e - L.light) / (L.end - L.light);
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const W = ctx.canvas.width;
+  const H = ctx.canvas.height;
+  ctx.globalAlpha = Math.max(0, Math.min(1, a));
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, W, H);
+  const P = window.bogiPix;
+  if (P && e >= L.textIn && e < L.textOut) {
+    ctx.globalAlpha = 1;
+    const s = 3;
+    const w = P.width(f.day) * s;
+    P.text(ctx, f.day, Math.round((W - w) / 2 / s) * s, Math.round((H / 2 - 6 * s) / s) * s, s, "#ffffff");
+  }
+  ctx.restore();
+};
 const NG_KANSEN = {
+  drawOverlay: (ctx) => ngLoopDraw(ctx),
   tile: T,
   bg: "#c79a68",
   map: kGrid(32, 16, (c, r) => !NG_C_WALK(c, r)),
@@ -389,6 +419,22 @@ NG_KANSEN.objects.push(
     range: 1.2 * T,
     draw() {},
     interact(api) {
+      // 帽子をかぶったまま(入隊したまま)下りようとすると、同じ一日がもう一度来る(D700。ボマーの帽子の輪 D184 の裏返し)。
+      // 暗転して砲塔の戸の前へ。帽子はかぶったまま、砲はこめ直しから。字は出さない。返せば(退役)下りられる
+      if (ngHat.on) {
+        // 暗転のあいだに曜日を 1 つ出す(D701。輪に入るたびに 1 つ進む、月月火水木金金)
+        const day = NG_WEEK[ngLoop.n % NG_WEEK.length];
+        ngLoop.n++;
+        ngLoop.fx = { t0: ngNow(), day };
+        api.freeze(NG_LOOPFX.end);
+        api.later(NG_LOOPFX.warp * 1000, () => {
+          api.setFlag("fired", false);
+          ngDrill(api);
+          api.warp("kansen", "door");
+          api.freeze(NG_LOOPFX.end - NG_LOOPFX.warp);
+        });
+        return;
+      }
       ngRide.dir = "back";
       api.warp("kojo", "ride");
     },

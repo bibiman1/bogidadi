@@ -398,6 +398,7 @@ window.BOGI_WORLDS = {
     onEnterWorld(api) {
       for (const f of ["hat", "fired", "hatBack", "bought", "akiCar", "akiOpen", "night"]) api.setFlag(f, false); // 毎回はじめから(D571)
       ngHat.on = false;
+      Object.assign(ngLoop, { n: 0, fx: null }); // 帽子の輪の曜日は月曜日から(D701)
       ngReset();
       akiReset(); // 秋の峠の落ち葉焚き(D674)
       Object.assign(akiCar, { on: false, clearT: -1 }); // 東へ走る車と霧(D677)
