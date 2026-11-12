@@ -430,7 +430,7 @@ NG_KANSEN.objects.push(
         api.later(NG_LOOPFX.warp * 1000, () => {
           api.setFlag("fired", false);
           ngDrill(api);
-          api.warp("kansen", "door");
+          api.cut("kansen", "door"); // 暗転は ngLoopDraw がしている。warp の暗転を重ねると、曜日が 2 回出る(todo 297、D717)
           api.freeze(NG_LOOPFX.end - NG_LOOPFX.warp);
         });
         return;
