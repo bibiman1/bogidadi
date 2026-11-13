@@ -137,13 +137,18 @@ const AKI_SEWA = { x: 9.1 * T, y: 45.5 * T }; // お世話係(呪いの野犬の
 const AKI_PI = { x: 5.7 * T, y: 45.6 * T }; // ぴーは焚き火の西(道のきわ)
 const AKI_NEAR = 1.9 * T; // ここまで寄ると、イモを差し出す
 const AKI_AWAY = 3.6 * T; // ここまで離れると、また差し出す
-const aki = { phase: "idle", t0: 0, armed: true, pi: { x: AKI_PI.x, y: AKI_PI.y }, imo: null, hand: null };
-const akiReset = () => Object.assign(aki, { phase: "idle", t0: 0, armed: true, pi: { x: AKI_PI.x, y: AKI_PI.y }, imo: null, hand: null });
+const aki = { phase: "idle", t0: 0, armed: true, pi: { x: AKI_PI.x, y: AKI_PI.y }, imo: null, hand: null, burn: false, burnT: -99, outT: -99, spin: 0, dropT: -99, ground: false };
+const akiReset = () => Object.assign(aki, { phase: "idle", t0: 0, armed: true, pi: { x: AKI_PI.x, y: AKI_PI.y }, imo: null, hand: null, burn: false, burnT: -99, outT: -99, spin: 0, dropT: -99, ground: false });
 const AKI_OFFER = 0.7; // 枝を差し出す
 const AKI_HOLD = 0.7; // 差し出したまま
-const AKI_DASH = 0.32; // ぴーが飛んでくる
-const AKI_BACK = 0.8; // ぴーがイモを持って戻る
-const AKI_EAT = 2.6; // ぴーがイモを持っている
+const AKI_DASH = 0.32; // ぴーが焚き火を跳び越えて飛んでくる
+const AKI_BACK = 0.5; // ぴーがイモを持って、また焚き火を跳び越えて元の場所へ戻る(D728)
+const AKI_LIT = 1.1; // 戻ってから、まず体から煙が上がる。ぴーはまだ気づかない
+const AKI_NOTICE = 0.6; // ボッと全身が炎に包まれ、「！」
+const AKI_ROLL = 3.6; // ゴロゴロと速く回転して、あわてて転げ回り、火を消す。はじめのうちにイモを落とす
+const AKI_EAT = 2.2; // 火が消えて、すすけたぴーがしょんぼりしている
+const AKI_DROPF = 0.4; // 落としたイモが地面に着くまで
+const AKI_GROUND = { x: AKI_PI.x + 16, y: AKI_PI.y + 24 }; // 落ちたイモ(ぴーの南東。きーが拾える D728)
 const AKI_REDO = 0.6; // お世話係が、次のイモを焚き火にかざす
 const akiLerp = (a, b, k) => a + (b - a) * k;
 const akiEase = (k) => 1 - (1 - k) * (1 - k);
@@ -175,18 +180,49 @@ function akiBonfire() {
           go("offer");
         }
       } else if (aki.phase === "offer" && e >= AKI_OFFER) go("hold");
-      else if (aki.phase === "hold" && e >= AKI_HOLD) go("dash");
+      else if (aki.phase === "hold" && e >= AKI_HOLD) {
+        // 次のイモを奪いにいく。前に落としたイモの印は、ここで消す(地面のイモは拾うまで残る)
+        aki.dropT = -99;
+        aki.dropFrom = null;
+        aki.dropped = false;
+        go("dash");
+      }
       else if (aki.phase === "dash" && e >= AKI_DASH) {
         api.sfx("pop");
         go("back");
-      } else if (aki.phase === "back" && e >= AKI_BACK) go("eat");
+      } else if (aki.phase === "back" && e >= AKI_BACK) {
+        // 元の場所に着くと、まず体から煙が上がる
+        aki.smokeT = t;
+        go("lit");
+      } else if (aki.phase === "lit" && e >= AKI_LIT) {
+        // ボッと全身が炎に包まれる
+        aki.burn = true;
+        aki.burnT = t;
+        api.sfx("ignite");
+        api.bubble("aki_pi", "！", 900);
+        go("notice");
+      } else if (aki.phase === "notice" && e >= AKI_NOTICE) go("roll");
+      else if (aki.phase === "roll" && aki.dropT < aki.t0 && e >= AKI_ROLL * 0.12) {
+        aki.dropT = t; // 転げはじめてすぐ、イモを落とす
+        aki.dropFrom = { x: aki.pi.x + Math.round(Math.cos(aki.spin) * 16), y: aki.pi.y - 10 + Math.round(Math.sin(aki.spin) * 16) };
+      } else if (aki.phase === "roll" && e >= AKI_ROLL) {
+        aki.burn = false; // 火が消える
+        aki.outT = t;
+        api.sfx("fizzle");
+        go("eat");
+      }
       else if (aki.phase === "eat" && e >= AKI_EAT) go("redo");
       else if (aki.phase === "redo" && e >= AKI_REDO) go("idle");
       // 枝の先のイモと、ぴーの位置
       const fire = akiOverFire();
       let imo = fire;
       let pi = { x: AKI_PI.x, y: AKI_PI.y };
-      const k = Math.min(1, e / ({ offer: AKI_OFFER, dash: AKI_DASH, back: AKI_BACK, redo: AKI_REDO }[aki.phase] || 1));
+      const k = Math.min(1, e / ({ offer: AKI_OFFER, dash: AKI_DASH, back: AKI_BACK, roll: AKI_ROLL, redo: AKI_REDO }[aki.phase] || 1));
+      if (aki.dropT >= 0 && t - aki.dropT >= AKI_DROPF && !aki.dropped) {
+        aki.ground = true; // 地面に着いたイモ(1 つだけ。拾うまで残る)
+        aki.dropped = true;
+        api.sfx("pop");
+      }
       const piAt = { x: (aki.to || fire).x - 6, y: (aki.to || fire).y + 30 }; // イモの下(ぴーはイモに跳びつく)
       if (aki.phase === "offer") imo = { x: akiLerp(fire.x, aki.to.x, akiEase(k)), y: akiLerp(fire.y, aki.to.y, akiEase(k)) };
       else if (aki.phase === "hold") imo = aki.to;
@@ -194,20 +230,41 @@ function akiBonfire() {
         imo = aki.to;
         pi = { x: akiLerp(AKI_PI.x, piAt.x, akiEase(k)), y: akiLerp(AKI_PI.y, piAt.y, akiEase(k)) - Math.sin(k * Math.PI) * 18 };
       } else if (aki.phase === "back") {
-        pi = { x: akiLerp(piAt.x, AKI_PI.x, k), y: akiLerp(piAt.y, AKI_PI.y, k) - Math.abs(Math.sin(k * Math.PI * 3)) * 5 };
+        // イモを持って、また焚き火を跳び越えて戻る(D728)
+        pi = { x: akiLerp(piAt.x, AKI_PI.x, k), y: akiLerp(piAt.y, AKI_PI.y, k) - Math.sin(k * Math.PI) * 20 };
         imo = null;
-      } else if (aki.phase === "eat") imo = null;
+      } else if (aki.phase === "notice") {
+        pi = { x: AKI_PI.x, y: AKI_PI.y - (k < 0.3 ? Math.sin((k / 0.3) * Math.PI) * 6 : 0) }; // びくっと跳ねる
+        imo = null;
+      } else if (aki.phase === "roll") {
+        // ゴロゴロと転がる: 東へ転がって西へ転がりもどる。転がった道のりの分だけ体が回る(体の半径 11)
+        // あわてて、行ったり来たり 2 往復。向きの変わり目は不ぞろいに(パニック)
+        const ph = Math.PI * 4 * k + 0.8 * Math.sin(Math.PI * 6 * k);
+        const sw = -Math.sin(ph);
+        const dx = sw * (sw < 0 ? 38 : 12); // 西(焚き火から離れる向き)へ大きく、東へは焚き火に届かない幅で
+        const vx = dx - (aki.lastDx || 0);
+        aki.lastDx = dx;
+        // 回転は速く(転がる向きに 1 秒に 3 回転ほど)
+        aki.spin = (aki.spin || 0) + (vx >= 0 ? 1 : -1) * Math.PI * 6 * dt;
+        pi = { x: AKI_PI.x - 10 * Math.min(1, k * 6, (1 - k) * 6) + dx, y: AKI_PI.y + 4 - Math.abs(Math.sin(e * 13)) * 3 }; // 少し西に寄って転がる(焚き火に触れない)
+        imo = null;
+      } else if (aki.phase === "lit") imo = null;
+      else if (aki.phase === "eat") imo = null;
       else if (aki.phase === "redo") imo = null;
       aki.pi = pi;
       aki.imo = imo;
-      aki.withPi = aki.phase === "back" || aki.phase === "eat";
+      aki.withPi = aki.phase === "back" || aki.phase === "lit" || aki.phase === "notice" || (aki.phase === "roll" && aki.dropT < aki.t0);
+      if (aki.phase !== "roll") {
+        aki.spin = 0;
+        aki.lastDx = 0;
+      }
       // 枝: 奪われたあとは空の枝が残り、ゆっくり焚き火の上へ戻す
-      if (aki.phase === "back" || aki.phase === "eat") aki.tip = aki.to;
+      if (["back", "lit", "notice", "roll", "eat"].includes(aki.phase)) aki.tip = aki.to;
       else if (aki.phase === "redo") aki.tip = { x: akiLerp(aki.to.x, fire.x, k), y: akiLerp(aki.to.y, fire.y, k) };
       else aki.tip = imo;
       aki.newImo = aki.phase === "redo" ? k : 1; // 次のイモは、枝が焚き火の上に戻るころ現れる
       // 走るぴーにはじかれる(当たっても止めない)
-      if (aki.phase === "dash" || aki.phase === "back") {
+      if (aki.phase === "dash" || aki.phase === "roll" || aki.phase === "back") {
         const dx = pl.x - pi.x;
         const dy = pl.y - pi.y;
         const kk = Math.hypot(dx, dy);
@@ -220,6 +277,7 @@ function akiBonfire() {
     draw(ctx, sx, sy, t, api) {
       const im = api.image("aki_fire");
       if (im) ctx.drawImage(im, Math.round(sx - im.width / 2), Math.round(sy - 40));
+      akiBigFlame(ctx, sx, sy, t, api); // 絵の炎の上に、大きくゆれる炎を重ねる(D727)
       // 炎のゆらぎ(小さな火の粉が上がって消える)と、細い煙
       for (let i = 0; i < 4; i++) {
         const k = (t * 0.9 + i * 0.25) % 1;
@@ -238,6 +296,111 @@ function akiBonfire() {
       }
     },
   };
+}
+// 焚き火の大きな炎(D727)。炎の舌 3 本(まんなかが高い)。根もとは太く先は細く、左右にゆれて背が伸び縮みする
+function akiBigFlame(ctx, sx, sy, t, api) {
+  const tongue = (x, base, h, w, lean, ph) => {
+    for (let j = 0; j < h; j++) {
+      const k = j / h;
+      const ww = Math.max(1, Math.round(w * (1 - Math.pow(k, 1.7))));
+      const cx = x + lean * Math.pow(k, 1.5) + Math.sin(t * 6 + ph + k * 4) * k * 1.2;
+      ctx.fillStyle = k < 0.08 ? "#d8482a" : k < 0.5 ? "#f39a2c" : k < 0.85 ? "#ffd65e" : "#ffeea0";
+      ctx.fillRect(Math.round(cx - ww / 2), base - j, ww, 1);
+      if (ww >= 5 && k > 0.05 && k < 0.55) {
+        ctx.fillStyle = "#ffe27a";
+        ctx.fillRect(Math.round(cx - ww / 6), base - j, Math.max(1, Math.round(ww / 3)), 1);
+      }
+    }
+  };
+  const sway = Math.sin(t * 2.3) * 3 + Math.sin(t * 5.1) * 1.2;
+  const base = Math.round(sy - 18);
+  tongue(sx - 7, base + 2, 12 + Math.round(3 * Math.sin(t * 7.3)), 7, sway * 0.8 - 2, 1);
+  tongue(sx + 9, base + 1, 11 + Math.round(3 * Math.sin(t * 6.1 + 1)), 7, sway * 0.8 + 2, 2);
+  tongue(sx + 1, base, 22 + Math.round(4 * Math.sin(t * 5.3)), 12, sway, 0);
+  // 焼いているイモは、炎に隠れないよう手前に描き直す
+  if (aki.imo && (aki.phase === "idle" || aki.phase === "offer")) akiImo(ctx, api, aki.imo.x + (sx - AKI_FIRE.x), aki.imo.y + (sy - AKI_FIRE.y));
+}
+// 燃える前の煙: 体のあちこちから細い煙が上がり、だんだん濃くなる
+function akiSmolder(ctx, sx, sy, e, t) {
+  const g = Math.min(1, e / 0.8);
+  for (let i = 0; i < 9; i++) {
+    const k = (t * 0.9 + i / 9) % 1;
+    const x0 = sx - 12 + (i % 3) * 12;
+    ctx.fillStyle = `rgba(92, 88, 86, ${0.9 * g * (1 - k * 0.7)})`;
+    ctx.beginPath();
+    ctx.arc(x0 + Math.sin(t * 3 + i) * 2 + k * 5, sy - 18 - k * 30 * (0.5 + g * 0.5), 2.5 + k * 5 * g, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+// 全身にまとう炎。体の楕円(横 18、縦 11)のふちから、炎の舌がいつも上へ立つ。体には炎の照りを重ねる
+function akiBodyFire(ctx, cx, cy, t, g, spin) {
+  if (g <= 0) return;
+  const tongue = (x, base, h, w) => {
+    for (let j = 0; j < h; j++) {
+      const k = j / h;
+      const ww = Math.max(1, Math.round(w * (1 - k * k)));
+      ctx.fillStyle = k < 0.15 ? "#d8482a" : k < 0.6 ? "#f39a2c" : "#ffd65e";
+      ctx.fillRect(Math.round(x + Math.sin(t * 9 + x) * k * 1.5 - ww / 2), base - j, ww, 1);
+    }
+  };
+  // 体の照り
+  ctx.save();
+  ctx.translate(Math.round(cx), Math.round(cy));
+  ctx.rotate(spin);
+  ctx.fillStyle = `rgba(255, 130, 40, ${0.45 * g})`;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 18, 11, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  // ふちの炎(下半分のふちからは短く、上は高く)
+  const N = 12;
+  const pts = [];
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2;
+    const ex = Math.cos(a) * 17;
+    const ey = Math.sin(a) * 10;
+    pts.push({ x: cx + ex * Math.cos(spin) - ey * Math.sin(spin), y: cy + ex * Math.sin(spin) + ey * Math.cos(spin), i });
+  }
+  pts.sort((p, q) => q.y - p.y); // 下のふちから先に描き、上の炎を手前に
+  for (const p of pts) {
+    const up = (cy + 10 - p.y) / 20; // 0(下のふち)〜1(上のふち)
+    const h = Math.round((5 + up * 12 + 4 * Math.abs(Math.sin(t * 11 + p.i * 1.9))) * g);
+    if (h < 2) continue;
+    tongue(p.x, Math.round(p.y + 2), h, Math.max(3, Math.round(7 * g)));
+  }
+  for (let i = 0; i < 6; i++) {
+    const k = (t * 1.7 + i / 6) % 1;
+    ctx.fillStyle = `rgba(255, ${170 + i * 14}, 60, ${(1 - k) * g})`;
+    ctx.fillRect(Math.round(cx - 14 + i * 6 + Math.sin(t * 4 + i) * 3), Math.round(cy - 24 - k * 22), 1, 1);
+  }
+}
+// 火が消えたあとの煙(D726)
+function akiSmoke(ctx, sx, sy, e) {
+  if (e < 0 || e > 1.6) return;
+  for (let i = 0; i < 4; i++) {
+    const k = Math.min(1, (e + i * 0.12) / 1.6);
+    ctx.fillStyle = `rgba(150, 146, 140, ${0.55 * (1 - k)})`;
+    ctx.beginPath();
+    ctx.arc(sx - 8 + i * 5 + k * 6, sy - 30 - k * 34, 2 + k * 6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+// すすけたぴー(D726)。黒っぽく重ねた絵を、濃さ 8 段で取っておく(canvas の filter は使わない。古い Safari にない)
+const akiSootCache = {};
+function akiSoot(img, a) {
+  const lv = Math.max(1, Math.min(8, Math.round(a * 8)));
+  const key = lv;
+  if (akiSootCache[key] && akiSootCache[key].src === img) return akiSootCache[key].cv;
+  const cv = document.createElement("canvas");
+  cv.width = img.width;
+  cv.height = img.height;
+  const c = cv.getContext("2d");
+  c.drawImage(img, 0, 0);
+  c.globalCompositeOperation = "source-atop";
+  c.fillStyle = `rgba(40, 32, 30, ${0.32 * (lv / 8)})`;
+  c.fillRect(0, 0, cv.width, cv.height);
+  akiSootCache[key] = { src: img, cv };
+  return cv;
 }
 // 枝にさしたイモ(手で描いた絵の、イモのところだけ)
 const akiImo = (ctx, api, x, y, a = 1) => {
@@ -276,6 +439,27 @@ function akiSewa() {
     },
   };
 }
+// 落ちたイモ(D728)。きーが調べると、その場で食べる。どうぐには入らない
+function akiGroundImo() {
+  return {
+    id: "aki_ground_imo",
+    x: AKI_GROUND.x,
+    y: AKI_GROUND.y,
+    w: 1,
+    h: 1,
+    headY: 14,
+    range: 30,
+    hidden: () => !aki.ground,
+    draw(ctx, sx, sy, t, api) {
+      akiImo(ctx, api, sx, sy - 3);
+    },
+    interact(api) {
+      aki.ground = false;
+      api.sfx("pop");
+      api.mutter("もぐもぐ", 1800);
+    },
+  };
+}
 function akiPi() {
   return {
     id: "aki_pi",
@@ -295,13 +479,44 @@ function akiPi() {
       // 向き: 飛んでいくときは東、戻るときは西、ふだんは正面(焚き火を見ている)
       const row = aki.phase === "dash" ? 2 : aki.phase === "back" ? 3 : 0;
       const f = run ? Math.floor(t * 12) % 7 : 0;
-      ctx.drawImage(pi, f * 64, row * 64, 64, 64, Math.round(sx - 32), Math.round(sy - 47), 64, 64);
-      if (aki.withPi) akiImo(ctx, api, sx + (aki.phase === "back" ? -10 : 0), sy - 26 + (aki.phase === "eat" ? Math.round(Math.sin(t * 5)) : 0));
+      // 火が消えたあと、しばらくすすける(D726)
+      const soot = Math.max(0, 1 - (t - aki.outT) / 4.5);
+      const src = soot > 0 ? akiSoot(pi, soot) : pi;
+      ctx.save();
+      if (aki.spin) {
+        // 体のまんなか(絵の中で y 26〜47 の楕円)を軸に回す
+        ctx.translate(Math.round(sx), Math.round(sy - 10));
+        ctx.rotate(aki.spin);
+        ctx.translate(-Math.round(sx), -Math.round(sy - 10));
+      }
+      ctx.drawImage(src, f * 64, row * 64, 64, 64, Math.round(sx - 32), Math.round(sy - 47), 64, 64);
+      if (aki.withPi && aki.phase !== "roll") akiImo(ctx, api, sx + (aki.phase === "back" ? -10 : 0), sy - 26 + (aki.phase === "lit" ? Math.round(Math.sin(t * 5)) : 0));
+      ctx.restore();
+      // 燃える前の煙(D729)
+      if (aki.phase === "lit") akiSmolder(ctx, sx, sy, t - aki.smokeT, t);
+      // 全身にまとう炎(D729)。ボッと一気につき、転がるうちに小さくなって消える
+      if (aki.burn) {
+        const kr = aki.phase === "roll" ? Math.min(1, (t - aki.t0) / AKI_ROLL) : 0;
+        const pop = Math.min(1, (t - aki.burnT) / 0.12);
+        akiBodyFire(ctx, sx, sy - 10, t, pop * (kr < 0.45 ? 1 : Math.max(0.15, 1 - (kr - 0.45) / 0.55)), aki.spin);
+      }
+      // 転げはじめは、まだイモを持っている
+      if (aki.withPi && aki.phase === "roll") akiImo(ctx, api, sx + Math.round(Math.cos(aki.spin) * 16), sy - 10 + Math.round(Math.sin(aki.spin) * 16));
+      // 落としたイモが、地面へ弧を描いて飛ぶ
+      const fe = t - aki.dropT;
+      if (aki.dropFrom && fe >= 0 && fe < AKI_DROPF) {
+        const u = fe / AKI_DROPF;
+        akiImo(ctx, api, akiLerp(aki.dropFrom.x, AKI_GROUND.x, u) + (sx - this.x), akiLerp(aki.dropFrom.y, AKI_GROUND.y - 3, u) - Math.sin(u * Math.PI) * 14 + (sy - this.y));
+      }
+      akiSmoke(ctx, sx, sy, t - aki.outT);
     },
   };
 }
 
 const NA_ROAD = {
+  onEnter() {
+    akiReset(); // 入るたびに落ち葉焚きをはじめから。落ちたイモも消える(D728)
+  },
   tile: T,
   bgm: "silence", // 秋の寄り道では、長門のカノンを流さない(作者「カノンは流さなくていい」)
   bg: AKI_BG,
@@ -338,6 +553,7 @@ const NA_ROAD = {
     akiBonfire(),
     akiSewa(),
     akiPi(),
+    akiGroundImo(),
   ].concat(forest(roadMapGrid, 8, [[8, 0, 13, 14], [43, 4, 48, 11]]).map(akiTree)),
 };
 
