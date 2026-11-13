@@ -147,6 +147,8 @@ const AKI_LIT = 1.1; // 戻ってから、まず体から煙が上がる。ぴ�
 const AKI_NOTICE = 0.6; // ボッと全身が炎に包まれ、「！」
 const AKI_ROLL = 3.6; // ゴロゴロと速く回転して、あわてて転げ回り、火を消す。はじめのうちにイモを落とす
 const AKI_EAT = 2.2; // 火が消えて、すすけたぴーがしょんぼりしている
+const AKI_KEEP = 2.6; // 燃えなかった回: ぴーがイモを持って揺れている(版 570 までと同じ。イモはそのまま消える)
+const AKI_BURN_P = 1 / 6; // ぴーが燃えるのは 6 回に 1 回くらい(D730、くじは最初から)
 const AKI_DROPF = 0.4; // 落としたイモが地面に着くまで
 const AKI_GROUND = { x: AKI_PI.x + 16, y: AKI_PI.y + 24 }; // 落ちたイモ(ぴーの南東。きーが拾える D728)
 const AKI_REDO = 0.6; // お世話係が、次のイモを焚き火にかざす
@@ -185,15 +187,20 @@ function akiBonfire() {
         aki.dropT = -99;
         aki.dropFrom = null;
         aki.dropped = false;
+        aki.willBurn = Math.random() < AKI_BURN_P; // 今回燃えるかのくじ(D730)
         go("dash");
       }
       else if (aki.phase === "dash" && e >= AKI_DASH) {
         api.sfx("pop");
         go("back");
       } else if (aki.phase === "back" && e >= AKI_BACK) {
-        // 元の場所に着くと、まず体から煙が上がる
-        aki.smokeT = t;
-        go("lit");
+        if (aki.willBurn) {
+          // 元の場所に着くと、まず体から煙が上がる
+          aki.smokeT = t;
+          go("lit");
+        } else go("keep"); // 燃えなかった回は、イモを持ち逃げ
+      } else if (aki.phase === "keep" && e >= AKI_KEEP) {
+        go("redo");
       } else if (aki.phase === "lit" && e >= AKI_LIT) {
         // ボッと全身が炎に包まれる
         aki.burn = true;
@@ -248,18 +255,18 @@ function akiBonfire() {
         aki.spin = (aki.spin || 0) + (vx >= 0 ? 1 : -1) * Math.PI * 6 * dt;
         pi = { x: AKI_PI.x - 10 * Math.min(1, k * 6, (1 - k) * 6) + dx, y: AKI_PI.y + 4 - Math.abs(Math.sin(e * 13)) * 3 }; // 少し西に寄って転がる(焚き火に触れない)
         imo = null;
-      } else if (aki.phase === "lit") imo = null;
+      } else if (aki.phase === "lit" || aki.phase === "keep") imo = null;
       else if (aki.phase === "eat") imo = null;
       else if (aki.phase === "redo") imo = null;
       aki.pi = pi;
       aki.imo = imo;
-      aki.withPi = aki.phase === "back" || aki.phase === "lit" || aki.phase === "notice" || (aki.phase === "roll" && aki.dropT < aki.t0);
+      aki.withPi = aki.phase === "back" || aki.phase === "lit" || aki.phase === "keep" || aki.phase === "notice" || (aki.phase === "roll" && aki.dropT < aki.t0);
       if (aki.phase !== "roll") {
         aki.spin = 0;
         aki.lastDx = 0;
       }
       // 枝: 奪われたあとは空の枝が残り、ゆっくり焚き火の上へ戻す
-      if (["back", "lit", "notice", "roll", "eat"].includes(aki.phase)) aki.tip = aki.to;
+      if (["back", "lit", "keep", "notice", "roll", "eat"].includes(aki.phase)) aki.tip = aki.to;
       else if (aki.phase === "redo") aki.tip = { x: akiLerp(aki.to.x, fire.x, k), y: akiLerp(aki.to.y, fire.y, k) };
       else aki.tip = imo;
       aki.newImo = aki.phase === "redo" ? k : 1; // 次のイモは、枝が焚き火の上に戻るころ現れる
@@ -490,7 +497,7 @@ function akiPi() {
         ctx.translate(-Math.round(sx), -Math.round(sy - 10));
       }
       ctx.drawImage(src, f * 64, row * 64, 64, 64, Math.round(sx - 32), Math.round(sy - 47), 64, 64);
-      if (aki.withPi && aki.phase !== "roll") akiImo(ctx, api, sx + (aki.phase === "back" ? -10 : 0), sy - 26 + (aki.phase === "lit" ? Math.round(Math.sin(t * 5)) : 0));
+      if (aki.withPi && aki.phase !== "roll") akiImo(ctx, api, sx + (aki.phase === "back" ? -10 : 0), sy - 26 + (aki.phase === "lit" || aki.phase === "keep" ? Math.round(Math.sin(t * 5)) : 0));
       ctx.restore();
       // 燃える前の煙(D729)
       if (aki.phase === "lit") akiSmolder(ctx, sx, sy, t - aki.smokeT, t);
