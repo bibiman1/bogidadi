@@ -57,30 +57,79 @@ const ngRnd = (i) => {
   return s - Math.floor(s);
 };
 const ngOut = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : 1 - (1 - u) * (1 - u));
-// ドットの丸(1 ドットずつの横線で塗る)
+// ドットの丸(1 ドットずつの横線で塗る)。横線はひとつの道すじに集めて 1 回で塗る(GPU では塗る回数が多いと、ときどき数秒止まった。11-13 版 566)
 const ngDisc = (g, cx, cy, r, col) => {
   const R = Math.round(r);
   if (R < 1) return;
   g.fillStyle = col;
   const x0 = Math.round(cx);
   const y0 = Math.round(cy);
+  g.beginPath();
   for (let y = -R; y <= R; y++) {
     const w = Math.floor(Math.sqrt(R * R + R * 0.8 - y * y));
-    if (w >= 0) g.fillRect(x0 - w, y0 + y, w * 2 + 1, 1);
+    if (w >= 0) g.rect(x0 - w, y0 + y, w * 2 + 1, 1);
   }
+  g.fill();
 };
 // 点描の丸(ふちをぼかす。d は 0〜1 の濃さ。市松もようの間引き)
+// 1 ドットずつ塗ると、大きな丸(旅館の花火の赤い殻)で 1 こまに数万回になって重い(11-13、監督「PCで見たときに処理が遅い」)。
+// 市松の間引きを 4 × 4 の模様にして、丸の中心にそろえ、横線をひとつの道すじに集めて 1 回で塗る(塗られるドットは前と同じ)
 const ngDither = (g, cx, cy, r, col, d) => {
   const R = Math.round(r);
   if (R < 1 || d <= 0) return;
-  g.fillStyle = col;
   const x0 = Math.round(cx);
   const y0 = Math.round(cy);
   const step = d > 0.7 ? 1 : d > 0.4 ? 2 : 4;
+  if (R < 16 && step > 1) {
+    // 小さい丸は前のとおり 1 ドットずつ(砲煙のつやなど。模様や道すじにすると、GPU ではかえって遅かった。11-13)
+    g.fillStyle = col;
+    for (let y = -R; y <= R; y++) {
+      const w = Math.floor(Math.sqrt(R * R + R * 0.8 - y * y));
+      for (let x = -w; x <= w; x++) if ((((x + y) % step) + step) % step === 0 && (step < 4 || (y & 1) === 0)) g.fillRect(x0 + x, y0 + y, 1, 1);
+    }
+    return;
+  }
+  g.fillStyle = step === 1 ? col : ngDitherPat(g, col, step, x0, y0);
+  g.beginPath();
   for (let y = -R; y <= R; y++) {
     const w = Math.floor(Math.sqrt(R * R + R * 0.8 - y * y));
-    for (let x = -w; x <= w; x++) if ((((x + y) % step) + step) % step === 0 && (step < 4 || (y & 1) === 0)) g.fillRect(x0 + x, y0 + y, 1, 1);
+    if (w >= 0) g.rect(x0 - w, y0 + y, w * 2 + 1, 1);
   }
+  g.fill();
+};
+// 点描の模様(色と間引きごとに 1 枚の 4 × 4)。中心 (x0, y0) からの x + y が step の倍数のドット(step 4 は偶数の行だけ)
+const ngDitherTiles = {};
+const ngDitherM = new DOMMatrix();
+const ngDitherPat = (g, col, step, x0, y0) => {
+  const k = `${col}|${step}`;
+  if (!ngDitherTiles[k]) {
+    const c = document.createElement("canvas");
+    c.width = 4;
+    c.height = 4;
+    const cg = c.getContext("2d");
+    cg.fillStyle = col;
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) if ((x + y) % step === 0 && (step < 4 || (y & 1) === 0)) cg.fillRect(x, y, 1, 1);
+    ngDitherTiles[k] = c;
+  }
+  // 模様は色と間引きごとに 1 度だけ作り、位置だけ合わせなおす(呼ぶたびに作ると、GPU では絵を送りなおして重い)
+  const pk = `${k}|p`;
+  if (!ngDitherTiles[pk]) ngDitherTiles[pk] = g.createPattern(ngDitherTiles[k], "repeat");
+  const pat = ngDitherTiles[pk];
+  ngDitherM.e = x0;
+  ngDitherM.f = y0;
+  pat.setTransform(ngDitherM);
+  return pat;
+};
+// ngRnd の値を覚えておく(煙のでこぼこで、同じ格子の点を毎こま何万回も求めていた。11-13)。値は ngRnd と同じ
+const ngRndMemoTab = new Map();
+const ngRndMemo = (i) => {
+  let v = ngRndMemoTab.get(i);
+  if (v === undefined) {
+    if (ngRndMemoTab.size > 200000) ngRndMemoTab.clear();
+    v = ngRnd(i);
+    ngRndMemoTab.set(i, v);
+  }
+  return v;
 };
 // なめらかな乱れ(0〜1)。炎のふちと煙のでこぼこに使う
 const ngNoise = (x, y) => {
@@ -88,7 +137,7 @@ const ngNoise = (x, y) => {
   const yi = Math.floor(y);
   const u = (x - xi) * (x - xi) * (3 - 2 * (x - xi));
   const v = (y - yi) * (y - yi) * (3 - 2 * (y - yi));
-  const h = (a, b) => ngRnd(a * 57 + b * 131);
+  const h = (a, b) => ngRndMemo(a * 57 + b * 131);
   return (h(xi, yi) * (1 - u) + h(xi + 1, yi) * u) * (1 - v) + (h(xi, yi + 1) * (1 - u) + h(xi + 1, yi + 1) * u) * v;
 };
 // 砲煙: 黒煙がもうもうと湧く(作者「その後のもうもうとして黒煙」、写真 ref_fire.png)。たくさんの玉が、炎の中から湧いてふくらみ、ゆっくり流れる
@@ -339,14 +388,23 @@ const ngEmp = (ctx, src, X, Y, k) => {
   }
   // 走査線
   ctx.fillStyle = `rgba(0,0,0,${0.22 * k})`;
-  for (let y = 0; y < 288; y += 2) ctx.fillRect(X, Y + y, 480, 1);
+  ctx.beginPath();
+  for (let y = 0; y < 288; y += 2) ctx.rect(X, Y + y, 480, 1);
+  ctx.fill();
   // 砂のノイズ
+  // 色ごとに道すじを集めて 4 回で塗る(1 粒ずつ塗ると、GPU では重い。11-13 版 566)
   const m = Math.round(2600 * k);
+  const SAND = ["#ffffff", "#9a9aa8", "#ff6070", "#60e0ff"];
+  const paths = SAND.map(() => new Path2D());
   for (let i = 0; i < m; i++) {
     const v = Math.random();
-    ctx.fillStyle = v < 0.45 ? "#ffffff" : v < 0.8 ? "#9a9aa8" : v < 0.9 ? "#ff6070" : "#60e0ff";
-    ctx.fillRect(X + Math.floor(Math.random() * 480), Y + Math.floor(Math.random() * 288), 1 + (Math.random() < 0.2 ? 1 : 0), 1);
+    const c = v < 0.45 ? 0 : v < 0.8 ? 1 : v < 0.9 ? 2 : 3;
+    paths[c].rect(X + Math.floor(Math.random() * 480), Y + Math.floor(Math.random() * 288), 1 + (Math.random() < 0.2 ? 1 : 0), 1);
   }
+  SAND.forEach((c, i) => {
+    ctx.fillStyle = c;
+    ctx.fill(paths[i]);
+  });
   // ときどき、一行まるごと白く光る
   if (Math.random() < 0.3 * k) {
     ctx.fillStyle = `rgba(255,255,255,${0.5 * k})`;
@@ -357,9 +415,13 @@ const ngEmp = (ctx, src, X, Y, k) => {
   if (EP <= 1) return;
   const a = Math.min(1, k * (EP - 1) * 0.6);
   if (a <= 0.02) return;
-  const nc = ngEmpNoise.c || (ngEmpNoise.c = document.createElement("canvas"));
-  nc.width = 480;
-  nc.height = 288;
+  if (!ngEmpNoise.c) {
+    // 1 度だけ作る(毎こま大きさを設定しなおすと作り直しになって重い。11-13 版 566)
+    ngEmpNoise.c = document.createElement("canvas");
+    ngEmpNoise.c.width = 480;
+    ngEmpNoise.c.height = 288;
+  }
+  const nc = ngEmpNoise.c;
   const ng = nc.getContext("2d");
   const im = ng.createImageData(480, 288);
   const d = im.data;
@@ -474,19 +536,25 @@ const ngSeihaCut1 = (ctx, img, api, t, g, X, Y) => {
   ctx.restore();
   // 水面の衝撃波(作者「斉射の波紋はもっと激しく」D569): 円盤としぶきの奥の半分は艦のうしろ、手前は艦の映りの上
   const pow = 1.6; // 強さ(作者「２でいい。激しさがつたわるから。」)
-  const wg = ngE.wave || (ngE.wave = document.createElement("canvas"));
-  wg.width = 480;
-  wg.height = 288;
+  // 衝撃波としぶきの裏の画面は 1 度だけ作り、毎こま消して使う。衝撃波は空の ImageData に描いて送るだけ(読み出さない)。
+  // しぶきは 1 ドットずつ塗るので CPU で描かせる(毎こま大きさを設定しなおして作り直し、GPU から読み出していたのが、PC の Chrome で重かった。11-13 版 565)
+  const newCanvas = () => {
+    const c = document.createElement("canvas");
+    c.width = 480;
+    c.height = 288;
+    return c;
+  };
+  const wg = ngE.wave || (ngE.wave = newCanvas());
   const w2 = wg.getContext("2d");
-  const wi = w2.getImageData(0, 0, 480, 288);
+  const wi = w2.createImageData(480, 288);
   ngWaveHard(wi, t - NG_E.fireA, pow);
   ngWaveHard(wi, t - NG_E.fireB, pow);
   w2.putImageData(wi, 0, 0);
-  const sg = ngE.spray || (ngE.spray = document.createElement("canvas"));
-  const s2 = sg.getContext("2d");
+  const sg = ngE.spray || (ngE.spray = newCanvas());
+  const s2 = sg.getContext("2d", { willReadFrequently: true });
   const spray = (half) => {
-    sg.width = 480;
-    sg.height = 288;
+    s2.clearRect(0, 0, 480, 288);
+    s2.globalAlpha = 1;
     ngSpray(s2, t - NG_E.fireA, pow, half);
     ngSpray(s2, t - NG_E.fireB, pow, half);
     ctx.drawImage(sg, X, Y);
@@ -540,7 +608,7 @@ const ngSeihaCut2 = (ctx, api, t, g, X, Y) => {
   const OX = X;
   const OY = Y;
   {
-  const ctx = ngE.c2.getContext("2d");
+  const ctx = ngE.c2.getContext("2d", { willReadFrequently: true });
   ctx.imageSmoothingEnabled = false;
   const X = 0;
   const Y = 0;
@@ -566,7 +634,7 @@ const ngSeihaCut2 = (ctx, api, t, g, X, Y) => {
     ctx.fillStyle = `rgba(255,110,70,${tint})`;
     ctx.fillRect(X, Y, 480, 288);
   }
-  ctx.drawImage(ngE.off, X, Y);
+  ctx.drawImage(ngE.offB, X, Y);
   // 爆発の光(空いっぱい)
   for (const t0 of [NG_E.burst1, NG_E.burst2]) {
     for (let i = 0; i < 4; i++) {
@@ -638,12 +706,15 @@ const NG_SEIHA = {
   },
   drawGround(ctx, ox, oy, img, api) {
     const t = ngE.t;
-    if (!ngE.off) {
-      ngE.off = document.createElement("canvas");
-      ngE.off.width = 480;
-      ngE.off.height = 288;
+    // 裏の画面は、カット 1(砲を撃つ)は GPU のまま、カット 2(見上げる核爆発)は大きな点描の丸を重ねるので CPU で描かせる
+    // (カット 2 は GPU だと数秒止まるこまが出た。カット 1 は CPU にすると遅くなった。11-13 版 566)
+    const key = t < NG_E.cut ? "off" : "offB";
+    if (!ngE[key]) {
+      ngE[key] = document.createElement("canvas");
+      ngE[key].width = 480;
+      ngE[key].height = 288;
     }
-    const g = ngE.off.getContext("2d");
+    const g = key === "off" ? ngE.off.getContext("2d") : ngE.offB.getContext("2d", { willReadFrequently: true });
     g.imageSmoothingEnabled = false;
     g.clearRect(0, 0, 480, 288);
     ctx.save();

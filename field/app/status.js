@@ -54,7 +54,7 @@ const ST_FLAGS = {
   lake: { ate: "", homeward: "", memory: "", saidHoutou: "", observed: "見届けた" },
   haihei: { card: "", heard: "", prize: "", stand: "", observed: "見届けた" },
   kasumi: { jump: "", observed: "見届けた" },
-  banana: { caught: "", chirinJoined: "", gotMango: "", observed: "見届けた" },
+  banana: { chirinJoined: "", gotMango: "", observed: "見届けた" },
   suzuki: { cartOff: "", charred: "", fallen: "", landing: "", launched: "", observed: "見届けた" },
   takarabune: { airlock: "", cast: "", glowed: "", installed: "", running: "", sowing: "", observed: "見届けた" },
   noroi: { custom: "", fudaKept: "", nrRound: "", ponponGone: "", seeOffDone: "", stripSeen: "", won: "", pinHigh: "", observed: "見届けた" },

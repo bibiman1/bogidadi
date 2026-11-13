@@ -257,22 +257,32 @@ const NG_HANABI = {
     ctx.imageSmoothingEnabled = false;
     const bg = api.image("bg_ryokan_view");
     if (cam > 0) {
+      // 上の空: 高いほど少し暗く(ディザ)、星をまく。動かないので 1 度だけ描いて、見えている所を貼る
+      // (毎こま 1 ドットずつ 2 万回あまり塗っていて、PC の Chrome で重かった。11-13 版 566)
+      if (!ngHb.sky) {
+        // 高さ 215: 下のはし(y 214)が夜景の絵の上のはし(Y + 15)のすぐ上。行 L は画面の Y + 15 - 215 + L
+        const c = document.createElement("canvas");
+        c.width = 480;
+        c.height = 215;
+        const sg = c.getContext("2d");
+        sg.fillStyle = "#14193e";
+        sg.fillRect(0, 0, 480, 215);
+        sg.fillStyle = "#0e1230";
+        for (let yy = 0; yy < 200; yy += 2) {
+          const u = yy / 200;
+          for (let xx = (yy / 2) % 2; xx < 480; xx += 2) if (((xx * 7 + yy * 3) % 10) / 10 < u * 0.6) sg.fillRect(xx, 214 - yy, 1, 1);
+        }
+        for (let k = 0; k < 90; k++) {
+          const sy = 15 - ((k * 61 + k * k * 7) % 215);
+          sg.fillStyle = k % 4 ? "#4a5080" : k % 8 ? "#9aa0c8" : "#e0e4f4";
+          sg.fillRect((k * 137 + k * k) % 480, sy + 200, 1, 1);
+        }
+        ngHb.sky = c;
+      }
+      // 見えているのは Y0(= Y - cam)から Y + 15 まで。前と同じく、ディザは yy < cam、星は sy + cam >= 15 の所だけ
       ctx.fillStyle = "#14193e";
       ctx.fillRect(X, Y0, 480, cam + 15);
-      // 上の空: 高いほど少し暗く(ディザ)、星をまく
-      for (let yy = 0; yy < cam; yy += 2) {
-        const u = yy / 200;
-        for (let xx = (yy / 2) % 2; xx < 480; xx += 2) if (((xx * 7 + yy * 3) % 10) / 10 < u * 0.6) {
-          ctx.fillStyle = "#0e1230";
-          ctx.fillRect(X + xx, Y + 15 - yy - 1, 1, 1);
-        }
-      }
-      for (let k = 0; k < 90; k++) {
-        const sy = 15 - ((k * 61 + k * k * 7) % 215);
-        if (sy + cam < 15) continue;
-        ctx.fillStyle = k % 4 ? "#4a5080" : k % 8 ? "#9aa0c8" : "#e0e4f4";
-        ctx.fillRect(X + ((k * 137 + k * k) % 480), Y + sy, 1, 1);
-      }
+      ctx.drawImage(ngHb.sky, 0, 215 - cam, 480, cam, X, Y0 + 15, 480, cam);
     }
     if (bg) ctx.drawImage(bg, 0, 15, 480, 273, X, Y + 15, 480, 273);
     // 火球は斉射の場面の絵(ngBurst)を、裏の画面に 2 倍の座標で描いて、半分に縮めて重ねる
@@ -281,7 +291,7 @@ const NG_HANABI = {
       ngHb.off.width = 960;
       ngHb.off.height = 576;
     }
-    const g = ngHb.off.getContext("2d");
+    const g = ngHb.off.getContext("2d", { willReadFrequently: true });
     g.clearRect(0, 0, 960, 576);
     g.save();
     g.translate(0, cam * 2);
