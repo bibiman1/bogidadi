@@ -59,18 +59,31 @@ const ASSET_V = (() => {
     function loadImage(key, src) {
       // 絵にも、このスクリプトと同じ版の番号を付ける(同じ名前の絵を描き直したとき、古い絵がキャッシュに残らないように)
       if (ASSET_V && !src.includes("?")) src += `?v=${ASSET_V}`;
-      if (images[key] && images[key].src === src) return;
-      const img = new Image();
-      const e = { img, src, loaded: false, done: false };
+      // 読めた絵と、読んでいる途中の絵は頼み直さない。
+      // 読めなかった絵(通信が悪いとき)は、世界に入り直したときにもう一度頼む(todo 311)
+      const old = images[key];
+      if (old && old.src === src && !old.failed) return;
+      const e = { img: null, src, loaded: false, done: false, failed: false, tries: 0 };
       images[key] = e;
-      img.onload = () => {
-        e.loaded = true;
-        e.done = true;
+      const attempt = () => {
+        const img = new Image();
+        img.onload = () => {
+          if (images[key] !== e) return;
+          e.img = img;
+          e.loaded = true;
+          e.done = true;
+        };
+        img.onerror = () => {
+          if (images[key] !== e) return;
+          e.done = true; // 読めなくても待ち続けない(読み直しは裏で続ける)
+          e.tries++;
+          if (e.tries > 3) e.failed = true;
+          else setTimeout(() => images[key] === e && attempt(), 1500 * e.tries);
+        };
+        // 読み直すときは、失敗した通信の残りを使わないよう、印を足す
+        img.src = e.tries ? src + (src.includes("?") ? "&" : "?") + "r=" + e.tries : src;
       };
-      img.onerror = () => {
-        e.done = true; // 読めなくても待ち続けない
-      };
-      img.src = src;
+      attempt();
     }
 
     // いまの世界の画像がすべて読み終わったら cb を呼ぶ(最長 maxMs まで待つ)
