@@ -186,7 +186,9 @@
       g.gain.setValueAtTime(0, t0);
       g.gain.linearRampToValueAtTime(0.5 * vol, t0 + at);
       g.gain.setTargetAtTime(0.28 * vol, t0 + at + 0.04, 0.4);
-      g.gain.setTargetAtTime(0, t0 + dur * 0.92, Math.min(0.18, dur * 0.4));
+      const rel = Math.min(0.18, dur * 0.4);
+      g.gain.setTargetAtTime(0, t0 + dur * 0.92, rel);
+      const end = t0 + dur * 0.92 + rel * 6; // 消えきったら止める(前は 1 秒鳴らしたままで、16 分音符では部品が重なっていた)
       g.connect(lp);
       const vib = ctx.createOscillator();
       vib.frequency.value = 4.6;
@@ -202,34 +204,47 @@
         og.gain.value = amp;
         o.connect(og).connect(g);
         o.start(t0);
-        o.stop(t0 + dur + 1);
+        o.stop(end);
       });
       vib.start(t0);
-      vib.stop(t0 + dur + 1);
+      vib.stop(end);
+    };
+    // 少しずつ並べる(11-13、作者「カノンがノイズが乗ったり途切れたりする」)。前は 1 回分(カノンは 275 音、約 2,500 の音の部品)を
+    // 始まる 2 秒前にまとめて作っていて、そのたびに処理が止まり、音がとぎれていた。今は 2 秒先までの音だけを、0.5 秒ごとに足す
+    let mi = 0; // 旋律の、次に並べる音
+    let mt = 0; // その音の時刻
+    let bi = 0; // 低音の、次に並べる音
+    let bt0 = 0; // その音の時刻
+    const round = () => {
+      mi = bi = 0;
+      mt = bt0 = next;
     };
     const queue = () => {
-      // 次の回を、始まる 2 秒前までに並べておく
-      while (next < ctx.currentTime + 2) {
-        let t = next;
+      const until = ctx.currentTime + 2;
+      for (;;) {
         // 低音(あれば)。旋律と同じ時刻から、別に並べる
-        if (m.bass) {
-          let tb = next;
-          for (const [semi, b] of m.bass) {
-            if (semi != null) note(semi, tb, b * m.beat, 0.55); // null は休み
-            tb += b * m.beat;
-          }
+        while (m.bass && bi < m.bass.length && bt0 < until) {
+          const [semi, b] = m.bass[bi++];
+          if (semi != null) note(semi, bt0, b * m.beat, 0.55); // null は休み
+          bt0 += b * m.beat;
         }
-        for (const [semi, b] of m.notes) {
+        while (mi < m.notes.length && mt < until) {
+          const [semi, b] = m.notes[mi++];
           // 不気味さ(形而アップダウンクイズ D509): 拍がのびちぢみし、音程がずれる。warpK = 0 ならいつもどおり
           const bt = b * m.beat * (warpK ? 1 + warpK * 0.14 * (Math.random() * 2 - 0.6) : 1);
-          if (semi != null) note(semi + (warpK >= 3 ? (Math.random() - 0.5) * warpK * 0.6 : 0), t, bt); // null は休み
-          t += bt;
+          if (semi != null) note(semi + (warpK >= 3 ? (Math.random() - 0.5) * warpK * 0.6 : 0), mt, bt); // null は休み
+          mt += bt;
         }
-        next = Math.max(t + m.gap, next + total * (warpK ? 0.5 : 1));
+        // 1 回を並べ終えたら、間をあけて次の回へ
+        if (mi < m.notes.length || (m.bass && bi < m.bass.length)) break;
+        next = Math.max(mt + m.gap, next + total * (warpK ? 0.5 : 1));
+        round();
+        if (next >= until) break;
       }
     };
     out.start = () => {
       next = ctx.currentTime + 1.2;
+      round();
       queue();
       timer = setInterval(queue, 500);
     };
