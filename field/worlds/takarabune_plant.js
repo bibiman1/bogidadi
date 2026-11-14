@@ -3,6 +3,71 @@
 "use strict";
 
 
+// 手ざわり(D741、todo 319): 調べると、字は出さず、物が音と動きで一度だけ応える。人はもういないが、機械はまだ人を待っている
+const tkTz = {};
+const tzNow = () => performance.now() / 1000;
+const tzAge = (id) => (tkTz[id] == null ? Infinity : tzNow() - tkTz[id]);
+const tzCache = {};
+// 背景の一部を切り出し、印の点(鎖、針)を左右のいちばん近い点の色でうめた下地(印の所だけ)と、印だけの絵に分ける
+const tzCut = (key, img, x0, y0, w, h, isMark) => {
+  if (tzCache[key]) return tzCache[key];
+  const mk = () => {
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    return c;
+  };
+  const a = mk(), m = mk(), f = mk();
+  const g = a.getContext("2d");
+  g.drawImage(img, x0, y0, w, h, 0, 0, w, h);
+  const d = g.getImageData(0, 0, w, h).data;
+  const mark = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) mark[i] = isMark(d[i * 4], d[i * 4 + 1], d[i * 4 + 2], x0 + (i % w), y0 + ((i / w) | 0)) ? 1 : 0;
+  const mi = m.getContext("2d").createImageData(w, h);
+  const fi = f.getContext("2d").createImageData(w, h);
+  for (let i = 0; i < w * h; i++) {
+    if (!mark[i]) continue;
+    for (let k = 0; k < 4; k++) mi.data[i * 4 + k] = d[i * 4 + k];
+    const x = i % w, y = (i / w) | 0;
+    let l = x, r = x;
+    while (l > 0 && mark[y * w + l]) l--;
+    while (r < w - 1 && mark[y * w + r]) r++;
+    const pick = mark[y * w + l] ? r : mark[y * w + r] ? l : x - l <= r - x ? l : r;
+    const j = (y * w + pick) * 4;
+    fi.data[i * 4] = d[j];
+    fi.data[i * 4 + 1] = d[j + 1];
+    fi.data[i * 4 + 2] = d[j + 2];
+    fi.data[i * 4 + 3] = 255;
+  }
+  m.getContext("2d").putImageData(mi, 0, 0);
+  f.getContext("2d").putImageData(fi, 0, 0);
+  return (tzCache[key] = { mark: m, fill: f });
+};
+// 調べる点(x, y)と、背景の上に描く応え draw(ctx, X, Y, age, api)(X, Y は背景の点を画面に写す)
+const tzSpot = (id, x, y, sound, dur, draw, extra) =>
+  Object.assign(
+    {
+      id,
+      x,
+      y,
+      w: 1,
+      h: 1,
+      range: 44,
+      headY: 30,
+      interact(api) {
+        tkTz[id] = tzNow();
+        api.sfx(sound);
+        if (extra && extra.onHit) extra.onHit(api);
+      },
+      draw(ctx, sx, sy, t, api) {
+        const age = tzAge(id);
+        if (age > dur || !draw) return;
+        draw(ctx, (X) => sx + X - x, (Y) => sy + Y - y, age, api);
+      },
+    },
+    extra && extra.props
+  );
+
 // B 正門(西から坂道で上がってくる。鎖の切れた門を抜けて北へ)
 // 正門の前後(fg_gate。docs/assets/takarabune/fg_gate.py)。2026-10-03、作者「金網フェンスは？前後関係」
 // フェンスの根もと(y 158)より北へは行けない。門は半開きで、2 枚の扉のあいだだけ通れる(扉の足もとの線の奥はふさぐ)。
@@ -21,7 +86,24 @@ const TK_GATE = tkMap("gate", 28, 10, {
     { id: "toYard", x: 11 * T, y: -T, w: 4 * T, h: 1.45 * T, warp: { map: "yard", spawn: "south" } },
   ],
   // 門の通り道(x 404〜432)の左右: 扉の足もとの線より奥を、段々にふさぐ
-  objects: [...TK_GATE_FG, tkWall(352, 0, 378, 180), tkWall(378, 0, 404, 200), tkWall(432, 0, 455, 192), tkWall(455, 0, 480, 175)],
+  objects: [
+    ...TK_GATE_FG,
+    tkWall(352, 0, 378, 180),
+    tkWall(378, 0, 404, 200),
+    tkWall(432, 0, 455, 192),
+    tkWall(455, 0, 480, 175),
+    // 1 門の柱から垂れた鎖: じゃらりと震えて、少し引きずられる
+    tzSpot("tzChain", 440, 236, "tzChain", 0.7, (ctx, X, Y, age, api) => {
+      const img = api.image("bg_gate");
+      if (!img) return;
+      const c = tzCut("chain", img, 420, 182, 50, 64, (r, g, b) => !(b > r + 22 && b > 45));
+      const k = 1 - age / 0.7;
+      const dx = Math.round(Math.sin(age * 38) * 3 * k);
+      const dy = -Math.round(Math.abs(Math.sin(age * 19)) * 2 * k);
+      ctx.drawImage(c.fill, Math.round(X(420)), Math.round(Y(182)));
+      ctx.drawImage(c.mark, Math.round(X(420)) + dx, Math.round(Y(182)) + dy);
+    }),
+  ],
 });
 
 // B2 構内(todo 152): 正門を北へ抜けると、夜の発電所の敷地。北の管理棟の扉(緑の非常灯)から中へ。南の門のすきまから正門へ
@@ -89,6 +171,14 @@ const TK_YARD = tkMap("yard", 20, 10, {
     door: { x: 10 * T, y: 4.5 * T, facing: "south" },
   },
   drawOverlay(ctx, ox, oy, t) {
+    // 4 調べると、非常灯がじじっと瞬いて消えかけ、また灯る
+    const age = tzAge("tzExit");
+    const off = age < 0.55 && [0.04, 0.12, 0.2, 0.34, 0.42].some((q) => age > q && age < q + 0.05 + (q > 0.3 ? 0.04 : 0));
+    if (off) {
+      ctx.fillStyle = "rgba(14, 34, 24, 0.9)";
+      ctx.fillRect(ox + 312, oy + 68, 14, 6);
+      return;
+    }
     tkLight(ctx, ox + 10 * T, oy + 2 * T + 11, 70, "90, 255, 140", 0.18 + 0.08 * Math.sin(t * 1.7)); // 扉の上の非常灯
   },
   triggers: [
@@ -99,6 +189,7 @@ const TK_YARD = tkMap("yard", 20, 10, {
   objects: [
     tkWall(0, 116, 52, 222), tkWall(0, 222, 46, 252), tkWall(0, 252, 34, 290),
     tkWall(588, 116, 640, 222), tkWall(594, 222, 640, 252), tkWall(606, 252, 640, 290),
+    tzSpot("tzExit", 352, 150, "tzBuzz", 0.6, null),
   ],
 });
 
@@ -116,7 +207,45 @@ const TK_ADMIN = tkMap("admin", 24, 12, {
     { id: "toYard", x: 4 * T, y: 11.5 * T, w: 2 * T, h: T, warp: { map: "yard", spawn: "door" } },
     { id: "toTurbine", x: 23.55 * T, y: 8 * T, w: 1.45 * T, h: 2 * T, warp: { map: "turbine", spawn: "west" } },
   ],
-  objects: [],
+  objects: [
+    // 6 制御盤のブラウン管: 一瞬ついて走査線が流れ、横一本に縮んで、点になって消える
+    tzSpot("tzCrt", 331, 176, "tzCrt", 1.3, (ctx, X, Y, age) => {
+      const x0 = Math.round(X(314)), y0 = Math.round(Y(130)), w = 35, h = 24;
+      ctx.save();
+      if (age < 0.06) {
+        ctx.fillStyle = "rgba(220, 255, 230, 0.9)";
+        ctx.fillRect(x0, y0, w, h);
+      } else if (age < 0.95) {
+        ctx.fillStyle = `rgba(110, 230, 140, ${0.32 + 0.05 * Math.sin(age * 60)})`;
+        ctx.fillRect(x0, y0, w, h);
+        ctx.fillStyle = "rgba(200, 255, 210, 0.55)";
+        ctx.fillRect(x0, y0 + Math.floor(((age * 1.6) % 1) * h), w, 2);
+        ctx.fillStyle = "rgba(20, 60, 30, 0.35)";
+        for (let y = 0; y < h; y += 2) ctx.fillRect(x0, y0 + y, w, 1);
+      } else if (age < 1.1) {
+        const q = (age - 0.95) / 0.15;
+        const lw = Math.max(2, Math.round(w * (1 - q)));
+        ctx.fillStyle = "rgba(230, 255, 235, 0.95)";
+        ctx.fillRect(x0 + Math.round((w - lw) / 2), y0 + 11, lw, 1);
+      } else {
+        ctx.fillStyle = `rgba(230, 255, 235, ${1 - (age - 1.1) / 0.2})`;
+        ctx.fillRect(x0 + 17, y0 + 11, 1, 1);
+      }
+      ctx.restore();
+    }),
+    // 7 大きな計器: 針がぐっと振れて、ゆれながら元に戻る
+    tzSpot("tzGauge", 293, 176, "tzNeedle", 1.8, (ctx, X, Y, age, api) => {
+      const img = api.image("bg_admin");
+      if (!img) return;
+      const cx = 293.5, cy = 79;
+      const c = tzCut("gauge", img, 281, 67, 26, 25, (r, g, b, x, y) => r < 70 && g < 90 && Math.hypot(x - cx, y - cy) < 9);
+      ctx.drawImage(c.fill, Math.round(X(281)), Math.round(Y(67)));
+      const sw = age < 0.22 ? 1.5 * (age / 0.22) : 1.5 * Math.exp(-(age - 0.22) * 2.6) * Math.cos((age - 0.22) * 9);
+      const a = -2.35 + sw; // 元の針は左上を向く
+      ctx.fillStyle = "rgb(33, 53, 44)";
+      for (let r = 0; r <= 8; r++) ctx.fillRect(Math.round(X(cx + Math.cos(a) * r)), Math.round(Y(cy + Math.sin(a) * r)), 1, 1);
+    }),
+  ],
 });
 
 // D タービン建屋(西から入り、東の扉から出る)。止まったタービンの南北に 2 マスの通路
@@ -140,6 +269,23 @@ const TK_TURBINE = tkMap("turbine", 28, 12, {
     tkFg("fg_turbine", 812, 238, 39, 47, 284),
     tkWall(392, 284, 420, 300),
     tkWall(812, 226, 851, 285), // 看板のうしろもふさぐ(きーが看板にすっかり隠れるので)
+    // 13 タービンの胴: ごうん、と一度だけ低くうなって、胴が身ぶるいし、建屋がかすかにゆれる
+    tzSpot(
+      "tzTurbine",
+      330,
+      268,
+      "tzTurbine",
+      1.2,
+      (ctx, X, Y, age, api) => {
+        const img = api.image("bg_turbine");
+        if (!img) return;
+        const k = Math.max(0, 1 - age / 1.2);
+        const dx = Math.round(Math.sin(age * 55) * 1.4 * k);
+        if (!dx) return;
+        ctx.drawImage(img, 92, 108, 480, 156, Math.round(X(92)) + dx, Math.round(Y(108)), 480, 156);
+      },
+      { onHit: (api) => api.shake(0.9, 2.5) }
+    ),
   ],
 });
 
