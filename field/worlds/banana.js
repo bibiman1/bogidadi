@@ -251,7 +251,8 @@ const B_CHURCH = {
   spawns: {
     door: { x: 240, y: 232, facing: "north" },
   },
-  triggers: [{ id: "toShore", x: 216, y: 260, w: 48, h: 20, warp: { map: "shore", spawn: "church" } }],
+  // 11-15 監督「きーが入口の手前にいるから直して」: 戸口へ下りる道で止まると、手前の丸太の壁に乗って見えた。壁にかかる前(y 244)で浜へ出す
+  triggers: [{ id: "toShore", x: 216, y: 244, w: 48, h: 36, warp: { map: "shore", spawn: "church" } }],
   objects: B_CHURCH_OBJS,
 };
 

@@ -142,10 +142,9 @@ const kp2Obj = () => ({
     if (n === "read") dy = Math.floor(t * 3) % 2 ? -1 : 0; // 背のびして、のぞきこむ
     if (n === "look" && k > 0.1) dy = -2;
     if (n === "eat") (dy = (t * 7) % 1 < 0.4 ? 3 : 0), (dx = Math.floor(t * 14) % 2 ? 1 : -1); // 前のめりに、速く、何度も
-    // 戸口を出入りするときは、下を戸の影に隠す
-    const vis = n === "out" ? k : n === "in" ? 1 - k : 1;
-    const h = n === "out" || n === "in" ? Math.round(25 + 22 * vis) : 64;
-    ctx.drawImage(pi, f * 64, row * 64, 64, h, Math.round(sx - 32 + dx), Math.round(sy - 47 + dy), 64, h);
+    // 戸口はぱっと出入りする(体を切って戸の影に隠すと、上から見て四角い入口が重なって見えた。11-15 監督、D747)
+    if ((n === "out" && k < 0.5) || (n === "in" && k >= 0.5)) return;
+    ctx.drawImage(pi, f * 64, row * 64, 64, 64, Math.round(sx - 32 + dx), Math.round(sy - 47 + dy), 64, 64);
     // 頭にのせたピール
     const carry = p.carry && n !== "in" ? api.image(p.carry === "raw" ? "k_peel_pizza_carry" : "k_peel_carry") : null;
     if (carry) ctx.drawImage(carry, Math.round(sx - carry.width / 2), Math.round(sy - 22 - carry.height + 3 + (n === "walk" ? Math.floor(t * 10) % 2 : 0)));
@@ -160,11 +159,11 @@ const kp2Obj = () => ({
       const ey = hy + (my - hy) * u;
       kp2Peel(ctx, hx, hy, ex, ey);
       if (n === "put" && k < 0.5) knPizza(ctx, ex, ey - 1, 6, "done");
-      if (n === "take" && k >= 0.5) kp2Burnt(ctx, ex, ey - 1, 6);
+      if (n === "take" && k >= 0.5) kp2Burnt(ctx, ex, ey - 1, 8); // 黒焦げは少し大きく(D747)
     }
     if (n === "eat") {
       kp2Peel(ctx, sx - 22, sy + 4, sx + 2, sy + 7);
-      kp2Burnt(ctx, sx + 2, sy + 6, 8.4 * Math.max(0, 1 - k * 1.1));
+      kp2Burnt(ctx, sx + 2, sy + 6, 11 * Math.max(0, 1 - k * 1.1));
       if (k < 0.9) {
         ctx.fillStyle = "#1e1814";
         const sd = Math.floor(t * 12);

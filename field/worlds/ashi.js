@@ -185,7 +185,10 @@
   // 段の帯の左のふちは banana.js の B_STAIRS と同じ xl(y)
   const churchStairs = (x, y) => y > 160 && y < 256 && Math.abs(x - (772 + ((248 - y) * 54) / 82 + 15)) < 21;
   wrap("banana", "shore", snowTrail, churchStairs);
-  ["farm", "canal", "steps"].forEach((m) => wrap("banana", m, snowTrail));
+  // 用水路の丸木橋(板の帯 x 336〜384、y 143〜207)の上にも残さない(D746。11-15 監督「橋の上は跡つかない」)
+  const canalBridge = (x, y) => x > 334 && x < 386 && y > 140 && y < 208;
+  wrap("banana", "canal", snowTrail, canalBridge);
+  ["farm", "steps"].forEach((m) => wrap("banana", m, snowTrail));
   ["road", "lake"].forEach((m) => wrap("lake", m, snowTrail));
   ["akiRoad", "akiLake", "akiWind"].forEach((m) => wrap("nagato", m, leafKick)); // 地面が落ち葉の画面(ほうとう屋の中と白い所は足さない)
   wrap("kinsei", "sando", rainSplash);
