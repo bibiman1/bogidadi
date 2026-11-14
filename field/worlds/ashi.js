@@ -23,7 +23,7 @@
   const isLeaf = (c) => c && c[0] > 125 && c[0] - c[2] > 80 && c[0] - c[1] > 30; // 赤と橙と黄の葉(下草のオリーブ色は入れない)
 
   // 雪の一すじ: 押した所は青い影でへこみ、ふちの下側だけ白く盛り上がる。4 秒そのまま、8 秒かけて埋まる
-  function snowTrail(memo) {
+  function snowTrail(memo, skip) {
     let pts = [], last = null, buf = null, rim = null, floor = null;
     return (ctx, ox, oy, api) => {
       const p = api.player();
@@ -31,7 +31,7 @@
       if (!last || Math.hypot(p.x - last.x, p.y - last.y) > 40) last = { x: p.x, y: p.y }; // 跳んだ、置き直した
       else if (Math.hypot(p.x - last.x, p.y - last.y) >= 3) {
         const c = sample(ctx, p.x + ox, p.y + oy - 1, memo, [p.x, p.y - 1]);
-        if (isSnow(c)) pts.push({ x: p.x, y: p.y, t, j: [0, 1, 0, -1, 1, 0, 0, -1][pts.length % 8], link: pts.length && pts[pts.length - 1].t > t - 0.4 });
+        if (isSnow(c) && !(skip && skip(p.x, p.y))) pts.push({ x: p.x, y: p.y, t, j: [0, 1, 0, -1, 1, 0, 0, -1][pts.length % 8], link: pts.length && pts[pts.length - 1].t > t - 0.4 });
         last = { x: p.x, y: p.y };
       }
       pts = pts.filter((q) => t - q.t < 12);
@@ -172,16 +172,20 @@
     };
   }
 
-  const wrap = (w, m, make) => {
+  const wrap = (w, m, make, opt) => {
     const map = window.BOGI_WORLDS[w] && window.BOGI_WORLDS[w].maps[m];
     if (!map) return console.warn("ashi: no map", w, m);
-    const g = map.drawGround, fx = make(new Map());
+    const g = map.drawGround, fx = make(new Map(), opt);
     map.drawGround = (ctx, ox, oy, img, api) => {
       if (g) g.call(map, ctx, ox, oy, img, api); // 地面の描き方は map を this に使うことがある
       if (api) fx(ctx, ox, oy, api);
     };
   };
-  ["shore", "farm", "canal", "steps"].forEach((m) => wrap("banana", m, snowTrail));
+  // 浜の、正教会へ上る岩の石段(D732)の上には残さない(D745。段ごとに切れた雪に、つながった溝は合わない)。
+  // 段の帯の左のふちは banana.js の B_STAIRS と同じ xl(y)
+  const churchStairs = (x, y) => y > 160 && y < 256 && Math.abs(x - (772 + ((248 - y) * 54) / 82 + 15)) < 21;
+  wrap("banana", "shore", snowTrail, churchStairs);
+  ["farm", "canal", "steps"].forEach((m) => wrap("banana", m, snowTrail));
   ["road", "lake"].forEach((m) => wrap("lake", m, snowTrail));
   ["akiRoad", "akiLake", "akiWind"].forEach((m) => wrap("nagato", m, leafKick)); // 地面が落ち葉の画面(ほうとう屋の中と白い所は足さない)
   wrap("kinsei", "sando", rainSplash);
