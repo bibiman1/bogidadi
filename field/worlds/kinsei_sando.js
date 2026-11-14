@@ -17,6 +17,24 @@ const knCrewX = (x0) => {
   knS[key] = x;
   return knS.crewGoT0 < 0 ? x : x + (knNow() - knS.crewGoT0) * KN_CREW_V;
 };
+// 道の上のふちと下のふち(x, y)。この外を、8 ドットはばの見えない壁でふさぐ(足の当たりは高さ 10 なので、その半分だけ内へ)
+const KN_SANDO_TOP = [[0, 170], [64, 167], [128, 168], [200, 158], [260, 149], [340, 146], [440, 135], [480, 142], [520, 140], [600, 148], [700, 141], [800, 140], [900, 129], [960, 125]];
+const KN_SANDO_BOT = [[0, 236], [100, 230], [160, 226], [208, 214], [260, 208], [340, 205], [420, 200], [470, 205], [520, 212], [600, 209], [700, 200], [800, 190], [860, 186], [960, 180]];
+const knEdgeAt = (pts, x) => {
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [ax, ay] = pts[i], [bx, by] = pts[i + 1];
+    if (x <= bx) return ay + ((by - ay) * (x - ax)) / (bx - ax);
+  }
+  return pts[pts.length - 1][1];
+};
+const knSandoEdges = () => {
+  const walls = [];
+  for (let x = 0; x < 30 * T; x += 8) {
+    const top = Math.round(knEdgeAt(KN_SANDO_TOP, x + 4)) - 4, bot = Math.round(knEdgeAt(KN_SANDO_BOT, x + 4)) + 4;
+    walls.push(kWall(x, 4 * T - 8, x + 8, top), kWall(x, bot, x + 8, 8 * T + 8));
+  }
+  return walls;
+};
 const KN_SANDO = {
   tile: T,
   bg: "#46504a",
@@ -25,7 +43,7 @@ const KN_SANDO = {
   drawGround: kImage("bg_sando", 30 * T, 10 * T),
   spawns: {
     start: { x: 1.6 * T, y: 6 * T, facing: "east" },
-    east: { x: 28.2 * T, y: 6 * T, facing: "west" },
+    east: { x: 28.2 * T, y: 5.3 * T, facing: "west" }, // 右はしの道は細いので、上へ寄せる(歩ける所を道に合わせたとき)
   },
   drawOverlay(ctx, ox, oy, t) {
     knStorm(ctx, t, 0.32);
@@ -62,6 +80,9 @@ const KN_SANDO = {
     },
   ],
   objects: [
+    // 歩ける所を、絵の道(砂利の帯と下の草のへり)に合わせる(作者「峠道の歩けるところ判定があまい」)。
+    // 4〜7 段目の長方形のままだと、下の崖の岩はだと上の草の斜面まで歩けた。道のふちは bg_sando から測った
+    ...knSandoEdges(),
     // 拡声器の柱は、背景から切り抜いた絵(fg_sando)を根元の y で前後させる(作者「背景の前後」)。鳴らさない(予報は気象台の中の無線 D380)
     kFg("fg_sando", 161, 70, 45, 91, 158),
     kWall(180, 152, 193, 160),
