@@ -333,7 +333,10 @@ window.BOGI_WORLDS = {
         "ponpon_e", "ponpon_s", "akabeko_e", "akabeko_s", "tori_e", "tori_s", "kokeshi_e", "kokeshi_s", "tansu_e", "tansu_w", "miton_s",
         "bogicar_e_ki", "bogicar_e_stick", "bogicar_e_flame", "v_mag_0", "v_mag_1", "v_mag_2", "v_mag_3", "v_mag_4", "v_mag_5", "v_mag_6", "pb_backglass", "pb_field", "pb_bump_beko", "pb_bump_drum", "pb_bump_duck", "pb_flipper", "ic_ticket"]
         .map((k) => [k, `${k}.png`])
-        .concat([["ki", "./assets/worlds/lake/ki_walk.png"]])
+        .concat([
+          ["ki", "./assets/worlds/lake/ki_walk.png"],
+          ["pi", "./assets/worlds/lake/pi_walk.png"], // 戻ってきたぴー(クイズのあと、古タイヤで往復 D739)
+        ])
     ),
     playerSprite: { img: "ki", cell: 64, frames: 7, footY: 17 },
     start: "pass",
