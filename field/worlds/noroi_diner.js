@@ -82,10 +82,11 @@ const nptPlan = (() => {
   const w = wobble(r[r.length - 1]);
   push("fallE", "in", w);
   st = last(w);
-  push("still", null, hold(st, 0.5));
-  push("pop", "pop", hold(st, 0.7));
+  // 右端: 中のぴーは穴の中で寝て、起きて縁からのぞき、跳び出る(todo 320)
+  push("lie", "lie", hold(st, 0.6));
+  push("sit", "sit", hold(st, 0.5));
   push("look", "look", hold(st, 0.8));
-  push("hopside", "hopside+", hold(st, 0.4));
+  push("hopside", "hopside+", hold(st, 0.5));
   const up = standup(st, Math.PI);
   push("push", "push+", up);
   st = Object.assign(last(up), { beta: 0 });
@@ -95,9 +96,9 @@ const nptPlan = (() => {
   const w2 = wobble(r2[r2.length - 1]);
   push("fallW", "onfall", w2);
   st = last(w2);
-  push("still", null, hold(st, 0.4));
-  push("pop", "pop", hold(st, 0.5));
-  push("hopside", "hopside-", hold(st, 0.4));
+  // 左端: 上のぴーは倒れぎわに道へ投げ出され、目を回して起きる(todo 320)
+  push("lie", "lie-", hold(st, 0.8));
+  push("getup", "getup-", hold(st, 0.5));
   push("push", "push-", standup(st, 0));
   let t = 0;
   for (const s of segs) (s.t = t), (t += s.arr.length * DT);
@@ -233,7 +234,7 @@ const nptObj = () => ({
     const pi = api.image("pi");
     if (!pi) return;
     if (!npt.can) npt.can = nptCanvas();
-    const { pm, st, k } = nptState();
+    const { name, pm, st, k } = nptState();
     const ease = (q) => q * q * (3 - 2 * q);
     const inside = pm === "in" && st.beta <= (72 * Math.PI) / 180;
     const enterIn = pm === "enter" && k >= 0.7;
@@ -248,23 +249,57 @@ const nptObj = () => ({
     ctx.drawImage(npt.can.canvas, Math.round(sx - NPT.CX), Math.round(sy - NPT.CY));
     const top = sy + r.top, hx = sx + r.hx, hy = sy + r.hy;
     const sd = pm && pm.endsWith("+") ? 1 : -1;
-    if (pm === "enter" && k < 0.7) {
+    // 回したぴー(体のまん中で回す)と、寝たタイヤの穴の中のぴー(手前の縁が体の下を隠す)
+    const rot = (row, x, foot, ang) => {
+      ctx.save();
+      ctx.translate(Math.round(x), Math.round(foot - 11));
+      ctx.rotate(ang);
+      ctx.drawImage(pi, 0, row * 64, 64, 64, -32, -36, 64, 64);
+      ctx.restore();
+    };
+    const inHole = (fn) => {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(hx - 80, hy - 90, 160, 90);
+      ctx.ellipse(hx, hy, NPT.RI, NPT.RI * NPT.FY, 0, 0, Math.PI * 2);
+      ctx.clip();
+      fn();
+      ctx.restore();
+    };
+    const G = hy + Math.round(NPT.WD * NPT.FZ); // 穴の底(地面)
+    const lieA = Math.PI / 2;
+    if (pm === "in" && st.beta > (72 * Math.PI) / 180) {
+      const q = Math.min(1, (st.beta - (72 * Math.PI) / 180) / ((18 * Math.PI) / 180));
+      inHole(() => rot(0, hx, G - 2, st.alpha * (1 - q) + lieA * q)); // 倒れながら穴の底へ寝る
+    } else if (name === "fallW" && k >= 0.55) {
+      const u = Math.min(1, (k - 0.55) / 0.3);
+      rot(1, hx - 42 * u, (top + 4) * (1 - u) + (sy - 2) * u - Math.sin(u * Math.PI) * 26, -2.5 * Math.PI * u); // 投げ出される
+    } else if (pm === "lie") {
+      inHole(() => rot(0, hx, G - 2, lieA + 0.15 * Math.sin(t * 9)));
+    } else if (pm === "sit") {
+      const u = ease(Math.min(1, k / 0.6));
+      inHole(() => rot(0, hx, G - 2 * (1 - u), lieA * (1 - u)));
+    } else if (pm === "look") {
+      inHole(() => nptPi(ctx, pi, k < 0.45 ? 3 : 2, 0, hx, G - (Math.floor(k * 6) % 2 ? 1 : 0)));
+    } else if (pm === "hopside+") {
+      const u = ease(k);
+      const hop = () => nptPi(ctx, pi, 2, 2, hx + 40 * u, G * (1 - u) + (sy - 2) * u - Math.sin(u * Math.PI) * 24);
+      if (u < 0.35) inHole(hop);
+      else hop();
+    } else if (pm === "lie-") {
+      const b = Math.max(0, 1 - k * 4);
+      rot(0, sx - 42, sy - 2 - Math.abs(Math.sin(k * 14)) * 4 * b, -2.5 * Math.PI + 0.12 * Math.sin(t * 9)); // 道で目を回す
+    } else if (pm === "getup-") {
+      const u = ease(k);
+      rot(2, sx - 42 + 2 * u, sy - 2, -lieA * (1 - u));
+    } else if (pm === "enter" && k < 0.7) {
       const u = k / 0.7;
       nptPi(ctx, pi, 2, Math.floor(t * 10) % 7, sx - 40 + 40 * u, sy - 2 - Math.sin(u * Math.PI) * 30 - 10 * u);
     } else if (pm === "on") {
       const bob = Math.floor(t * 12) % 2;
       nptPi(ctx, pi, 2, Math.floor(t * 16) % 7, sx + (bob ? 1 : -1), top + 4 - bob); // 東を向いて足ぶみ(タイヤは西へ)
     } else if (pm === "onfall") {
-      if (k < 0.75) nptPi(ctx, pi, Math.floor(t * 8) % 2 ? 2 : 3, Math.floor(t * 20) % 7, sx + Math.sin(t * 25) * 3, top + 4); // 首振りにあおられる
-      else if (k < 0.85) nptPi(ctx, pi, 1, 0, hx, top + 4 + (hy - top) * ((k - 0.75) / 0.1)); // 寝たタイヤの穴へ落ちる
-    } else if (pm === "pop" || pm === "look") {
-      const vis = pm === "pop" ? ease(Math.min(1, k / 0.7)) : 1;
-      const row = pm === "pop" ? 0 : k < 0.45 ? 3 : 2;
-      const foot = hy + 4 - (pm === "look" && Math.floor(k * 6) % 2 ? 1 : 0);
-      nptPi(ctx, pi, row, 0, hx, foot, Math.min(Math.round(25 + 22 * vis), Math.round(hy + 1 - (foot - 47))));
-    } else if (pm && pm.startsWith("hopside")) {
-      const u = ease(k);
-      nptPi(ctx, pi, sd < 0 ? 3 : 2, 2, hx + sd * 40 * u, (hy + 4) * (1 - u) + (sy - 2) * u - Math.sin(u * Math.PI) * 12);
+      nptPi(ctx, pi, Math.floor(t * 8) % 2 ? 2 : 3, Math.floor(t * 20) % 7, sx + Math.sin(t * 25) * 3, top + 4); // 首振りにあおられる
     } else if (pm && pm.startsWith("push")) {
       const bump = Math.sin(Math.min(1, k * 1.5) * Math.PI) * 5;
       nptPi(ctx, pi, sd > 0 ? 3 : 2, 0, sx + sd * (40 - bump), sy - 2); // 体でぐいっと起こす
