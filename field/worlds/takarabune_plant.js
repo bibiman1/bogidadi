@@ -43,6 +43,20 @@ const tzCut = (key, img, x0, y0, w, h, isMark) => {
   f.getContext("2d").putImageData(fi, 0, 0);
   return (tzCache[key] = { mark: m, fill: f });
 };
+// 調べなくても動く物(D742): 人がいなくても続いている揺れ。period 秒ごとに dur 秒だけ draw を呼ぶ。調べられない(印も出ない)
+const tzAmbient = (id, x, y, period, dur, draw, sortDy) => ({
+  id,
+  x,
+  y,
+  w: 1,
+  h: 1,
+  sortDy: sortDy || 0,
+  draw(ctx, sx, sy, t, api) {
+    const age = tzNow() % period;
+    if (age > dur) return;
+    draw(ctx, (X) => sx + X - x, (Y) => sy + Y - y, age, api);
+  },
+});
 // 調べる点(x, y)と、背景の上に描く応え draw(ctx, X, Y, age, api)(X, Y は背景の点を画面に写す)
 const tzSpot = (id, x, y, sound, dur, draw, extra) =>
   Object.assign(
@@ -92,17 +106,17 @@ const TK_GATE = tkMap("gate", 28, 10, {
     tkWall(378, 0, 404, 200),
     tkWall(432, 0, 455, 192),
     tkWall(455, 0, 480, 175),
-    // 1 門の柱から垂れた鎖: じゃらりと震えて、少し引きずられる
-    tzSpot("tzChain", 440, 236, "tzChain", 0.7, (ctx, X, Y, age, api) => {
+    // 調べなくても動く(D742): 門の柱から垂れた鎖が、ときどき風でかすかに揺れる(音なし)
+    tzAmbient("tzChain", 440, 236, 7.3, 1.4, (ctx, X, Y, age, api) => {
       const img = api.image("bg_gate");
       if (!img) return;
       const c = tzCut("chain", img, 420, 182, 50, 64, (r, g, b) => !(b > r + 22 && b > 45));
-      const k = 1 - age / 0.7;
-      const dx = Math.round(Math.sin(age * 38) * 3 * k);
-      const dy = -Math.round(Math.abs(Math.sin(age * 19)) * 2 * k);
+      const k = 1 - age / 1.4;
+      const dx = Math.round(Math.sin(age * 9) * 1.4 * k);
+      const dy = 0;
       ctx.drawImage(c.fill, Math.round(X(420)), Math.round(Y(182)));
       ctx.drawImage(c.mark, Math.round(X(420)) + dx, Math.round(Y(182)) + dy);
-    }),
+    }, -60), // 地面に垂れているので、きーより先に描く
   ],
 });
 
@@ -171,8 +185,14 @@ const TK_YARD = tkMap("yard", 20, 10, {
     door: { x: 10 * T, y: 4.5 * T, facing: "south" },
   },
   drawOverlay(ctx, ox, oy, t) {
-    // 4 調べると、非常灯がじじっと瞬いて消えかけ、また灯る
-    const age = tzAge("tzExit");
+    // 調べなくても動く(D742): 非常灯が、まれにひとりでにじじっと瞬いて消えかけ、また灯る
+    const now = tzNow();
+    const age = now % 11.3;
+    const cyc = Math.floor(now / 11.3);
+    if (age < 0.1 && tkTz.exitCyc !== cyc) {
+      tkTz.exitCyc = cyc;
+      if (window.bogiAudio) window.bogiAudio.sfx("tzBuzzSoft");
+    }
     const off = age < 0.55 && [0.04, 0.12, 0.2, 0.34, 0.42].some((q) => age > q && age < q + 0.05 + (q > 0.3 ? 0.04 : 0));
     if (off) {
       ctx.fillStyle = "rgba(14, 34, 24, 0.9)";
@@ -189,7 +209,6 @@ const TK_YARD = tkMap("yard", 20, 10, {
   objects: [
     tkWall(0, 116, 52, 222), tkWall(0, 222, 46, 252), tkWall(0, 252, 34, 290),
     tkWall(588, 116, 640, 222), tkWall(594, 222, 640, 252), tkWall(606, 252, 640, 290),
-    tzSpot("tzExit", 352, 150, "tzBuzz", 0.6, null),
   ],
 });
 
@@ -269,6 +288,33 @@ const TK_TURBINE = tkMap("turbine", 28, 12, {
     tkFg("fg_turbine", 812, 238, 39, 47, 284),
     tkWall(392, 284, 420, 300),
     tkWall(812, 226, 851, 285), // 看板のうしろもふさぐ(きーが看板にすっかり隠れるので)
+    // 調べなくても動く(D742): 天井からのしずくが、水たまりに間をあけて落ち、波紋が広がる(地面の上なので、きーより先に描く)
+    tzAmbient(
+      "tzDrip",
+      345,
+      300,
+      3.7,
+      1.3,
+      (ctx, X, Y, age) => {
+        const q = age / 1.3;
+        const rx = 1 + q * 9, ry = rx * 0.45;
+        ctx.save();
+        ctx.strokeStyle = `rgba(150, 170, 190, ${0.55 * (1 - q)})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(Math.round(X(345)) + 0.5, Math.round(Y(300)) + 0.5, rx, ry, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        if (q > 0.3) {
+          const r2 = (q - 0.3) * 9;
+          ctx.strokeStyle = `rgba(150, 170, 190, ${0.4 * (1 - q)})`;
+          ctx.beginPath();
+          ctx.ellipse(Math.round(X(345)) + 0.5, Math.round(Y(300)) + 0.5, r2, r2 * 0.45, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      },
+      -120
+    ),
     // 13 タービンの胴: ごうん、と一度だけ低くうなって、胴が身ぶるいし、建屋がかすかにゆれる
     tzSpot(
       "tzTurbine",
