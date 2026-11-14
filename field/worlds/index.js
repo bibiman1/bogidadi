@@ -140,14 +140,14 @@ window.BOGI_WORLDS = {
       if (!api.flag("gotMango")) ["fledFarm", "fledCanal", "chirinJoined"].forEach((f) => api.setFlag(f, false));
     },
     images: Object.fromEntries(
-      ["bg_shore", "bg_farm", "bg_canal", "bg_steps", "fg_shore", "fg_shore2", "fg_farm", "fg_canal", "fg_steps", "kikori", "chirin", "kikikori", "goron", "v_final"]
+      ["bg_shore", "bg_farm", "bg_canal", "bg_steps", "fg_shore", "fg_shore2", "fg_farm", "fg_canal", "fg_steps", "kikori", "chirin", "kikikori", "goron", "v_final", "bg_church", "v_icon"]
         .map((k) => [k, `${k}.png`])
         .concat([["ki", "./assets/worlds/lake/ki_walk.png"]])
     ),
     playerSprite: { img: "ki", cell: 64, frames: 7, footY: 17 },
     start: "shore",
     startSpawn: "start",
-    maps: { shore: B_SHORE, farm: B_FARM, canal: B_CANAL, steps: B_STEPS },
+    maps: { shore: B_SHORE, farm: B_FARM, canal: B_CANAL, steps: B_STEPS, church: B_CHURCH },
   },
   // 断片: 荒川の鈴木商店。南極のバナナ農園を終えると懲罰空間に現れる
   suzuki: {
