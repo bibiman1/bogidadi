@@ -8,14 +8,109 @@
 //       → 機体の上を歩いて乗降口へ → 機内を通って操縦席へ → ミイラさまの遊覧飛行 → 懲罰空間に帰る
 // 背景は docs/assets/kasumi の設計図と下絵(*_blockout.png)から生成
 // ================================================================
+// 蓮田のぴー(D734、D735): 形而アップダウンクイズを終えてから入ると、道の東の田で、泥だらけのぴーがレンコンを水掘りしている。
+// 水を噴く → 沈んで手探り → 1 本そっと抜く → 南のあぜへ放る、をくり返す。きーは無視(調べる物はない)。
+// 絵は docs/assets/kasumi/renkon/make.py(試し絵 docs/record/2026-11-14/renkon/trial3.gif と同じ描き方)。全部、地面の層に描く(きーは田に入れない)
+const KP = { x: 286, y: 318, line: 39, jet: 1.6, feel: 1.8, pull: 1.4, toss: 0.7 };
+// あぜの山: [x, y, 角度(反時計まわり)]。入るたびに 7 本から。放るたびに 1 本ふえる(9 本まで)
+const KP_PILE = [[252, 371, 8], [266, 372, -12], [281, 370, 175], [258, 367, -6], [273, 366, 20], [290, 372, 4], [264, 362, 168], [279, 363, -25], [246, 366, 30]];
+const kp = { t0: 0 };
+const kpNow = () => performance.now() / 1000;
+const kpRenkon = (ctx, im, i, x, y, deg) => {
+  ctx.save();
+  ctx.translate(Math.round(x), Math.round(y));
+  ctx.rotate((-deg * Math.PI) / 180);
+  ctx.drawImage(im, 0, i * 7, 34, 7, -17, -3.5, 34, 7);
+  ctx.restore();
+};
+function kpDraw(ctx, ox, oy, img) {
+  const pi = img("p_mud");
+  const rk = img("p_renkon");
+  const gr = img("p_ground");
+  const jt = img("p_jet");
+  if (!pi || !rk) return;
+  if (gr) ctx.drawImage(gr, ox, oy);
+  const t = kpNow() - kp.t0;
+  const cyc = KP.jet + KP.feel + KP.pull + KP.toss;
+  const n = Math.floor(t / cyc);
+  let u = t - n * cyc;
+  let ph = "jet";
+  if (u >= KP.jet) (u -= KP.jet), (ph = "feel");
+  if (ph === "feel" && u >= KP.feel) (u -= KP.feel), (ph = "pull");
+  if (ph === "pull" && u >= KP.pull) (u -= KP.pull), (ph = "toss");
+  const k = u / KP[ph];
+  let dy = ph === "jet" ? 2 : ph === "feel" ? 2 + 5 * Math.min(1, k * 2) : ph === "pull" ? 7 - 7 * k : 2 * k;
+  const dx = ph === "feel" ? Math.round(Math.sin(t * 2.2) * 1.5) : 0;
+  dy = Math.round(dy + (ph === "feel" ? Math.sin(t * 3) * 0.6 : 0));
+  const cx = KP.x + ox;
+  const cy = KP.y + oy;
+  const wl0 = cy - 47 + KP.line;
+  // 噴いて泥が巻き上がる
+  if (ph === "jet" && jt) ctx.drawImage(jt, Math.min(7, Math.floor(k * 8)) * 32, 0, 32, 16, cx - 14 - 16, cy - 2 - 8, 32, 16);
+  // 体(水面より下は描かない)
+  const cut = KP.line - Math.max(0, dy - 2);
+  ctx.drawImage(pi, 0, 0, 64, cut, cx - 32 + dx, cy - 47 + dy, 64, cut);
+  const wl = cy - 47 + dy + cut;
+  // 水面の輪(きれぎれに、ゆっくり広がる)
+  const rr = 17 + ((t * 6) % 6);
+  ctx.fillStyle = "rgb(240, 220, 230)";
+  for (let a = 20; a <= 160; a += 4) {
+    if (a > 70 && a < 110) continue;
+    const r = (a * Math.PI) / 180;
+    ctx.fillRect(Math.round(cx + rr * Math.cos(r)), Math.round(wl + 0.5 + 3.5 * Math.sin(r)), 1, 1);
+  }
+  // ホースの先で、水面がぼこぼこ泡立つ
+  if (ph === "jet") {
+    let sd = Math.floor(t * 12) * 9301 + 49297;
+    const rnd = () => ((sd = (sd * 9301 + 49297) % 233280) / 233280);
+    for (let i = 0; i < 7; i++) {
+      const bx = cx - 21 + Math.floor(rnd() * 13);
+      const by = wl0 - 3 + Math.floor(rnd() * 6);
+      ctx.fillStyle = "rgb(246, 228, 238)";
+      ctx.fillRect(bx, by, 1, 1);
+      ctx.fillStyle = "rgb(150, 116, 100)";
+      ctx.fillRect(bx + 1, by, 1, 1);
+    }
+  }
+  // 折らないように、長い 1 本をそっと斜めに抜く
+  if (ph === "pull") {
+    const W = 28;
+    const H = 31;
+    const show = Math.floor(H * Math.min(1, 0.15 + k * 0.85));
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(cx - 30, wl - show + 1, W, show);
+    ctx.clip();
+    kpRenkon(ctx, rk, 9, cx - 30 + W / 2, wl - show + 1 + H / 2, 50);
+    ctx.restore();
+  }
+  // あぜの山
+  const pile = Math.min(7 + n, KP_PILE.length);
+  for (let i = 0; i < pile - (ph === "toss" ? 1 : 0); i++) kpRenkon(ctx, rk, i, KP_PILE[i][0] + ox, KP_PILE[i][1] + oy, KP_PILE[i][2]);
+  // 体を跳ね上げた勢いで、あぜへ弧を描いて飛ぶ
+  if (ph === "toss") {
+    const i = pile - 1;
+    const [x1, y1, a1] = KP_PILE[i];
+    const x0 = cx - 20;
+    const y0 = wl - 14;
+    kpRenkon(ctx, rk, i, x0 + (x1 + ox - x0) * k, y0 + (y1 + oy - y0) * k - Math.sin(k * Math.PI) * 26, 50 + (a1 - 50 + 360) * k);
+  }
+}
+
 // A 蓮田のあぜ道(入口。北の門柱の先が基地跡)
 const K_LOTUS = {
+  onEnter() {
+    kp.t0 = kpNow(); // 入るたびに、噴くところから。あぜの山も 7 本に戻る
+  },
   tile: T,
   bg: "#6b5f3e",
   tint: "rgba(255, 190, 150, 0.06)",
   map: kGrid(12, 14, (c) => c < 5 || c > 6),
   legend: K_LEGEND,
-  drawGround: kImage("bg_lotus", 12 * T, 14 * T),
+  drawGround(ctx, ox, oy, img, api) {
+    kImage("bg_lotus", 12 * T, 14 * T)(ctx, ox, oy, img);
+    if (api && api.cleared("keiji")) kpDraw(ctx, ox, oy, img); // クイズのあとだけ(D734)
+  },
   spawns: {
     start: { x: 6 * T, y: 12.6 * T, facing: "north" },
     north: { x: 6 * T, y: 1.4 * T, facing: "south" },

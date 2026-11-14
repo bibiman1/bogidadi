@@ -121,7 +121,7 @@ window.BOGI_WORLDS = {
     name: "霞ヶ浦のエクラノプラン",
     assetBase: "./assets/worlds/kasumi/",
     images: Object.fromEntries(
-      ["bg_lotus", "bg_hangar", "bg_wing", "bg_cabin", "bg_cockpit", "fg_shore", "fg_hangar", "fg_cabin", "fg_cockpit", "crew_hawk", "crew_wagtail", "crew_rooster", "fl_sky", "fl_hills", "fl_wbase", "fl_ripple", "fl_mist", "fl_ekrano", "fl_ekrano8", "fl_ekrano_top", "fl_ekrano_shadow", "fl_lake", "v_flight", "v_summer", "photo_summer", "face_mummy", "i_hasu"]
+      ["bg_lotus", "bg_hangar", "bg_wing", "bg_cabin", "bg_cockpit", "fg_shore", "fg_hangar", "fg_cabin", "fg_cockpit", "crew_hawk", "crew_wagtail", "crew_rooster", "fl_sky", "fl_hills", "fl_wbase", "fl_ripple", "fl_mist", "fl_ekrano", "fl_ekrano8", "fl_ekrano_top", "fl_ekrano_shadow", "fl_lake", "v_flight", "v_summer", "photo_summer", "face_mummy", "i_hasu", "p_mud", "p_renkon", "p_ground", "p_jet"]
         .map((k) => [k, `${k}.png`])
         .concat([["bg_shore", "bg_shore.png"], ["ki", "./assets/worlds/lake/ki_walk.png"]])
     ),
