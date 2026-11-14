@@ -267,6 +267,7 @@ window.BOGI_WORLDS = {
           ["kikikori", "./assets/worlds/banana/kikikori.png"], // 南極の撮影隊(D379)。左向きは kikikori_l、goron_l(仮の絵の反転 D389)
           ["goron", "./assets/worlds/banana/goron.png"],
           ["ic_pizza", "./assets/icons/ic_pizza.png"], // 取り出したきこりのピザ(丸ごと)と、切るミニゲームの絵(D395)
+          ["pi", "./assets/worlds/lake/pi_walk.png"], // 戻ってきたぴー(クイズのあと、山頂で観測とピザ D736〜D738)
         ])
     ),
     playerSprite: { img: "ki", cell: 64, frames: 7, footY: 17 },
