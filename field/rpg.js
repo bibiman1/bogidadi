@@ -249,7 +249,7 @@ const ASSET_V = (() => {
           host.enterWorld(id);
         },
         player() {
-          return { x: player.x, y: player.y, facing: player.facing };
+          return { x: player.x, y: player.y, facing: player.facing, z: jumpHeight() }; // z は跳んでいる高さ(地面にいれば 0)
         },
         // きーを同じマップの別の場所へ置く(段差を跳び上がる、など)
         place(x, y) {

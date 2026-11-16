@@ -24,14 +24,15 @@
 
   // 雪の一すじ: 押した所は青い影でへこみ、ふちの下側だけ白く盛り上がる。4 秒そのまま、8 秒かけて埋まる
   function snowTrail(memo, skip) {
-    let pts = [], last = null, buf = null, rim = null, floor = null;
+    let pts = [], last = null, gap = false, buf = null, rim = null, floor = null;
     return (ctx, ox, oy, api) => {
       const p = api.player();
       const t = now();
       if (!last || Math.hypot(p.x - last.x, p.y - last.y) > 40) last = { x: p.x, y: p.y }; // 跳んだ、置き直した
       else if (Math.hypot(p.x - last.x, p.y - last.y) >= 3) {
-        const c = sample(ctx, p.x + ox, p.y + oy - 1, memo, [p.x, p.y - 1]);
-        if (isSnow(c) && !(skip && skip(p.x, p.y))) pts.push({ x: p.x, y: p.y, t, j: [0, 1, 0, -1, 1, 0, 0, -1][pts.length % 8], link: pts.length && pts[pts.length - 1].t > t - 0.4 });
+        if (p.z > 0.5) gap = true; // 跳んでいる間は体が雪にふれない。踏み切りと着地の間もつながない(D754、todo 329)
+        else if (isSnow(sample(ctx, p.x + ox, p.y + oy - 1, memo, [p.x, p.y - 1])) && !(skip && skip(p.x, p.y))) pts.push({ x: p.x, y: p.y, t, j: [0, 1, 0, -1, 1, 0, 0, -1][pts.length % 8], link: !gap && pts.length && pts[pts.length - 1].t > t - 0.4 }), (gap = false);
+        else if (skip && skip(p.x, p.y)) gap = true; // 橋や石段をはさんだ前後は、つながない(走って橋を渡ると、橋の上に線が引かれていた。11-16 監督「橋の上は跡つかない」)
         last = { x: p.x, y: p.y };
       }
       pts = pts.filter((q) => t - q.t < 12);
@@ -84,7 +85,7 @@
       const p = api.player();
       const t = now();
       const moved = last && Math.hypot(p.x - last.x, p.y - last.y);
-      if (moved > 0.5 && moved < 40 && t > next) {
+      if (moved > 0.5 && moved < 40 && t > next && !(p.z > 0.5)) { // 跳んでいる間は出さない(D754)
         // 足もとのまわり 7 点を見て、葉の数だけはねる(葉の上なら多く、アスファルトのすきまなら少し)
         const dir = Math.atan2(p.y - last.y, p.x - last.x);
         const found = [];
@@ -145,7 +146,7 @@
       const p = api.player();
       const t = now();
       const moved = last && Math.hypot(p.x - last.x, p.y - last.y);
-      if (moved > 0.5 && moved < 40 && t > next) {
+      if (moved > 0.5 && moved < 40 && t > next && !(p.z > 0.5)) { // 跳んでいる間は出さない(D754)
         ss.push({ x: p.x + (Math.random() * 6 - 3), y: p.y, t0: t, d: [0, 1, 2, 3].map((i) => ({ a: Math.PI * (0.15 + 0.7 * Math.random()) * (i % 2 ? 1 : -1) + (i % 2 ? 0 : Math.PI), v: 18 + Math.random() * 14 })) });
         next = t + 0.26;
       }
