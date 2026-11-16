@@ -32,7 +32,7 @@
       else if (Math.hypot(p.x - last.x, p.y - last.y) >= 3) {
         if (p.z > 0.5) gap = true; // 跳んでいる間は体が雪にふれない。踏み切りと着地の間もつながない(D754、todo 329)
         else if (isSnow(sample(ctx, p.x + ox, p.y + oy - 1, memo, [p.x, p.y - 1])) && !(skip && skip(p.x, p.y))) pts.push({ x: p.x, y: p.y, t, j: [0, 1, 0, -1, 1, 0, 0, -1][pts.length % 8], link: !gap && pts.length && pts[pts.length - 1].t > t - 0.4 }), (gap = false);
-        else if (skip && skip(p.x, p.y)) gap = true; // 橋や石段をはさんだ前後は、つながない(走って橋を渡ると、橋の上に線が引かれていた。11-16 監督「橋の上は跡つかない」)
+        else gap = true; // 雪のない所(道路、橋、石段)をはさんだ前後は、つながない(走って渡ると、そこに線が引かれていた。11-16 監督「橋の上は跡つかない」「積雪がない道路に跡がついてるよ」)
         last = { x: p.x, y: p.y };
       }
       pts = pts.filter((q) => t - q.t < 12);
