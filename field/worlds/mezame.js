@@ -123,29 +123,60 @@
       }
     }
     const L = Math.round(sx - w / 2), Tp = Math.round(sy - (base - y0));
-    // 反転は、絵の箱ではなく、ペンギンの見える所(不透明の幅)のまん中で折り返す
+    // 反転は、絵の箱ではなく、ペンギンの体(いちばん大きいひとかたまり)の幅のまん中で折り返す。
+    // 切り抜きには体から離れた 1 ドットのかけら(雪の粒)が残っていて、かけらまで含めると軸がずれる(11-17)。
+    // かけらは反転せず、もとの所にそのまま描く
     if (!PBOX[i]) {
       const c = mk(w, h).getContext("2d");
       c.drawImage(im, ax, ay, w, h, 0, 0, w, h);
-      const d = c.getImageData(0, 0, w, h).data;
+      const id = c.getImageData(0, 0, w, h), d = id.data;
+      const lab = new Int32Array(w * h).fill(-1);
+      let best = -1, bestN = 0, n = 0;
+      for (let q = 0; q < w * h; q++) {
+        if (d[q * 4 + 3] === 0 || lab[q] >= 0) continue;
+        let cnt = 0;
+        const st = [q];
+        lab[q] = n;
+        while (st.length) {
+          const p = st.pop(), px = p % w, py = (p - px) / w;
+          cnt++;
+          for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+            const nx = px + dx, ny = py + dy, r = ny * w + nx;
+            if (nx >= 0 && nx < w && ny >= 0 && ny < h && lab[r] < 0 && d[r * 4 + 3] > 0) (lab[r] = n), st.push(r);
+          }
+        }
+        if (cnt > bestN) (bestN = cnt), (best = n);
+        n++;
+      }
+      const body = mk(w, h), rest = mk(w, h);
+      const bi = body.getContext("2d").createImageData(w, h), ri = rest.getContext("2d").createImageData(w, h);
       let l = w, r = 0;
-      for (let q = 0; q < w * h; q++) if (d[q * 4 + 3] > 0) (l = Math.min(l, q % w)), (r = Math.max(r, q % w));
-      PBOX[i] = [l, r];
+      for (let q = 0; q < w * h; q++) {
+        if (lab[q] < 0) continue;
+        const dst = lab[q] === best ? bi.data : ri.data;
+        for (let k = 0; k < 4; k++) dst[q * 4 + k] = d[q * 4 + k];
+        if (lab[q] === best) (l = Math.min(l, q % w)), (r = Math.max(r, q % w));
+      }
+      body.getContext("2d").putImageData(bi, 0, 0);
+      rest.getContext("2d").putImageData(ri, 0, 0);
+      PBOX[i] = [l, r, body, rest, n > 1];
     }
+    const [bl, br, body, rest, hasRest] = PBOX[i];
+    if (hasRest) ctx.drawImage(rest, L, Tp);
     ctx.save();
-    if (s.flip) (ctx.translate(L * 2 + PBOX[i][0] + PBOX[i][1] + 1, 0), ctx.scale(-1, 1));
+    if (s.flip) (ctx.translate(L * 2 + bl + br + 1, 0), ctx.scale(-1, 1));
     if (s.mode === "neck") {
       // 首をのばす: 上の 4 割を 2 ドット上げ、すき間は首のつけねの行をのばしてうめる
       const k = Math.min(1, (T - s.t0) / 0.3, (s.until - T) / 0.3), up = Math.round(2 * k), cut = Math.round(h * 0.4);
-      ctx.drawImage(im, ax, ay + cut, w, h - cut, L, Tp + cut, w, h - cut);
-      for (let j = 0; j < up; j++) ctx.drawImage(im, ax, ay + cut, w, 1, L, Tp + cut - 1 - j, w, 1);
-      ctx.drawImage(im, ax, ay, w, cut, L, Tp - up, w, cut);
+      ctx.drawImage(body, 0, cut, w, h - cut, L, Tp + cut, w, h - cut);
+      for (let j = 0; j < up; j++) ctx.drawImage(body, 0, cut, w, 1, L, Tp + cut - 1 - j, w, 1);
+      ctx.drawImage(body, 0, 0, w, cut, L, Tp - up, w, cut);
     } else if (s.mode === "rock") {
       // 体を左右にゆらす(上だけ 1 ドットずらす)
       const d = Math.floor((T - s.t0) * 5) % 2 ? 1 : -1, cut = Math.round(h * 0.6);
-      ctx.drawImage(im, ax, ay + cut, w, h - cut, L, Tp + cut, w, h - cut);
-      ctx.drawImage(im, ax, ay, w, cut, L + d, Tp, w, cut);
-    } else ctx.drawImage(im, ax, ay, w, h, L, Tp, w, h);
+      ctx.drawImage(body, 0, cut, w, h - cut, L, Tp + cut, w, h - cut);
+      ctx.drawImage(body, 0, 0, w, cut, L + d, Tp, w, cut);
+    } else ctx.drawImage(body, 0, 0, w, h, L, Tp, w, h);
     ctx.restore();
   }
   {
