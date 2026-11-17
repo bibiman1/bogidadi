@@ -22,6 +22,9 @@
   const isSnow = (c) => c && c[0] > 196 && c[1] > 204 && c[2] > 212 && Math.max(c[0], c[1], c[2]) - Math.min(c[0], c[1], c[2]) < 40;
   const isLeaf = (c) => c && c[0] > 125 && c[0] - c[2] > 80 && c[0] - c[1] > 30; // 赤と橙と黄の葉(下草のオリーブ色は入れない)
 
+  // 足もとが雪か。足もとの 1 点だけでなく、左右 6 ドットも雪のときだけ(道路の白い中央線や、路面の白い点を雪と読んでいた。11-17 監督「変な跡がつく」、版 602)
+  const onSnow = (ctx, p, ox, oy, memo) => [0, -6, 6].every((d) => isSnow(sample(ctx, p.x + d + ox, p.y + oy - 1, memo, [p.x + d, p.y - 1])));
+
   // 雪の一すじ: 押した所は青い影でへこみ、ふちの下側だけ白く盛り上がる。4 秒そのまま、8 秒かけて埋まる
   function snowTrail(memo, skip) {
     let pts = [], last = null, gap = false, buf = null, rim = null, floor = null;
@@ -31,7 +34,7 @@
       if (!last || Math.hypot(p.x - last.x, p.y - last.y) > 40) last = { x: p.x, y: p.y }; // 跳んだ、置き直した
       else if (Math.hypot(p.x - last.x, p.y - last.y) >= 3) {
         if (p.z > 0.5) gap = true; // 跳んでいる間は体が雪にふれない。踏み切りと着地の間もつながない(D754、todo 329)
-        else if (isSnow(sample(ctx, p.x + ox, p.y + oy - 1, memo, [p.x, p.y - 1])) && !(skip && skip(p.x, p.y))) pts.push({ x: p.x, y: p.y, t, j: [0, 1, 0, -1, 1, 0, 0, -1][pts.length % 8], link: !gap && pts.length && pts[pts.length - 1].t > t - 0.4 }), (gap = false);
+        else if (onSnow(ctx, p, ox, oy, memo) && !(skip && skip(p.x, p.y))) pts.push({ x: p.x, y: p.y, t, j: [0, 1, 0, -1, 1, 0, 0, -1][pts.length % 8], link: !gap && pts.length && pts[pts.length - 1].t > t - 0.4 }), (gap = false);
         else gap = true; // 雪のない所(道路、橋、石段)をはさんだ前後は、つながない(走って渡ると、そこに線が引かれていた。11-16 監督「橋の上は跡つかない」「積雪がない道路に跡がついてるよ」)
         last = { x: p.x, y: p.y };
       }
