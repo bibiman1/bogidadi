@@ -327,15 +327,19 @@
 
   essayPanel.appendChild(synthesisEl);
 
-  // タブ: 資料写真 / 用語集 / 作品解説 / 制作日記(D260)
+  // タブ: 資料写真 / 用語集 / 作品解説 / 制作日記(D260) / 総括(todo 333)
   const diaryPanel = document.getElementById("diaryPanel");
   const diaryFrame = document.getElementById("diaryFrame");
   const tabDiary = document.getElementById("tabDiary");
+  const soukatsuPanel = document.getElementById("soukatsuPanel");
+  const soukatsuFrame = document.getElementById("soukatsuFrame");
+  const tabSoukatsu = document.getElementById("tabSoukatsu");
   const TABS = [
     [tabImages, grid],
     [tabGlossary, glossaryPanel],
     [tabEssay, essayPanel],
     [tabDiary, diaryPanel],
+    [tabSoukatsu, soukatsuPanel],
   ];
   function showTab(tab) {
     for (const [t, panel] of TABS) {
@@ -343,11 +347,13 @@
       t.classList.toggle("active", t === tab);
     }
     if (tab === tabDiary && !diaryFrame.src) diaryFrame.src = "../docs/diary/index.html";
+    if (tab === tabSoukatsu && !soukatsuFrame.src) soukatsuFrame.src = "./soukatsu.html";
   }
   const showImages = () => showTab(tabImages);
   const showGlossary = () => showTab(tabGlossary);
   const showEssay = () => showTab(tabEssay);
   tabDiary.addEventListener("click", () => showTab(tabDiary));
+  tabSoukatsu.addEventListener("click", () => showTab(tabSoukatsu));
 
   tabImages.addEventListener("click", showImages);
   tabGlossary.addEventListener("click", showGlossary);

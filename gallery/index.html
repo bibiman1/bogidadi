@@ -7,13 +7,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="ぼぎだぢの世界のイメージボード・手描き資料ギャラリー">
   <title>ぼぎだぢ - 書庫</title>
-  <link rel="stylesheet" href="./style.css?v=4">
+  <link rel="stylesheet" href="./style.css?v=5">
 </head>
 <body>
   <header class="gallery-header">
     <a class="back-link" href="../field/index.html">← 懲罰空間に戻る</a>
     <h1>ぼぎだぢ 書庫</h1>
-    <p class="lead">世界観の元になった手描きスケッチ・資料写真と、断片からまとめられた用語集・作品解説、制作日記。</p>
+    <p class="lead">世界観の元になった手描きスケッチ・資料写真と、断片からまとめられた用語集・作品解説、制作日記、五人の批評家による総括。</p>
   </header>
 
   <nav class="gallery-tabs" aria-label="資料の種類">
@@ -21,6 +21,7 @@
     <button type="button" id="tabGlossary" class="gallery-tab">用語集</button>
     <button type="button" id="tabEssay" class="gallery-tab">作品解説</button>
     <button type="button" id="tabDiary" class="gallery-tab">制作日記</button>
+    <button type="button" id="tabSoukatsu" class="gallery-tab">総括</button>
   </nav>
 
   <main class="gallery-wrap">
@@ -29,6 +30,8 @@
     <div id="essayPanel" class="essay-panel" hidden></div>
     <!-- 制作日記(D260): docs/diary の日記をそのまま読む -->
     <div id="diaryPanel" class="diary-panel" hidden><iframe id="diaryFrame" title="ぼぎだぢ制作日記"></iframe></div>
+    <!-- 総括(todo 333): 五人の批評と座談会。gallery/soukatsu.md -->
+    <div id="soukatsuPanel" class="diary-panel" hidden><iframe id="soukatsuFrame" title="ぼぎだぢ 総括"></iframe></div>
   </main>
 
   <div id="lightbox" class="lightbox" hidden>
@@ -43,6 +46,6 @@
     <small>© bibiman1</small>
   </footer>
 
-  <script src="./script.js?v=7"></script>
+  <script src="./script.js?v=8"></script>
 </body>
 </html>

@@ -54,6 +54,7 @@ body {
 
 .gallery-tabs {
   display: flex;
+  flex-wrap: wrap; /* 5 つ目のタブ「総括」(todo 333)で、スマホの幅に収まらないため */
   justify-content: center;
   gap: 8px;
   padding: 20px 24px 0;
