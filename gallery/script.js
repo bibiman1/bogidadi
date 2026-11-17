@@ -347,7 +347,7 @@
       t.classList.toggle("active", t === tab);
     }
     if (tab === tabDiary && !diaryFrame.src) diaryFrame.src = "../docs/diary/index.html";
-    if (tab === tabSoukatsu && !soukatsuFrame.src) soukatsuFrame.src = "./soukatsu.html?v=2";
+    if (tab === tabSoukatsu && !soukatsuFrame.src) soukatsuFrame.src = "./soukatsu.html?v=3";
   }
   const showImages = () => showTab(tabImages);
   const showGlossary = () => showTab(tabGlossary);
