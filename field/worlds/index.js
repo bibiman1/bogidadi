@@ -40,9 +40,11 @@ window.BOGI_WORLDS = {
       door_open: "door_open.png",
       tatami: "tatami.png",
       chabudai: "chabudai.png",
+      ...Object.fromEntries(VOID_OMIYAGE.map(([, k]) => [`omi_${k}`, `omi_${k}.png`])), // きーの部屋に並ぶ持ち帰った物(D765)
       ki: "./assets/worlds/lake/ki_walk.png",
     },
     playerSprite: { img: "ki", cell: 64, frames: 7, footY: 17 },
+    carry: () => (vOmi.carry ? `omi_${vOmi.carry}` : null), // きーの部屋の持ち帰った物を頭にのせて運ぶ(D766)
     start: "void",
     startSpawn: "start",
     maps: { void: VOID },

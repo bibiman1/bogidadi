@@ -5,6 +5,21 @@
 // ---- 懲罰空間: 何もない、白い空間。断片に近づくと、何もなかった場所に何かが見えてくる ----
 const VOID_COLS = 44;
 const VOID_ROWS = 36;
+// きーの部屋に並ぶ持ち帰った物(D765): [おもいでの名前, 絵, 畳の上はしのまん中からの x, y(ドット。足もと)]
+const VOID_OMIYAGE = [
+  ["氷のかけら", "kori", -32, 56], ["蓮の花", "hasu", -37, 25], ["マンゴー", "mango", 36, 25], ["クラブの札", "fuda", 31, 46],
+  ["おたかぽっぽ", "poppo", 5, 89], ["白紙の海図", "kaizu", -25, 93], ["焼けたピザのひと切れ", "slice", 36, 76], ["納品書", "nouhin", -40, 41],
+  ["安全ピンのリボン", "ribbon", 38, 60], ["水あめのわりばし", "ame", 23, 93], ["白紙の解答札", "kaitou", -37, 10], ["絵葉書", "ehagaki", -28, 17],
+];
+const VOID_OMI_FLY = 0.5; // 放ってから落ちるまで(秒。D414 と同じ)
+const vOmi = { carry: null, fly: null }; // 頭にのせている物(絵の名前)と、飛んでいる物
+// 断片や扉に入るとき、頭にのせていたら足もとに置く(D766)
+function vOmiDrop(api) {
+  if (!vOmi.carry) return;
+  const p = api.player();
+  api.setFlag(`omi.${vOmi.carry}`, `${Math.round(p.x)},${Math.round(p.y)}`);
+  vOmi.carry = null;
+}
 
 function voidGrid() {
   // 床のところどころに、うっすら段差のある場所(まばらに)
@@ -47,6 +62,7 @@ function fragment(id, title, text, icon, col, row, tier) {
       // 台座は、はじめから 12 並んでいる(空の台座 D229)。断片が現れると模型が置かれ、終えると灯り、見届けるといっそう明るく灯る
       canInteract: (api) => present(api) && found(api),
       interact(api) {
+        vOmiDrop(api);
         api.enterWorld(id);
       },
       draw(ctx, sx, sy, t, api) {
@@ -83,6 +99,7 @@ function fragment(id, title, text, icon, col, row, tier) {
       run(api) {
         if (found(api)) return;
         api.setFlag(`found.${id}`);
+        vOmiDrop(api);
         api.enterWorld(id);
       },
     },
@@ -151,6 +168,91 @@ const VOID = {
       draw(ctx, sx, sy, t, api) {
         const im = api.image("chabudai");
         if (im) ctx.drawImage(im, Math.round(sx - im.width / 2), Math.round(sy - im.height + 2));
+      },
+    },
+    // 持ち帰った物が、きーの部屋に並ぶ(D765、todo 334)。棚に飾らず、畳の上に少し不ぞろいに。置き場所のはじめは試し絵(docs/record/2026-11-18/omiyage/mock.py)のとおり
+    // きーが重なって A で頭にのせ、もう一度 A で向いている方へ放る(D766。ハンガーの畑 D414 と同じ手ざわり)。落ちた所に残り、覚えておく。誰も拾いに来ない。字は出さない
+    ...VOID_OMIYAGE.map(([name, key, dx, dy]) => ({
+      id: `omi_${key}`,
+      x: 28 * T + dx,
+      y: 31 * T + dy,
+      w: 1,
+      h: 1,
+      range: 14,
+      noLook: true,
+      hidden: (api) => !api.hasItem(name) || vOmi.carry === key || (vOmi.fly && vOmi.fly.key === key),
+      canInteract: () => !vOmi.carry && !vOmi.fly,
+      update(dt, t, api) {
+        const v = api.flagValue(`omi.${key}`); // 放ったあとの場所("x,y")。なければはじめの場所
+        if (v) [this.x, this.y] = String(v).split(",").map(Number);
+      },
+      interact() {
+        vOmi.carry = key;
+      },
+      draw(ctx, sx, sy, t, api) {
+        const im = api.image(`omi_${key}`);
+        if (!im) return;
+        ctx.fillStyle = "rgba(40,50,30,0.24)"; // 床に落ちるうすい影
+        ctx.fillRect(Math.round(sx - im.width / 2) + 2, Math.round(sy) - 1, im.width - 4, 2);
+        ctx.drawImage(im, Math.round(sx - im.width / 2), Math.round(sy - im.height));
+      },
+    })),
+    {
+      // のせている間、もう一度 A で、向いている方へ 2〜3 マス放る(D766、D414)。きーについて歩く、見えない調べ先
+      id: "omiThrow",
+      x: 0,
+      y: 0,
+      w: 1,
+      h: 1,
+      range: 400,
+      noLook: true,
+      noMark: () => true,
+      canInteract: () => !!vOmi.carry && !vOmi.fly,
+      update(dt, t, api) {
+        const p = api.player();
+        this.x = p.x;
+        this.y = p.y;
+      },
+      draw() {},
+      interact(api) {
+        const p = api.player();
+        const v = { east: [1, 0], west: [-1, 0], north: [0, -1], south: [0, 1] }[p.facing] || [0, 1];
+        const x1 = Math.round(Math.max(T, Math.min((VOID_COLS - 1) * T, p.x + v[0] * 2.5 * T)));
+        const y1 = Math.round(Math.max(1.5 * T, Math.min((VOID_ROWS - 0.5) * T, p.y + v[1] * 2.5 * T)));
+        vOmi.fly = { key: vOmi.carry, x0: p.x, y0: p.y, x1, y1, t0: performance.now() / 1000 };
+        vOmi.carry = null;
+        api.sfx("whir");
+      },
+    },
+    {
+      // 放った物: 弧をえがいて飛び、落ちた所に置かれる(転がらない)
+      id: "omiFly",
+      x: 0,
+      y: 0,
+      w: 1,
+      h: 1,
+      hidden: () => !vOmi.fly,
+      update(dt, t, api) {
+        const f = vOmi.fly;
+        if (!f) return;
+        const u = Math.min(1, (performance.now() / 1000 - f.t0) / VOID_OMI_FLY);
+        this.x = f.x0 + (f.x1 - f.x0) * u;
+        this.y = f.y0 + (f.y1 - f.y0) * u;
+        this.z = Math.sin(u * Math.PI) * 26 + (1 - u) * 22; // 頭の高さから投げて、地面に落ちる
+        if (u >= 1) {
+          api.setFlag(`omi.${f.key}`, `${f.x1},${f.y1}`);
+          vOmi.fly = null;
+        }
+      },
+      draw(ctx, sx, sy, t, api) {
+        const f = vOmi.fly;
+        const im = f && api.image(`omi_${f.key}`);
+        if (!im) return;
+        ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
+        ctx.beginPath();
+        ctx.ellipse(Math.round(sx), Math.round(sy), 6, 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.drawImage(im, Math.round(sx - im.width / 2), Math.round(sy - im.height - this.z));
       },
     },
     {
@@ -222,6 +324,7 @@ const VOID = {
       solid: { w: 42, h: 10, dy: -5 },
       canInteract: (api) => api.flag("doorOpen"),
       interact(api) {
+        vOmiDrop(api);
         api.enterWorld("finale");
       },
       draw(ctx, sx, sy, t, api) {
