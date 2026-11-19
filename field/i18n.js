@@ -145,6 +145,7 @@
     "ドラ = まんなかの絵で 1くみ": "Dora = a set of the middle tile",
     "親は 1.5ばい": "Dealer gets x1.5",
     "A つぎへ": "A Next",
+    "A ボタンで はじめる": "Press A to start",
     "4・5翻": "4-5 han",
     "6・7翻": "6-7 han",
     "8翻〜": "8+ han",

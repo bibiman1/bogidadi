@@ -110,7 +110,7 @@ const NG_GAMECEN = {
   triggers: [{ id: "out", x: 5.5 * T, y: 9.6 * T, w: 4 * T, h: T, run: (api) => api.warp("kohan", "gamecen") }],
 };
 
-// ======== ぼぎ雀(D768、D770、D771、D774、D777〜D783)========
+// ======== ぼぎ雀(D768、D770、D771、D774、D777〜D784)========
 // 牌はぼぎだぢの世界の物: 持ち帰ったおもいで 12 種と、形而アップダウンクイズの変な物 6 種。1 種 4 枚、72 枚(D778)。
 // あがりは同じ絵 3 枚の組が 3 つ(ポンとカンした組も数える)。ツモとロン、ポン、カン(D780)、リーチ。親と子、点数、半荘(東南 8 局)。はじめの親はサイコロ(D777)。
 // ながれたら、テンパイの人にノーテンの人が 3000 点を払う。親がテンパイなら連荘(D781)。リーチの 1000 点は、ながれても場に残り、次にあがった人が取る(D779)。
@@ -186,11 +186,12 @@ function bjAiDiscard(hand) {
   return best;
 }
 // 半荘のはじめ: 相手を選び、点を戻し、サイコロで親を決める
-function bjMatch() {
+// again: 半荘の終わりから「もう一度」のときは、タイトルと札を飛ばしてサイコロへ
+function bjMatch(again) {
   const foes = bjShuffle(BJ_FOES.slice()).slice(0, 3).map((f) => Object.assign({}, f, f.crew ? { key: ["crew_hawk", "crew_wagtail", "crew_rooster"][Math.floor(Math.random() * 3)] } : {}));
   bj.seats = [null, ...foes];
   bj.pts = [BJ_START, BJ_START, BJ_START, BJ_START];
-  Object.assign(bj, { wind: 0, kyoku: 0, sticks: 0, phase: "rules", page: 0, dora: null, end: null, back: null, hands: [[], [], [], []], melds: [[], [], [], []], rivers: [[], [], [], []], riichi: [false, false, false, false], drawn: null });
+  Object.assign(bj, { wind: 0, kyoku: 0, sticks: 0, phase: "title", titleT: bj.t, page: 0, dora: null, end: null, back: null, hands: [[], [], [], []], melds: [[], [], [], []], rivers: [[], [], [], []], riichi: [false, false, false, false], drawn: null });
 }
 // はじめの札のあと、サイコロで親を決める
 function bjDice() {
@@ -581,6 +582,11 @@ function bjDraw(ctx, ox, oy, img) {
   ctx.fillRect(X, Y, 480, 300);
   const P = window.bogiPix;
   const txt = (s, x, y, col, k = 1, right) => P && P.text(ctx, s, right ? x - P.width(s) * k : x, y, k, col);
+  if (P && (bj.phase === "title" || (bj.phase === "quitAsk" && bj.back === "title"))) {
+    bjTitle(ctx, X, Y, img, P);
+    if (bj.phase === "quitAsk") bjQuit(ctx, X, Y, txt, P);
+    return bjScan(ctx, X, Y);
+  }
   if (bj.phase === "rules" || (bj.phase === "quitAsk" && bj.back === "rules")) {
     bjRules(ctx, X, Y, img, txt, P);
     if (bj.phase === "quitAsk" && P) bjQuit(ctx, X, Y, txt, P);
@@ -785,6 +791,53 @@ function bjScan(ctx, X, Y) {
   ctx.fillStyle = "rgba(0, 0, 0, 0.16)";
   for (let y = 0; y < 300; y += 2) ctx.fillRect(X, Y + y, 480, 1);
 }
+// タイトル画面(D784。試し絵 docs/record/2026-11-19/bogijan/title/mock_2x.png)。台に座ると最初に出す。
+// 題字は字体の 5 倍に、こげ茶の縁と影。黄から橙の帯が下へ流れる。奥にうすく牌の柄、牌の列が横に流れる、相手 7 人の顔、A の案内が点滅
+const bjTitleBuf = { c: null };
+function bjTitle(ctx, X, Y, img, P) {
+  const t = bj.t - (bj.titleT || 0);
+  ctx.fillStyle = "#0b2a20";
+  ctx.fillRect(X, Y, 480, 300);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(X, Y, 480, 300);
+  ctx.clip();
+  ctx.globalAlpha = 0.12;
+  for (let r = 0; r < 7; r++)
+    for (let i = 0; i < 15; i++) {
+      const im = img(BJ_IMG(BJ_KINDS[(r * 5 + i) % 18]));
+      if (im) ctx.drawImage(im, Math.round(X + i * 36 - (r % 2) * 18 + ((t * 12) % 36) - 36), Y + r * 44, 32, 32);
+    }
+  ctx.globalAlpha = 1;
+  const s = 5;
+  const word = "ぼぎ雀";
+  const w = P.width(word) * s;
+  const x0 = X + 240 - w / 2;
+  const y0 = Y + 30;
+  for (const [dx, dy] of [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]) P.text(ctx, word, x0 + dx * 4, y0 + dy * 4, s, "#3a1a0a");
+  P.text(ctx, word, x0 + 6, y0 + 8, s, "#1a0a04");
+  if (!bjTitleBuf.c) {
+    bjTitleBuf.c = document.createElement("canvas");
+    bjTitleBuf.c.width = 480;
+    bjTitleBuf.c.height = 120;
+  }
+  const g = bjTitleBuf.c.getContext("2d");
+  g.globalCompositeOperation = "source-over";
+  g.clearRect(0, 0, 480, 120);
+  P.text(g, word, 240 - w / 2, 10, s, "#ffffff");
+  g.globalCompositeOperation = "source-atop";
+  const cols = ["#fff4b0", "#ffd84a", "#ffb03a", "#ff7a2a"];
+  for (let y = 0; y < 120; y += 4) {
+    g.fillStyle = cols[Math.floor((y / 4 + t * 6) / 3) % 4];
+    g.fillRect(0, y, 480, 4);
+  }
+  ctx.drawImage(bjTitleBuf.c, X, y0 - 10);
+  P.text(ctx, "BOGI-JAN", X + 240 - P.width("BOGI-JAN") / 2, Y + 128, 1, "#9fc7b0");
+  for (let i = -1; i < 13; i++) bjTile(ctx, img, X + i * 38 + ((t * 30) % 38), Y + 152, BJ_KINDS[(i + 18) % 18]);
+  BJ_FOES.forEach((f, i) => bjFace(ctx, img, X + 26 + i * 62, Y + 206, Object.assign({}, f, f.crew ? { key: "crew_hawk" } : {}), false));
+  if (Math.floor(t * 1.5) % 2 === 0) P.text(ctx, "A ボタンで はじめる", X + 240 - P.width("A ボタンで はじめる") / 2, Y + 268, 1, "#f2d27a");
+  ctx.restore();
+}
 // はじめの札(D783)。3 枚、A でめくる
 const BJ_RULE_LINES = [
   ["ツモ", "じぶんで ひいた牌で あがる"],
@@ -849,7 +902,10 @@ const NG_JAN = {
   },
   debug: () => bj,
   onA(api) {
-    if (bj.phase === "rules") {
+    if (bj.phase === "title") {
+      api.sfx("ok");
+      bj.phase = "rules";
+    } else if (bj.phase === "rules") {
       api.sfx("page");
       if (bj.page < 2) bj.page += 1;
       else bjDice();
@@ -861,7 +917,8 @@ const NG_JAN = {
       bjNext(api);
     } else if (bj.phase === "matchEnd" && bj.t - bj.end.t > 0.8) {
       api.sfx("ok");
-      bjMatch();
+      bjMatch(true);
+      bjDice();
     } else if (bj.phase === "quitAsk") bjLeave(api);
     return true;
   },
