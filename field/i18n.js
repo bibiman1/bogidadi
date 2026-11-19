@@ -106,6 +106,22 @@
     "形而上": "Metaphysical",
     "形而下": "Physical",
     "やすみ": "Skip",
+    // ゲームセンターのぼぎ雀(D768、D770)
+    "ぼぎ雀": "Bogi-jan",
+    "ツモ": "Tsumo",
+    "ロン": "Ron",
+    "ながれ": "Draw",
+    "あがり": "Win",
+    "面前": "Closed",
+    "リーチ": "Riichi",
+    "▲ リーチ": "▲ Riichi",
+    "△ リーチ": "△ Riichi",
+    "ポン": "Pon",
+    "ポン？": "Pon?",
+    "A ポン　B みおくる": "A Pon  B Pass",
+    "親": "D",
+    "やめますか？": "Quit?",
+    "A はい　B いいえ": "A Yes  B No",
     "おみやげ = 正しい物": "Souvenirs = right answers",
     "へんな物 = どこにもない物": "Strange things = from nowhere",
     "まんなかに なにか いたような……": "Something was there... in the middle?",
@@ -250,6 +266,9 @@
 
   // 式の入った文(数や名前が入る)。$1 などには、中身も訳して入れる
   var PAT = [
+    [/^のこり (\d+)$/, "Left $1"], // ぼぎ雀の山の残り
+    [/^東(\d)局$/, "East $1"],
+    [/^南(\d)局$/, "South $1"],
     [/^見つけた断片: (.+?) \/ (.+)$/, "Fragments found: $1 / $2"],
     [/^断片のなか: (.+)$/, "In a fragment: $1"],
     [/^もちもの: (.+)$/, "Items: $1"],
