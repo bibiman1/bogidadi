@@ -66,11 +66,12 @@ const NG_GAMECEN = {
   },
   objects: [
     // きーが奥へ回ると、手前の物がきーより前に来るように、背景から切り出して描く
-    ngRyoCut("gcTableL", "bg_gamecen", 118, 156, 74, 212), // 画面の暗いテーブル台
-    ngRyoCut("gcTableJ", "bg_gamecen", 293, 152, 68, 224), // ぼぎ雀の台
-    ngRyoCut("gcStoolL", "bg_gamecen", 96, 186, 24, 212), // 暗い台の左のいす
-    ngRyoCut("gcStoolL2", "bg_gamecen", 142, 222, 26, 248), // 暗い台の前のいす
-    ngRyoCut("gcStoolJ", "bg_gamecen", 314, 216, 28, 244), // ぼぎ雀の台の前のいす
+    // 台といすは、まわりの床をぬいた絵で描く(四角く切ると、うしろに回ったきーに床がかぶる。todo 356。docs/record/2026-11-20/gc_kasanari/)
+    // [id, 絵, 物の x(もとの切り抜きの左), 絵の左, 絵の上, 足もと]
+    ...[["gcTableL", "tableL", 118, 121, 168, 212], ["gcTableJ", "tableJ", 293, 294, 160, 224], ["gcStoolL", "stoolL", 96, 96, 187, 212], ["gcStoolL2", "stoolL2", 142, 142, 222, 248], ["gcStoolJ", "stoolJ", 314, 314, 217, 244]].map(([id, k, x, ix, y0, base]) => ({
+      id, x, y: base, w: 1, h: 1,
+      draw(ctx, sx, sy, t, api) { const im = api.image(`fg_gc_${k}`); if (im) ctx.drawImage(im, sx + ix - x, sy - (base - y0)); },
+    })),
     ngRyoCut("gcVend", "bg_gamecen", 434, 204, 46, 320), // 自販機(横向き。部屋の絵ごと頼み直した D813。docs/record/2026-11-20/gc_redo/)
     ngRyoCut("gcBench", "bg_gamecen", 436, 134, 44, 226), // 長いす
     // 手前のガラス戸(南の壁)。きーはいつも戸のうしろ。枠は不透明、ガラスは半透明で透けて見える(todo 348。docs/record/2026-11-20/gc_door/)
