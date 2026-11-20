@@ -1,7 +1,7 @@
 // 断片: 本栖湖の長門。湖畔の通りの、土産物屋と旅館のあいだの切妻の家(戸が開いている)はゲームセンター(todo 335、D767〜D776)
 // 中はだれもいない。台はだれもいない画面にデモを流し続ける。テーブル台の「ぼぎ雀」(麻雀風、麻雀そのものではない D768、D770)で遊べる。
 // 奥の裏口は裏庭に出る(D772)。ぼぎ雀の半荘で 1 位になるとあく(D786、D804。裏庭と、あく場面は nagato_uraniwa.js)。
-// 絵は docs/record/2026-11-19/gamecen/(Pro 3 案、75 回分。案 1 を使う D776)。ぼぎ雀の画面は docs/record/2026-11-19/bogijan/(D774)
+// 絵は docs/record/2026-11-19/gamecen/(Pro 3 案、75 回分。案 1 を使う D776)。自販機を横向きにして、部屋ごと頼み直した(D813、docs/record/2026-11-20/gc_redo/)。ぼぎ雀の画面は docs/record/2026-11-19/bogijan/(D774)
 // field/worlds/ のファイルは index.html の順に読む。上のファイルで決めた名前(T、kGrid、NG_KOHAN、ngRyoCut など)をそのまま使う
 "use strict";
 
@@ -71,7 +71,7 @@ const NG_GAMECEN = {
     ngRyoCut("gcStoolL", "bg_gamecen", 96, 186, 24, 212), // 暗い台の左のいす
     ngRyoCut("gcStoolL2", "bg_gamecen", 142, 222, 26, 248), // 暗い台の前のいす
     ngRyoCut("gcStoolJ", "bg_gamecen", 314, 216, 28, 244), // ぼぎ雀の台の前のいす
-    ngRyoCut("gcVend", "bg_gamecen", 436, 218, 44, 320), // 自販機(横向き D808。docs/record/2026-11-20/gc_vend/)
+    ngRyoCut("gcVend", "bg_gamecen", 434, 204, 46, 320), // 自販機(横向き。部屋の絵ごと頼み直した D813。docs/record/2026-11-20/gc_redo/)
     ngRyoCut("gcBench", "bg_gamecen", 436, 134, 44, 226), // 長いす
     // 手前のガラス戸(南の壁)。きーはいつも戸のうしろ。枠は不透明、ガラスは半透明で透けて見える(todo 348。docs/record/2026-11-20/gc_door/)
     { id: "gcDoor", x: 181, y: 320, w: 1, h: 1, draw(ctx, sx, sy, t, api) { const im = api.image("fg_gc_door"); if (im) ctx.drawImage(im, sx, sy - 89); } },
