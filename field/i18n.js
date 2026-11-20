@@ -132,6 +132,7 @@
     "3くみ そろえれば あがり": "Make 3 sets to win",
     "おなじ絵 3まい(スーツは なんでも)": "3 of the same picture (any suit)",
     "おなじスーツの ちがう絵 3まい": "3 different pictures, same suit",
+    "(並びは 鳴いていない手だけ)": "(runs only in a closed hand)",
     "一発": "Ippatsu",
     "海底": "Haitei",
     "河底": "Houtei",

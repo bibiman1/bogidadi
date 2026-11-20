@@ -100,6 +100,42 @@
     out.stop = () => oscs.forEach(([o, l]) => (o.stop(), l.stop()));
     return out;
   }
+  // 風の音(ファイルなし)。ゲームセンターの裏庭(D804)。ざらざらした音を帯で通し、帯の高さと大きさをゆっくりゆらす
+  function windNode() {
+    const sec = 4;
+    const b = ctx.createBuffer(1, Math.floor(ctx.sampleRate * sec), ctx.sampleRate);
+    const d = b.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < d.length; i++) {
+      last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; // 赤みがかった音(低いほうへ寄せる)
+      d[i] = last * 3.5;
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = b;
+    src.loop = true;
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = 420;
+    bp.Q.value = 0.8;
+    const out = ctx.createGain();
+    out.gain.value = 0.22;
+    const lfos = [
+      [0.07, 180, bp.frequency],
+      [0.11, 0.1, out.gain],
+    ].map(([hz, depth, param]) => {
+      const o = ctx.createOscillator();
+      o.frequency.value = hz;
+      const g = ctx.createGain();
+      g.gain.value = depth;
+      o.connect(g).connect(param);
+      o.start();
+      return o;
+    });
+    src.connect(bp).connect(out);
+    out.start = () => src.start();
+    out.stop = () => (src.stop(), lfos.forEach((o) => o.stop()));
+    return out;
+  }
   // 旋律を音の部品で鳴らす(ファイルなし)。ぱーでれの断片の「遠き山に日は落ちて」(ドヴォルザーク「新世界より」第 2 楽章の旋律。D432)
   // 霧の向こうから聞こえるように、やわらかい音、こもった音色、こだま。1 回ごとに間をあけてくり返す
   const MELODIES = {
@@ -316,6 +352,7 @@
         start(s);
       });
     else if (MELODIES[key]) start(melodyNode(MELODIES[key]));
+    else if (key === "kaze") start(windNode());
     else start(droneNode(key));
     if (old) {
       old.gain.gain.cancelScheduledValues(ctx.currentTime);

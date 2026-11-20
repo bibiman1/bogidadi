@@ -1,6 +1,6 @@
 // 断片: 本栖湖の長門。湖畔の通りの、土産物屋と旅館のあいだの切妻の家(戸が開いている)はゲームセンター(todo 335、D767〜D776)
 // 中はだれもいない。台はだれもいない画面にデモを流し続ける。テーブル台の「ぼぎ雀」(麻雀風、麻雀そのものではない D768、D770)で遊べる。
-// 奥の裏口は裏庭に出る(D772)。裏庭の中身は監督があとで考えるので、いまは開かない戸。
+// 奥の裏口は裏庭に出る(D772)。ぼぎ雀の半荘で 1 位になるとあく(D786、D804。裏庭と、あく場面は nagato_uraniwa.js)。
 // 絵は docs/record/2026-11-19/gamecen/(Pro 3 案、75 回分。案 1 を使う D776)。ぼぎ雀の画面は docs/record/2026-11-19/bogijan/(D774)
 // field/worlds/ のファイルは index.html の順に読む。上のファイルで決めた名前(T、kGrid、NG_KOHAN、ngRyoCut など)をそのまま使う
 "use strict";
@@ -94,7 +94,7 @@ const NG_GAMECEN = {
         api.later(300, () => api.warp("jan", "view"));
       },
     },
-    // 奥の裏口(裏庭へ D772)。いまは開かない
+    // 奥の裏口(裏庭へ D772)。調べたときの動きは nagato_uraniwa.js で決める(優勝するまでは開かない)
     {
       id: "uraguchi",
       x: 418,
@@ -117,7 +117,8 @@ const NG_GAMECEN = {
 // きーの相手 3 人は 7 人から毎回ランダムで、画面の中だけ(D771、D773)。あがっても何ももらえない(D768)。説明は出さず、あがりの役と点だけ出す(D213)
 // 操作: 十字キーの左右で牌を選び A で捨てる。上でリーチをつける(もう一度でやめる)。下でカン。ポンを聞かれたら A で鳴く、下でカン、B で見送る。B で台を離れる(勝負の途中は聞く)
 // 牌は「絵.スーツ」の文字(例 "mango.h")。おもいでの 4 枚にはトランプのスーツ ♠ ♥ ♦ ♣ を 1 つずつ(D794)。変な物はスーツなし("u1")。
-// 組は 2 つ: 刻子(同じ絵 3 枚、スーツは問わない)と、並び(同じスーツのちがうおもいで 3 枚)。変な物は刻子だけ。チーはない
+// 組は 2 つ: 刻子(同じ絵 3 枚、スーツは問わない)と、並び(同じスーツのちがうおもいで 3 枚)。変な物は刻子だけ。チーはない。
+// 並びは鳴いていない手でだけ作れる(D797。ポンやカンで鳴いたら、刻子でしかあがれない)
 // 鳴いた組は { k: 絵, n: 3 か 4, closed: 暗カンなら true, tiles: [牌] }
 const BJ_KINDS = ["kori", "hasu", "mango", "fuda", "poppo", "kaizu", "slice", "nouhin", "ribbon", "ame", "kaitou", "ehagaki", "u1", "u2", "u3", "u4", "u5", "u6"];
 const BJ_SUITS = ["s", "h", "d", "c"]; // ♠ ♥ ♦ ♣
@@ -125,6 +126,8 @@ const bjK = (t) => t.split(".")[0]; // 絵
 const bjS = (t) => t.split(".")[1] || null; // スーツ(変な物は null)
 const BJ_IMG = (t) => (t[0] === "u" ? bjK(t) : `ic_${bjK(t)}`); // 変な物は形而の絵(u1〜u6)
 const BJ_COPIES = 4;
+let BJ_HAND = 8; // 配る枚数
+let BJ_NEED = 3; // あがりに要る組の数
 // 牌の種類(54)。おもいで 12 × スーツ 4、変な物 6
 const BJ_TILES = BJ_KINDS.flatMap((k) => (k[0] === "u" ? [k] : BJ_SUITS.map((s) => `${k}.${s}`)));
 const bjFullDeck = () => BJ_KINDS.flatMap((k) => (k[0] === "u" ? Array(BJ_COPIES).fill(k) : BJ_SUITS.map((s) => `${k}.${s}`)));
@@ -157,7 +160,7 @@ const bjCount = (h) => {
 const bjCountK = (h) => bjCount(h.map(bjK)); // 絵ごとの枚数
 // 手の牌を組に分ける分け方を、すべて返す(組は { type: "k" 刻子 | "n" 並び, tiles })。残りの牌は組にしない。
 // 先頭の牌を「刻子に入れる」「並びに入れる」「使わない」に分けて、のこりを同じように分ける(手は 9 枚までなので、すぐ終わる)
-function bjDecomps(h) {
+function bjDecomps(h, noRuns) {
   const t = bjSort(h.slice());
   const out = [];
   const rec = (rest, sets) => {
@@ -168,7 +171,7 @@ function bjDecomps(h) {
     for (let i = 0; i < same.length; i++)
       for (let j = i + 1; j < same.length; j++) rec(more.filter((_, q) => q !== same[i][1] && q !== same[j][1]), sets.concat({ type: "k", tiles: [a, same[i][0], same[j][0]] }));
     // 並び: a と同じスーツで、絵のちがう 2 枚(3 つともちがう絵)
-    if (bjS(a)) {
+    if (bjS(a) && !noRuns) {
       const suit = more.map((x, i) => [x, i]).filter(([x]) => bjS(x) === bjS(a) && bjK(x) !== bjK(a));
       for (let i = 0; i < suit.length; i++)
         for (let j = i + 1; j < suit.length; j++) {
@@ -181,9 +184,10 @@ function bjDecomps(h) {
   rec(t, []);
   return out;
 }
-const bjMaxSets = (h) => bjDecomps(h).reduce((m, d) => Math.max(m, d.length), 0);
-const bjSets = (h, m) => m.length + bjMaxSets(h);
-const bjWin = (h, m) => bjSets(h, m) >= 3;
+let BJ_RUN_MENZEN = true; // 並びは鳴いていない手でだけ作れる(D797。鳴いたら刻子でしかあがれない)
+const bjMaxSets = (h, noRuns) => bjDecomps(h, noRuns).reduce((m, d) => Math.max(m, d.length), 0);
+const bjSets = (h, m) => m.length + bjMaxSets(h, BJ_RUN_MENZEN && m.some((x) => !x.closed));
+const bjWin = (h, m) => bjSets(h, m) >= BJ_NEED;
 const bjTenpai = (h, m) => BJ_TILES.some((t) => bjWin(h.concat(t), m));
 const bjShuffle = (a) => {
   for (let i = a.length - 1; i > 0; i--) {
@@ -192,7 +196,9 @@ const bjShuffle = (a) => {
   }
   return a;
 };
-const bjSort = (h) => h.sort((a, b) => BJ_KINDS.indexOf(bjK(a)) - BJ_KINDS.indexOf(bjK(b)) || BJ_SUITS.indexOf(bjS(a)) - BJ_SUITS.indexOf(bjS(b)));
+// 手の並べ方: スーツが先(♠ ♥ ♦ ♣、変な物は最後)、その中で絵の順(監督「スーツのソートを優先して」)
+const bjSuitRank = (t) => (bjS(t) ? BJ_SUITS.indexOf(bjS(t)) : 9);
+const bjSort = (h) => h.sort((a, b) => bjSuitRank(a) - bjSuitRank(b) || BJ_KINDS.indexOf(bjK(a)) - BJ_KINDS.indexOf(bjK(b)));
 const bjSeen = () => bjCountK(bj.rivers.flat().map((r) => r.k).concat(...bj.melds.flat().map((m) => m.tiles)));
 const bjMenzen = (p) => bj.melds[p].every((m) => m.closed); // 暗カンは面前のまま(D780)
 // 自分の番にできるカン(手と引いた牌で)。リーチのあとは、引いた牌で 4 枚になる暗カンだけ(待ちが変わらない)
@@ -242,7 +248,7 @@ function bjDice() {
 }
 function bjDeal() {
   bj.deck = bjShuffle(bjFullDeck());
-  bj.hands = [0, 1, 2, 3].map(() => bj.deck.splice(0, 8));
+  bj.hands = [0, 1, 2, 3].map(() => bj.deck.splice(0, BJ_HAND));
   bj.dora = bj.deck.shift(); // 山の最後の 1 枚を表にしてドラ(引かない)
   bj.ippatsu = [false, false, false, false];
   bjSort(bj.hands[0]);
@@ -260,8 +266,8 @@ function bjAgari(api, kind, who, from, rinshan) {
   // 手の分け方ごとに役を数え、翻のいちばん高い分け方をとる
   let yaku = null;
   let han = -1;
-  for (const d of bjDecomps(h)) {
-    if (d.length + m.length < 3) continue;
+  for (const d of bjDecomps(h, BJ_RUN_MENZEN && m.some((x) => !x.closed))) {
+    if (d.length + m.length < BJ_NEED) continue;
     const sets = m.map((x) => ({ type: "k", tiles: x.tiles, closed: x.closed })).concat(d.map((x) => Object.assign({ closed: true }, x)));
     const y = bjYaku(sets, kind, who, rinshan, last);
     const hn = y.reduce((s, n) => s + BJ_YAKU.find((r) => r[0] === n)[1], 0);
@@ -342,6 +348,7 @@ function bjNext(api) {
     bj.phase = "matchEnd";
     bj.end = { kind: "match", t: bj.t };
     api.sfx("ok");
+    ngUraWin(api); // きーが 1 位なら裏口があく(D786、D804。nagato_uraniwa.js)
     return;
   }
   bjDeal();
@@ -949,6 +956,7 @@ function bjTitle(ctx, X, Y, img, P) {
 const BJ_RULE_LINES = [
   ["刻子", "おなじ絵 3まい(スーツは なんでも)"],
   ["並び", "おなじスーツの ちがう絵 3まい"],
+  ["", "(並びは 鳴いていない手だけ)"],
   ["ツモ", "じぶんで ひいた牌で あがる"],
   ["ロン", "ひとが すてた牌で あがる"],
   ["ポン", "手に 2まい → ひとの牌で 1くみ"],
@@ -975,8 +983,8 @@ function bjRules(ctx, X, Y, img, txt, P) {
     });
     txt("3くみ そろえれば あがり", X + 240 - P.width("3くみ そろえれば あがり") / 2, Y + 84, "#e8e0c8");
     BJ_RULE_LINES.forEach(([a, b], i) => {
-      txt(a, X + 40, Y + 110 + i * 23, "#f2d27a");
-      txt(b, X + 120, Y + 110 + i * 23, "#e8e0c8");
+      txt(a, X + 40, Y + 106 + i * 21, "#f2d27a");
+      txt(b, X + 120, Y + 106 + i * 21, "#e8e0c8");
     });
   } else {
     txt("役と点", X + 240 - 24, Y + 26, "#f2d27a");
