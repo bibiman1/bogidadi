@@ -61,7 +61,7 @@ const ST_FLAGS = {
   padre: { ending_oneness: "", gone: "", taken: "", observed: "見届けた" },
   bomber: { cap: "", loadSeen: "", ribbonBlown: "", observed: "見届けた" },
   keiji: { lit: "明かりがついた(露出のあと)", observed: "見届けた" },
-  nagato: { hat: "水兵帽をかぶった", fired: "斉射した", hatBack: "帽子を返した", bought: "絵葉書を買った", observed: "見届けた" },
+  nagato: { hat: "水兵帽をかぶった", fired: "斉射した", hatBack: "帽子を返した", bought: "絵葉書を買った", uraWin: "ぼぎ雀で 1 位(次にゲームセンターに入ると 3 人が飛び出す)", uraOpen: "裏口があいた", uraBroken: "天板が割れている(OFF で直る)", observed: "見届けた" },
 };
 const stFlagWorld = () => (rpg.isHub ? stMenu.fw : rpg.worldId);
 function stFlagRows() {

@@ -7,8 +7,8 @@
 "use strict";
 
 // 状態: pending は、勝った半荘の相手(裏口へ走る 3 人)。ゲームセンターに戻ったときに走らせる
-// broken: 天板が割れている(D806。ゲームセンターを出ると直る)。door: 裏口の戸のあき(0 閉 〜 1 開)
-const ngUra = { pending: null, run: null, t0: 0, broken: false, door: 0, debris: null };
+// 天板が割れているのは旗 uraBroken(D806。ゲームセンターを出ると直る。デバッグのフラグで直せる D807)。door: 裏口の戸のあき(0 閉 〜 1 開)
+const ngUra = { pending: null, run: null, t0: 0, door: 0, debris: null };
 // 時間表(秒、t0 から。D806): 台が震える → 天板を割って 3 人が飛び出す → 天板の上で跳ねる → 降りて裏口へ → 戸があき、入り、閉まる
 const NG_URA_T = { shake: 1.0, pop: 0.5, popGap: 0.08, hops: 3, hop: 0.34, hopH: 11, downGap: 0.22, down: 0.45, speed: 120, open: 0.2, enter: 0.3, close: 0.25 };
 const NG_URA_CAB = { x: 327, y: 178 }; // ぼぎ雀の台の画面
@@ -28,6 +28,12 @@ function ngUraWin(api) {
 
 // ゲームセンターに戻ったとき: 用意があれば走らせる
 function ngUraStart(api) {
+  // デバッグのフラグ「uraWin」(D807): 半荘で 1 位を取ったことにする。相手はぼぎ雀の相手からくじで 3 人
+  if (!ngUra.pending && api.flag("uraWin")) {
+    api.setFlag("uraWin", false);
+    api.setFlag("uraOpen");
+    ngUra.pending = bjShuffle(BJ_FOES.slice()).slice(0, 3).map((f) => Object.assign({}, f, f.crew ? { key: ["crew_hawk", "crew_wagtail", "crew_rooster"][Math.floor(Math.random() * 3)] } : {}));
+  }
   if (!ngUra.pending) return;
   const foes = ngUra.pending;
   ngUra.pending = null;
@@ -78,7 +84,7 @@ function ngUraFx() {
       const c = ngUra.cues;
       if (!c) return;
       if (!c.shake && now >= ngUra.t0) ((c.shake = true), api.sfx("gata"), api.later(500, () => api.sfx("gata")));
-      if (!c.brk && now >= ngUra.sBreak) ((c.brk = true), (ngUra.broken = true), api.sfx("bari"));
+      if (!c.brk && now >= ngUra.sBreak) ((c.brk = true), api.setFlag("uraBroken"), api.sfx("bari"));
       if (!c.open && now >= ngUra.sOpen) ((c.open = true), api.sfx("doorOpen"));
       if (!c.close && now >= ngUra.sClose) ((c.close = true), api.sfx("doorClose"));
       const T = NG_URA_T;
@@ -346,15 +352,15 @@ NG_GAMECEN.onEnter = (api) => ngUraStart(api);
       dy = Math.floor(now * 19) % 3 === 0 ? -1 : 0;
     }
     cabDraw.call(this, ctx, sx + dx, sy + dy, t, api);
-    if (ngUra.broken) ngUraDrawHole(ctx, sx - 293, sy - 224);
+    if (api.flag("uraBroken")) ngUraDrawHole(ctx, sx - 293, sy - 224);
   };
   const jan = NG_GAMECEN.objects.find((o) => o.id === "bogijan");
   const janAct = jan.interact;
-  jan.interact = (api) => (ngUra.broken ? api.sfx("gata") : janAct(api));
+  jan.interact = (api) => (api.flag("uraBroken") ? api.sfx("gata") : janAct(api));
   // 裏口の戸があいた形(戸の足もとの y で前後を決める)
   NG_GAMECEN.objects.push({ id: "uraDoor", x: 418, y: 104.5, w: 1, h: 1, draw: (ctx, sx, sy, t, api) => ngUra.door > 0 && ngUraDrawDoor(ctx, api, sx - 418, sy - 104.5, ngUra.door) });
   // ゲームセンターを出ると、天板は直っている
   const out = NG_GAMECEN.triggers.find((tr) => tr.id === "out");
   const outRun = out.run;
-  out.run = (api) => ((ngUra.broken = false), outRun(api));
+  out.run = (api) => (api.setFlag("uraBroken", false), outRun(api));
 }
