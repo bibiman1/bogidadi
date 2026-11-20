@@ -71,8 +71,10 @@ const NG_GAMECEN = {
     ngRyoCut("gcStoolL", "bg_gamecen", 96, 186, 24, 212), // 暗い台の左のいす
     ngRyoCut("gcStoolL2", "bg_gamecen", 142, 222, 26, 248), // 暗い台の前のいす
     ngRyoCut("gcStoolJ", "bg_gamecen", 314, 216, 28, 244), // ぼぎ雀の台の前のいす
-    ngRyoCut("gcVend", "bg_gamecen", 426, 222, 54, 320), // 自販機
+    ngRyoCut("gcVend", "bg_gamecen", 436, 218, 44, 320), // 自販機(横向き D808。docs/record/2026-11-20/gc_vend/)
     ngRyoCut("gcBench", "bg_gamecen", 436, 134, 44, 226), // 長いす
+    // 手前のガラス戸(南の壁)。きーはいつも戸のうしろ。枠は不透明、ガラスは半透明で透けて見える(todo 348。docs/record/2026-11-20/gc_door/)
+    { id: "gcDoor", x: 181, y: 320, w: 1, h: 1, draw(ctx, sx, sy, t, api) { const im = api.image("fg_gc_door"); if (im) ctx.drawImage(im, sx, sy - 89); } },
     // 当たり(テーブル台、いす。奥の台の前、西の壁ぎわ、テーブル台の奥と手前のいす)
     { id: "hTableL", x: 155, y: 196, w: 1, h: 1, solid: { w: 66, h: 26 }, draw() {} },
     { id: "hTableJ", x: 327, y: 204, w: 1, h: 1, solid: { w: 60, h: 30 }, draw() {} },
@@ -534,9 +536,12 @@ function bjKiAfter(i) {
   h.splice(i, 1);
   return h;
 }
+// 「▲ リーチ」のとき、i 番目を捨てるとテンパイが残るか(残らない牌は選べない。todo 351)
+const bjKiOk = (i) => !bj.arm || bjTenpai(bjKiAfter(i), bj.melds[0]);
 function bjKiDiscard(api) {
   const n = bj.hands[0].length;
   const i = bj.riichi[0] ? n : bj.cur;
+  if (!bj.riichi[0] && !bjKiOk(i)) return;
   const all = bj.hands[0].concat(bj.drawn ? [bj.drawn] : []);
   const tile = all[i];
   const after = bjKiAfter(i);
@@ -791,6 +796,11 @@ function bjDraw(ctx, ox, oy, img) {
   const pick = bj.phase === "pick" && !bj.riichi[0];
   for (let i = 0; i < h.length; i++) bjTile(ctx, img, X + 70 + i * 35, Y + 236 - (pick && bj.cur === i ? 8 : 0), h[i]);
   if (bj.drawn && bj.turn === 0) bjTile(ctx, img, X + 70 + h.length * 35 + 12, Y + 236 - (pick && bj.cur === h.length ? 8 : 0), bj.drawn);
+  // 「▲ リーチ」のあいだ、捨てるとテンパイが崩れる牌は暗く(選べない。todo 351)
+  if (pick && bj.arm) {
+    ctx.fillStyle = "rgba(6, 16, 12, 0.6)";
+    for (let i = 0; i < h.length + (bj.drawn ? 1 : 0); i++) if (!bjKiOk(i)) ctx.fillRect(X + 70 + i * 35 + (i === h.length ? 12 : 0), Y + 236, 34, 44);
+  }
   {
     let x = X + 470;
     for (const m of bj.melds[0]) {
@@ -1067,12 +1077,23 @@ const NG_JAN = {
     }
     if (bj.phase === "pick" && !bj.riichi[0]) {
       const n = bj.hands[0].length + (bj.drawn ? 1 : 0);
+      // 「▲ リーチ」のあいだは、捨ててもテンパイが残る牌だけを渡る(todo 351)
       if (dx && dx !== bj.prevX) {
-        bj.cur = (bj.cur + dx + n) % n;
+        for (let k = 0; k < n; k++) {
+          bj.cur = (bj.cur + dx + n) % n;
+          if (bjKiOk(bj.cur)) break;
+        }
         api.sfx("cursor");
       }
       if (dy === -1 && dy !== bj.prevY && bjCanRiichi()) {
         bj.arm = !bj.arm;
+        if (bj.arm && !bjKiOk(bj.cur)) {
+          // いちばん近い選べる牌へ
+          for (let d = 1; d < n; d++) {
+            if (bj.cur - d >= 0 && bjKiOk(bj.cur - d)) { bj.cur -= d; break; }
+            if (bj.cur + d < n && bjKiOk(bj.cur + d)) { bj.cur += d; break; }
+          }
+        }
         api.sfx("cursor");
       }
     }
