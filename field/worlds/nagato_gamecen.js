@@ -262,6 +262,7 @@ function bjDeal() {
 const bjUp = (n) => Math.ceil(n / 100) * 100;
 // あがり: 役と点を数えて、払う
 function bjAgari(api, kind, who, from, rinshan) {
+  const pts0 = bj.pts.slice(); // 精算の前の点(だれが何点動いたかを出す。todo 353)
   const h = bj.hands[who];
   const m = bj.melds[who];
   const last = h[h.length - 1]; // あがった牌(ロンなら人の捨て牌)
@@ -296,7 +297,7 @@ function bjAgari(api, kind, who, from, rinshan) {
   bj.sticks = 0;
   bj.pts[who] += got;
   bjSort(bj.hands[who]);
-  bj.end = { kind, who, from, yaku, han, got, t: bj.t };
+  bj.end = { kind, who, from, yaku, han, got, tile: last, t: bj.t, delta: bj.pts.map((v, i) => v - pts0[i]) };
   bj.phase = "kyokuEnd";
   api.sfx("pinpon");
 }
@@ -327,11 +328,12 @@ function bjYaku(sets, kind, who, rinshan, last) {
 }
 // ながれ: テンパイ(あと 1 枚。リーチの人もふくむ)の人に、ノーテンの人が合わせて 3000 点を払う(D781)
 function bjNagare(api) {
+  const pts0 = bj.pts.slice();
   const ten = [0, 1, 2, 3].map((p) => bj.riichi[p] || bjTenpai(bj.hands[p], bj.melds[p]));
   const n = ten.filter(Boolean).length;
   if (n > 0 && n < 4) for (let p = 0; p < 4; p++) bj.pts[p] += ten[p] ? 3000 / n : -3000 / (4 - n);
   for (let p = 0; p < 4; p++) if (ten[p]) bjSort(bj.hands[p]);
-  bj.end = { kind: "nagare", who: -1, ten, t: bj.t };
+  bj.end = { kind: "nagare", who: -1, ten, t: bj.t, delta: bj.pts.map((v, i) => Math.round(v - pts0[i])) };
   bj.phase = "kyokuEnd";
   api.sfx("back");
 }
@@ -861,16 +863,50 @@ function bjDraw(ctx, ox, oy, img) {
     txt("ドラ", X + 214, Y + 128, "#9fc7b0");
     bjSmall(ctx, img, X + 258, Y + 136, bj.dora, 0);
   }
+  // 精算(todo 353): 点のそばに、動いた点(+ は金、- は赤。下の牌にかからないよう暗い地をしく)。ロンなら、ふりこんだ人の顔を赤い枠で囲み、顔の下に「ふりこみ」の札
+  if (end && end.delta && P) {
+    const at = [[8, 198, false], [474, 106, true], [114, 50, true], [6, 106, false]];
+    for (let p = 0; p < 4; p++) {
+      const d = end.delta[p];
+      if (!d) continue;
+      const [x, y, r] = at[p];
+      const s = d > 0 ? `+${d}` : `${d}`;
+      ctx.fillStyle = "rgba(8, 20, 14, 0.9)";
+      ctx.fillRect(X + (r ? x - P.width(s) - 2 : x - 2), Y + y - 1, P.width(s) + 4, 18);
+      txt(s, X + x, Y + y, d > 0 ? "#f2d27a" : "#ff6a5a", 1, r);
+    }
+    if (end.kind === "ron") {
+      const f = end.from;
+      const w = P.width("ふりこみ") + 6;
+      const tag = (x, y) => {
+        ctx.fillStyle = "#b8322a";
+        ctx.fillRect(X + x, Y + y, w, 18);
+        txt("ふりこみ", X + x + 3, Y + y + 1, "#fff4e0");
+      };
+      if (f === 0) tag(8 + P.width(`${end.delta[0]}`) + 6, 197); // きーは動いた点のとなり(まん中の札にかからない)
+      else {
+        const [fx, fy] = [[0, 0], [430, 40], [120, 4], [6, 40]][f];
+        ctx.strokeStyle = "#ff5a4a";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(X + fx - 1, Y + fy - 1, 46, 48);
+        ctx.lineWidth = 1;
+        if (f === 2) tag(fx, fy + 48); // 上の人は点と動いた点が顔の左にあるので、顔の下へ
+        else tag(Math.max(1, Math.min(479 - w, fx + 22 - w / 2)), fy + 28);
+      }
+    }
+  }
   // 局の終わり: ツモ / ロン / ながれ、役(2 行まで折り返す)、翻と点
   if (bj.phase === "kyokuEnd" && P) {
     const e = bj.end;
     const word = { tsumo: "ツモ", ron: "ロン", nagare: "ながれ" }[e.kind];
     ctx.fillStyle = "rgba(8, 20, 14, 0.96)"; // 下の捨て牌やリーチの棒が透けて、役の字にかからないように
-    ctx.fillRect(X + 130, Y + 96, 220, e.kind === "nagare" ? 52 : 124); // 役は 3 行まで
+    ctx.fillRect(X + 130, Y + 96, 220, e.kind === "nagare" ? 52 : 136); // 役は 3 行まで(あたり牌のぶん下へ)
     txt(word, X + 240 - P.width(word), Y + 104, e.kind === "nagare" ? "#9fc7b0" : "#f2d27a", 2);
     if (e.kind !== "nagare") {
+      // あたり牌(ロンなら人の捨て牌、ツモなら引いた牌。todo 353)。字の左に大きく
+      if (e.tile) bjTile(ctx, img, X + 142, Y + 100, e.tile);
       let x = X + 140;
-      let y = Y + 140;
+      let y = Y + 152;
       for (const name of e.yaku) {
         if (x + P.width(name) > X + 342) {
           x = X + 140;
@@ -879,8 +915,8 @@ function bjDraw(ctx, ox, oy, img) {
         txt(name, x, y, e.yaku[0] === "形而上" ? "#ff8a5a" : "#e8e0c8");
         x += P.width(name) + 8;
       }
-      txt(e.han >= 99 ? "役満" : `${e.han}翻`, X + 140, Y + 198, "#9fc7b0");
-      txt(`${e.got}`, X + 340, Y + 198, "#ff8a5a", 1, true);
+      txt(e.han >= 99 ? "役満" : `${e.han}翻`, X + 140, Y + 210, "#9fc7b0");
+      txt(`${e.got}`, X + 340, Y + 210, "#ff8a5a", 1, true);
     }
   }
   // 半荘の終わり: 点の多い順
