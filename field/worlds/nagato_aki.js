@@ -565,11 +565,11 @@ const NA_ROAD = {
 };
 
 // ---- 秋の湖ぞいの道(D680、todo 280): 長門の湖畔の通りの東のはし(霧が晴れたあと)から、秋の湖畔の東のはしへ下る、曲がりくねった道 ----
-// 北から入って S 字に 2 回曲がり、南西で西へ折れて秋の湖畔へ。下りきる手前で、木のあいだから茅葺きの屋根と開いたゲートが先に見える
+// 西(左のはし)から東向きに入り(町から東へ歩いてきた向きのまま D815)、右へ曲がって S 字に 2 回曲がり、南西で西へ折れて秋の湖畔へ。下りきる手前で、木のあいだから茅葺きの屋根と開いたゲートが先に見える
 // (作者「あ、ここにつながるのね！という体験をさせたい」)。言葉は出さない。絵は秋の峠道の地面・木・落ち葉を使う
 const WIND_COLS = 15;
 const WIND_ROWS = 30;
-const WIND_POINTS = [[-2, 7], [3, 7], [6, 10.5], [9.5, 11], [12.5, 8], [14.5, 4.5], [17.5, 3.5], [20.5, 6], [23, 9.5], [25.5, 8.5], [26.8, 5], [27, 1], [27, -3]];
+const WIND_POINTS = [[3, -3], [3, 1], [3.8, 5], [6, 9], [9.5, 11], [12.5, 8], [14.5, 4.5], [17.5, 3.5], [20.5, 6], [23, 9.5], [25.5, 8.5], [26.8, 5], [27, 1], [27, -3]];
 const WIND_CURVE = catmullRom(WIND_POINTS, 0.05);
 const windGrid = (() => {
   const g = [];
@@ -611,7 +611,14 @@ const WIND_RAILS = (() => {
     }
   }
   if (cur.length) runs.push(cur);
-  return runs.filter((r) => r.length > 4);
+  // 同じ側で、すき間が短いものは一本につなぐ(入口の曲がりで切れていた D815)
+  const out = [];
+  for (const r of runs) {
+    const p = out[out.length - 1];
+    if (p && p.side === r.side && Math.hypot(p[p.length - 1][0] - r[0][0], p[p.length - 1][1] - r[0][1]) < 3 * T) p.push(...r);
+    else out.push(r);
+  }
+  return out.filter((r) => r.length > 4);
 })();
 const WIND_HOUTOU = { x: 0.6 * T, y: 24.9 * T }; // 茅葺きの屋根(秋の湖畔のほうとう屋。西のはしから右半分がのぞく)
 const WIND_GATE_X = 0.7 * T; // 開いたゲート(秋の湖畔のゲートと同じ形)
@@ -681,11 +688,11 @@ const NA_WIND = {
     WIND_RAILS.forEach((run) => guardrail(ctx, ox, oy, run));
   },
   spawns: {
-    top: { x: 7.5 * T, y: 1.2 * T, facing: "south" }, // 長門の湖畔の通りから来た所
+    top: { x: 0.9 * T, y: 3.4 * T, facing: "east" }, // 長門の湖畔の通りから来た所(町から東へ歩いて、左のはしから東向きに入る D815)
     bottom: { x: 1.6 * T, y: 27.5 * T, facing: "east" }, // 秋の湖畔から戻ってきた所
   },
   triggers: [
-    { id: "toNagato", x: 4 * T, y: -T, w: 7 * T, h: 1.5 * T, warp: { map: "kohan", spawn: "east" } },
+    { id: "toNagato", x: -T, y: 1.5 * T, w: 1.5 * T, h: 4 * T, warp: { map: "kohan", spawn: "east" } },
     { id: "toLake", x: -T, y: 25 * T, w: 1.5 * T, h: 4 * T, warp: { map: "akiLake", spawn: "east" } },
   ],
   objects: forest(windGrid, 0, [[21, 0, 26, 4]]).map(akiTree),
@@ -880,6 +887,16 @@ const NA_WHITE = {
   },
 };
 
+// なめらかな値のノイズ(0〜1)。格子の点ごとに決まった値を、なめらかにつなぐ
+function akiNoise(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y);
+  const fx = x - xi, fy = y - yi;
+  const h = (a, b) => { const q = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return q - Math.floor(q); };
+  const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+  const top = h(xi, yi) + (h(xi + 1, yi) - h(xi, yi)) * sx;
+  const bot = h(xi, yi + 1) + (h(xi + 1, yi + 1) - h(xi, yi + 1)) * sx;
+  return top + (bot - top) * sy;
+}
 function akiFog() {
   return {
     id: "aki_fog",
@@ -1009,20 +1026,31 @@ function akiFog() {
       let a = 1;
       if (api.flag("akiOpen")) a = akiCar.clearT < 0 ? 0 : Math.max(0, 1 - (t - akiCar.clearT) / 2.5);
       if (a <= 0) return;
-      // 霧は通りの上の家並みと木までかける(作者「上の方が切れてる」D679)
-      const g = ctx.createLinearGradient(AKI_FOG_X + ox, 0, AKI_FOG_X + 2.4 * T + ox, 0);
-      g.addColorStop(0, "rgba(226, 228, 230, 0)");
-      g.addColorStop(1, `rgba(226, 228, 230, ${0.96 * a})`);
-      ctx.fillStyle = g;
-      ctx.fillRect(AKI_FOG_X + ox, -T + oy, 5.6 * T, 20 * T);
-      for (let i = 0; i < 16; i++) {
-        const px = AKI_FOG_X + ((i * 53 + t * 9) % (3.6 * T)) + 0.4 * T;
-        const py = 0.5 * T + ((i * 71) % (17 * T));
-        const r = 18 + (i % 3) * 8;
-        ctx.fillStyle = `rgba(236, 238, 240, ${0.45 * a * Math.min(1, (px - AKI_FOG_X) / (1.2 * T))})`;
-        ctx.beginPath();
-        ctx.ellipse(px + ox, py + oy, r * 1.6, r * 0.7, 0, 0, Math.PI * 2);
-        ctx.fill();
+      // 霧をドット絵のかたまり(3 ドット角)で描く(D816)。濃さは 5 段。左のふちは行ごとにゆれ、地面と水の近くが濃い。模様はゆっくり右へ流れる
+      const B = 3;
+      const x0 = AKI_FOG_X - 1.6 * T;
+      const x1 = AKI_FOG_X + 5.6 * T;
+      const y0 = -T;
+      const y1 = 19 * T;
+      const LV = [0, 0.22, 0.42, 0.66, 0.9, 0.97];
+      for (let y = y0; y < y1; y += B) {
+        const yy = y / T;
+        const edge = (akiNoise(yy * 0.7, 3.1) - 0.5) * 2.2 * T + (akiNoise(yy * 2.5, 7.7) - 0.5) * 0.8 * T; // 左のふちのゆれ
+        const low = yy > 9 ? 1 : 0.72 + 0.28 * (yy / 9); // 上は薄い
+        for (let x = x0; x < x1; x += B) {
+          const ramp = Math.max(0, Math.min(1, (x - AKI_FOG_X - edge + 1.0 * T) / (3.4 * T)));
+          if (ramp <= 0) continue;
+          const n = akiNoise((x - t * 7) / 64, y / 14) * 0.6 + akiNoise((x - t * 12) / 26, y / 7 + 5) * 0.4; // 横にのびた筋
+          let v = ramp * low * (0.35 + 1.0 * n);
+          const deep = Math.max(0, Math.min(1, (x - AKI_FOG_X - 1.8 * T) / (1.4 * T)));
+          v = v + (0.97 - v) * deep * deep; // 奥は隠しきる(霧の奥の白い世界 D679)
+          v *= a;
+          let k = 0;
+          while (k < LV.length - 1 && v > (LV[k] + LV[k + 1]) / 2) k++;
+          if (!k) continue;
+          ctx.fillStyle = `rgba(228, 230, 232, ${LV[k]})`;
+          ctx.fillRect(Math.round(x + ox), Math.round(y + oy), B, B);
+        }
       }
       akiWhiteVeil(ctx, t);
     },
@@ -1030,3 +1058,29 @@ function akiFog() {
 }
 NG_KOHAN.objects.push(akiFog());
 NG_KOHAN.triggers.find((tr) => tr.id === "toAki").enabled = (api) => api.flag("akiOpen");
+
+// 霧が晴れたあと、通りの東のはしに落ち葉を散らす(東ほど多く。D816)
+NG_KOHAN.objects.push({
+  id: "aki_peek", x: 48 * T, y: 10.6 * T, w: 1, h: 1,
+  draw(ctx, sx, sy, t, api) {
+    if (!api.flag("akiOpen")) return;
+    const ox = sx - this.x, oy = sy - this.y;
+    if (!this.leaves) {
+      const c = document.createElement("canvas");
+      c.width = 7 * T; c.height = 5 * T;
+      const g = c.getContext("2d");
+      for (let k = 0; k < 260; k++) {
+        const u = rand(k, 3, 1), v = rand(k, 5, 2);
+        if (rand(k, 7, 3) > u * 1.3) continue; // 東ほど多く
+        const col = AKI_LEAF_COL[Math.floor(rand(k, 9, 4) * AKI_LEAF_COL.length)];
+        const sh = AKI_LEAF_SHAPE[Math.floor(rand(k, 11, 5) * AKI_LEAF_SHAPE.length)];
+        const px = Math.floor(u * 7 * T), py = Math.floor(v * 4.6 * T);
+        for (const [dx, dy] of sh) { const d = dx + dy < 3 ? 1 : 0.8; g.fillStyle = `rgb(${col[0] * d | 0},${col[1] * d | 0},${col[2] * d | 0})`; g.fillRect(px + dx, py + dy, 1, 1); }
+        g.fillStyle = "rgba(40, 30, 20, 0.35)";
+        g.fillRect(px + 1, py + 5, 3, 1);
+      }
+      this.leaves = c;
+    }
+    ctx.drawImage(this.leaves, Math.round(43.5 * T + ox), Math.round(11.1 * T + oy));
+  },
+});
