@@ -67,22 +67,46 @@ const NG_SEAT_Y = 186; // きーの体の下(座面)
 const NG_DIAL_Y = 92;
 const ngNow = () => performance.now() / 1000;
 const ngD = { sit: null, bell: null }; // sit: { side, t0 } / bell: { t0 }
-// 針(2 ドットの太さ)。turn は東(右)から南(下)へ、elev は水平(右)から上へ(0〜30 度を 4 分の 1 周に広げる)
-const ngNeedle = (ctx, x0, y0, side, u) => {
-  const a = ((side === "L" ? 90 : -90) * u * Math.PI) / 180;
-  const c = 19.5;
-  ctx.fillStyle = "#1e1a1a";
-  for (const d of [-0.5, 0.5]) {
-    const sx = c + d * Math.sin(a);
-    const sy = c - d * Math.cos(a);
-    const ex = sx + Math.cos(a) * 13;
-    const ey = sy + Math.sin(a) * 13;
-    const n = 30;
-    for (let i = 0; i <= n; i++) ctx.fillRect(x0 + Math.floor(sx + ((ex - sx) * i) / n), y0 + Math.floor(sy + ((ey - sy) * i) / n), 1, 1);
+// 計器の小窓の中の砲(todo 358、D823)。右は横から見た砲身が 0 度から 30 度へ上がる。左は上から見た砲塔が回る
+const ngPx = (ctx, x, y, col) => ((ctx.fillStyle = col), ctx.fillRect(Math.round(x), Math.round(y), 1, 1));
+const ngBar = (ctx, x0, y0, sx, sy, a, len, w, col) => {
+  // (sx, sy) から角度 a へ、長さ len・太さ w の棒を 1 ドットずつ
+  const ca = Math.cos(a), sa = Math.sin(a);
+  for (let t = 0; t <= len; t += 0.5)
+    for (let k = -(w - 1) / 2; k <= (w - 1) / 2 + 0.01; k += 0.5) ngPx(ctx, x0 + sx + ca * t - sa * k, y0 + sy + sa * t + ca * k, col);
+};
+const ngGunIcon = (ctx, x0, y0, side, u) => {
+  const INK = "#2a2226", MID = "#5a4f55", HI = "#8a8086";
+  // 文字盤の目盛りと針の代わりに、うすい地を敷く
+  ctx.fillStyle = "#e3dcc7";
+  for (let y = 6; y < 34; y++) {
+    const h = Math.sqrt(Math.max(0, 14.5 * 14.5 - (y - 19.5) * (y - 19.5)));
+    ctx.fillRect(x0 + Math.round(19.5 - h), y0 + y, Math.round(h * 2), 1);
   }
-  ctx.fillStyle = "#291c22";
-  ctx.fillRect(x0 + 18, y0 + 19, 4, 2);
-  ctx.fillRect(x0 + 19, y0 + 18, 2, 4);
+  if (side === "R") {
+    // 横から見た砲。砲耳(左下)を軸に、砲身が右へ伸びて持ち上がる
+    const px = 13, py = 23;
+    ctx.fillStyle = "#b9b09c";
+    ctx.fillRect(x0 + 7, y0 + 29, 26, 1); // 甲板の線
+    ngBar(ctx, x0, y0, px, py, (-30 * u * Math.PI) / 180, 16, 3, INK);
+    ngBar(ctx, x0, y0, px, py, (-30 * u * Math.PI) / 180, 15, 1, MID);
+    ctx.fillStyle = INK;
+    ctx.fillRect(x0 + 8, y0 + 21, 9, 8); // 砲塔の箱
+    ctx.fillStyle = MID;
+    ctx.fillRect(x0 + 9, y0 + 22, 7, 6);
+    ctx.fillStyle = HI;
+    ctx.fillRect(x0 + 9, y0 + 22, 7, 1);
+  } else {
+    // 上から見た砲塔。2 本の砲身ごと、東から南へ回る
+    const a = (90 * u * Math.PI) / 180;
+    const cx = 19.5, cy = 19.5;
+    for (const k of [-2.5, 2.5]) ngBar(ctx, x0, y0, cx - Math.sin(a) * k, cy + Math.cos(a) * k, a, 13, 2, INK);
+    for (let y = -6; y <= 6; y++)
+      for (let x = -6; x <= 6; x++) {
+        const r = Math.hypot(x, y);
+        if (r <= 6.2) ngPx(ctx, x0 + cx + x, y0 + cy + y, r > 5.2 ? INK : y < -2 ? HI : MID);
+      }
+  }
 };
 const ngSeat = (side) => ({
   id: "seat" + side,
@@ -235,7 +259,7 @@ const NG_HOTOU = {
       const dy = Math.round(oy + NG_DIAL_Y);
       if (d) ctx.drawImage(d, dx, dy);
       const u = ngEase((ngNow() - ngD.sit.t0 - 0.3) / 2.2);
-      ngNeedle(ctx, dx, dy, ngD.sit.side, u);
+      ngGunIcon(ctx, dx, dy, ngD.sit.side, u);
     }
   },
   spawns: {
