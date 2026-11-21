@@ -8,33 +8,8 @@
   const hit = {};
   const age = (id) => (hit[id] == null ? Infinity : now() - hit[id]);
   const px = (ctx, x, y, w, h, c) => ((ctx.fillStyle = c), ctx.fillRect(Math.round(x), Math.round(y), w, h));
-  // 背景から、印の点を切り出して、元の所を左右の近い色でうめた下地を作る(宝舟の tzCut と同じ考え)
-  const cache = {};
-  function cut(key, img, x0, y0, w, h, isMark) {
-    if (cache[key]) return cache[key];
-    const mk = () => Object.assign(document.createElement("canvas"), { width: w, height: h });
-    const a = mk(), m = mk(), f = mk();
-    const g = a.getContext("2d");
-    g.drawImage(img, x0, y0, w, h, 0, 0, w, h);
-    const d = g.getImageData(0, 0, w, h).data;
-    const mark = new Uint8Array(w * h);
-    for (let i = 0; i < w * h; i++) mark[i] = isMark(d[i * 4], d[i * 4 + 1], d[i * 4 + 2], i % w, (i / w) | 0) ? 1 : 0;
-    const mi = m.getContext("2d").createImageData(w, h), fi = f.getContext("2d").createImageData(w, h);
-    for (let i = 0; i < w * h; i++) {
-      if (!mark[i]) continue;
-      for (let k = 0; k < 4; k++) mi.data[i * 4 + k] = d[i * 4 + k];
-      const x = i % w, y = (i / w) | 0;
-      let l = x, r = x;
-      while (l > 0 && mark[y * w + l]) l--;
-      while (r < w - 1 && mark[y * w + r]) r++;
-      const pick = mark[y * w + l] ? r : mark[y * w + r] ? l : x - l <= r - x ? l : r;
-      const j = (y * w + pick) * 4;
-      fi.data[i * 4] = d[j], fi.data[i * 4 + 1] = d[j + 1], fi.data[i * 4 + 2] = d[j + 2], fi.data[i * 4 + 3] = 255;
-    }
-    m.getContext("2d").putImageData(mi, 0, 0);
-    f.getContext("2d").putImageData(fi, 0, 0);
-    return (cache[key] = { mark: m, fill: f });
-  }
+  // 背景から、印の点を切り出して、元の所を左右の近い色でうめた下地を作る(common.js の kCutFill)。isMark の x, y は切り出しの中の位置
+  const cut = (key, img, x0, y0, w, h, isMark) => kCutFill(`kinai:${key}`, img, x0, y0, w, h, (r, g, b, x, y) => isMark(r, g, b, x - x0, y - y0));
   const spot = (id, x, y, sortDy, sound, dur, draw) => ({
     id, x, y, w: 1, h: 1, range: 44, headY: 16, sortDy,
     interact(api) {

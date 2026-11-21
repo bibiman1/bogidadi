@@ -7,42 +7,8 @@
 const tkTz = {};
 const tzNow = () => performance.now() / 1000;
 const tzAge = (id) => (tkTz[id] == null ? Infinity : tzNow() - tkTz[id]);
-const tzCache = {};
-// 背景の一部を切り出し、印の点(鎖、針)を左右のいちばん近い点の色でうめた下地(印の所だけ)と、印だけの絵に分ける
-const tzCut = (key, img, x0, y0, w, h, isMark) => {
-  if (tzCache[key]) return tzCache[key];
-  const mk = () => {
-    const c = document.createElement("canvas");
-    c.width = w;
-    c.height = h;
-    return c;
-  };
-  const a = mk(), m = mk(), f = mk();
-  const g = a.getContext("2d");
-  g.drawImage(img, x0, y0, w, h, 0, 0, w, h);
-  const d = g.getImageData(0, 0, w, h).data;
-  const mark = new Uint8Array(w * h);
-  for (let i = 0; i < w * h; i++) mark[i] = isMark(d[i * 4], d[i * 4 + 1], d[i * 4 + 2], x0 + (i % w), y0 + ((i / w) | 0)) ? 1 : 0;
-  const mi = m.getContext("2d").createImageData(w, h);
-  const fi = f.getContext("2d").createImageData(w, h);
-  for (let i = 0; i < w * h; i++) {
-    if (!mark[i]) continue;
-    for (let k = 0; k < 4; k++) mi.data[i * 4 + k] = d[i * 4 + k];
-    const x = i % w, y = (i / w) | 0;
-    let l = x, r = x;
-    while (l > 0 && mark[y * w + l]) l--;
-    while (r < w - 1 && mark[y * w + r]) r++;
-    const pick = mark[y * w + l] ? r : mark[y * w + r] ? l : x - l <= r - x ? l : r;
-    const j = (y * w + pick) * 4;
-    fi.data[i * 4] = d[j];
-    fi.data[i * 4 + 1] = d[j + 1];
-    fi.data[i * 4 + 2] = d[j + 2];
-    fi.data[i * 4 + 3] = 255;
-  }
-  m.getContext("2d").putImageData(mi, 0, 0);
-  f.getContext("2d").putImageData(fi, 0, 0);
-  return (tzCache[key] = { mark: m, fill: f });
-};
+// 背景の印を切り出して、元の所をうめる(common.js の kCutFill)
+const tzCut = (key, ...rest) => kCutFill(`tk:${key}`, ...rest);
 // 調べなくても動く物(D742): 人がいなくても続いている揺れ。period 秒ごとに dur 秒だけ draw を呼ぶ。調べられない(印も出ない)
 const tzAmbient = (id, x, y, period, dur, draw, sortDy) => ({
   id,

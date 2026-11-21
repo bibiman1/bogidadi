@@ -244,6 +244,38 @@ const kFg = (img, x0, y0, w, h, base) => ({
 });
 const kWall = (x0, y0, x1, y1) => ({ id: `wall${x0}_${y0}`, x: (x0 + x1) / 2, y: (y0 + y1) / 2, w: 1, h: 1, solid: { w: x1 - x0, h: y1 - y0 } });
 // なめらかに 0 から 1 へ(はじめと終わりがゆっくり)
+// 背景の一部を切り出し、印の点(鎖、針、ヘルメットなど)を左右のいちばん近い点の色でうめた下地(印の所だけ)と、印だけの絵に分ける。
+// isMark(r, g, b, x, y) の x, y は背景の上の位置。key ごとに一度だけ作る(宝舟の発電所と、エクラノプランの機内で使う)
+const kCutCache = {};
+const kCutFill = (key, img, x0, y0, w, h, isMark) => {
+  if (kCutCache[key]) return kCutCache[key];
+  const mk = () => Object.assign(document.createElement("canvas"), { width: w, height: h });
+  const a = mk(), m = mk(), f = mk();
+  const g = a.getContext("2d");
+  g.drawImage(img, x0, y0, w, h, 0, 0, w, h);
+  const d = g.getImageData(0, 0, w, h).data;
+  const mark = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) mark[i] = isMark(d[i * 4], d[i * 4 + 1], d[i * 4 + 2], x0 + (i % w), y0 + ((i / w) | 0)) ? 1 : 0;
+  const mi = m.getContext("2d").createImageData(w, h);
+  const fi = f.getContext("2d").createImageData(w, h);
+  for (let i = 0; i < w * h; i++) {
+    if (!mark[i]) continue;
+    for (let k = 0; k < 4; k++) mi.data[i * 4 + k] = d[i * 4 + k];
+    const x = i % w, y = (i / w) | 0;
+    let l = x, r = x;
+    while (l > 0 && mark[y * w + l]) l--;
+    while (r < w - 1 && mark[y * w + r]) r++;
+    const pick = mark[y * w + l] ? r : mark[y * w + r] ? l : x - l <= r - x ? l : r;
+    const j = (y * w + pick) * 4;
+    fi.data[i * 4] = d[j];
+    fi.data[i * 4 + 1] = d[j + 1];
+    fi.data[i * 4 + 2] = d[j + 2];
+    fi.data[i * 4 + 3] = 255;
+  }
+  m.getContext("2d").putImageData(mi, 0, 0);
+  f.getContext("2d").putImageData(fi, 0, 0);
+  return (kCutCache[key] = { mark: m, fill: f });
+};
 const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 // ジャンプを教えるときの吹き出しに出す(霞ヶ浦と南極。もとは kasumi.js、D666)
 // どのボタンで跳ぶか: 最後にキーボードを使っていれば「Xキー」、画面をさわっていれば「Bボタン」
