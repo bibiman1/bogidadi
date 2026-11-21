@@ -48,6 +48,7 @@ const ngBreech = (gun, x) => ({
   h: 1,
   headY: 48,
   range: 1.9 * T,
+  noMark: (api) => ngNextId(api) === "breech" + gun, // 次にすることの ▼ と重ねない(todo 357)
   interact(api) {
     // こめ終わった砲は、もう寄りの絵に入らない(入ると、することがなく、出方もわからなかった。作者「二回目はいると出れなくなる」)
     if (api.flag("loaded" + gun)) return api.sfx("clang");
@@ -91,6 +92,7 @@ const ngSeat = (side) => ({
   h: 1,
   headY: 30,
   range: 1.1 * T,
+  noMark: (api) => ngNextId(api) === "seat" + side, // 次にすることの ▼ と重ねない(todo 357)
   interact(api) {
     const S = NG_SEAT[side];
     if (ngD.sit || ngD.bell) return;
@@ -165,13 +167,17 @@ const ngDemoEnter = (api) => {
   } else ngDemo.crew = null;
 };
 // 次にすることの ▼(こめる場面と同じ印 D698)。お手本のあいだは、お鷹ぽっぽの番の所には出さない
+// 次にする物の id。ここに ▼ を出す物は、ふつうの「調べられる ▼」を出さない(二つ重なっていた。todo 357)
+const ngNextId = (api) => {
+  if (!api.flag("loadedL")) return ngDemo.on ? null : "breechL";
+  if (!api.flag("loadedR")) return "breechR";
+  if (!api.flag("turned")) return ngDemo.on ? null : "seatL";
+  if (!api.flag("elevated")) return "seatR";
+  return null;
+};
 const ngNextMark = (api) => {
   const o = (id) => NG_HOTOU.objects.find((x) => x.id === id);
-  let id = null;
-  if (!api.flag("loadedL")) id = ngDemo.on ? null : "breechL";
-  else if (!api.flag("loadedR")) id = "breechR";
-  else if (!api.flag("turned")) id = ngDemo.on ? null : "seatL";
-  else if (!api.flag("elevated")) id = "seatR";
+  const id = ngNextId(api);
   const ob = id && o(id);
   if (!ob) return null;
   if (id.startsWith("seat")) return [ob.x, 157]; // 丸椅子のすぐ上(計器の箱の下)
