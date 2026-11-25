@@ -35,7 +35,9 @@ const knPeelHeld = (ctx, x, y, d) => {
 // ピザをベネラの口(窯 D383)に入れ → 百葉箱の北の扉をのぞき → 風の塔を見上げ → 黒焦げを取り出して、その場で貪り食う → 気象台へ戻る。
 // 熱の中には入らない(D391)。さかいの手前からピールで出し入れする。きーは無視(調べる物はない)。試し絵 docs/record/2026-11-14/kisho/trial2.py
 const KP2 = { door: [170, 116], mid: [300, 210], oven: [428, 262], box: [352, 158], mast: [388, 122], speed: 55 };
-const kp2Plan = (() => {
+// D829: 一回りおきに、焦げる回(今まで)と、うまく焼ける回。焼けた回は、ピザを気象台の中へ持ち帰り、撮影隊と三人で分ける(縦の雑な 2 本)
+const KP2_IN = 14.8; // 焼けた回に、ぴーが気象台の中にいる秒(kp2In の段の合計)
+const kp2Make = (good) => {
   const P = [];
   const d = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1]) / KP2.speed;
   const add = (name, sec, a, b, carry) => P.push({ name, sec, a, b: b || a, carry });
@@ -52,26 +54,39 @@ const kp2Plan = (() => {
   add("look", 2.0, mast, null, "peel");
   add("walk", d(mast, oven), mast, oven, "peel");
   add("take", 1.6, oven, null, null);
-  add("eat", 3.2, oven, null, null);
-  add("walk", d(oven, mid), oven, mid, "peel");
-  add("walk", d(mid, door), mid, door, "peel");
-  add("in", 0.8, door, null, "peel");
-  add("gone", 2.0, door, null, null);
+  if (good) {
+    add("hold", 1.2, oven, null, "raw"); // 焼けたピザをピールごと頭にのせる
+    add("walk", d(oven, mid), oven, mid, "raw");
+    add("walk", d(mid, door), mid, door, "raw");
+    add("in", 0.8, door, null, "raw");
+    add("inside", KP2_IN, door, null, null);
+  } else {
+    add("angry", 1.6, oven, null, null); // 黒焦げを見て怒る(D830)
+    add("eat", 3.2, oven, null, null);
+    add("walk", d(oven, mid), oven, mid, "peel");
+    add("walk", d(mid, door), mid, door, "peel");
+    add("in", 0.8, door, null, "peel");
+    add("gone", 2.0, door, null, null);
+  }
   let t = 0;
   for (const p of P) (p.t = t), (t += p.sec);
   P.cycle = t;
-  P.afterPut = P[4].t; // 入ったときは、ピザを窯に入れたあとから(ぴーが外にいる所から見せる)
+  P.good = good;
   P.baking = [P[3].t + 0.8, P[11].t + 0.8];
   return P;
-})();
+};
+const kp2Plans = [kp2Make(false), kp2Make(true)];
+const kp2Plan = { afterPut: kp2Plans[0][4].t, cycle: kp2Plans[0].cycle + kp2Plans[1].cycle };
 const kp2 = { t0: 0 };
 const kp2State = () => {
-  const P = kp2Plan;
-  const tc = (((knNow() - kp2.t0) % P.cycle) + P.cycle) % P.cycle;
+  let tc = (((knNow() - kp2.t0) % kp2Plan.cycle) + kp2Plan.cycle) % kp2Plan.cycle;
+  let P = kp2Plans[0];
+  let base = 0;
+  if (tc >= P.cycle) (base = P.cycle), (tc -= P.cycle), (P = kp2Plans[1]);
   let p = P[P.length - 1];
   for (const q of P) if (tc >= q.t && tc < q.t + q.sec) p = q;
   const k = Math.min(1, (tc - p.t) / p.sec);
-  return { p, k, tc, x: p.a[0] + (p.b[0] - p.a[0]) * k, y: p.a[1] + (p.b[1] - p.a[1]) * k };
+  return { p, k, tc, P, good: P.good, x: p.a[0] + (p.b[0] - p.a[0]) * k, y: p.a[1] + (p.b[1] - p.a[1]) * k };
 };
 const kp2Shown = (api) => api.cleared("keiji") && api.cleared("kinsei") && knS.phase !== "run";
 // 黒焦げのピザ(きこりの焦げ D383 より黒い)
@@ -97,6 +112,7 @@ const kp2Peel = (ctx, hx, hy, ex, ey) => {
   knEll(ctx, ex, ey, 7, 4, "#6e4c28");
   knEll(ctx, ex, ey, 6, 3, "#c4965f");
 };
+const kp2Buf = document.createElement("canvas");
 const kp2Obj = () => ({
   id: "kp2",
   x: KP2.door[0],
@@ -130,21 +146,35 @@ const kp2Obj = () => ({
       ctx.fillStyle = "#8c8c88";
       ctx.fillRect(ox + 342 + w, oy + 103 - Math.floor(w / 3), 1, 28);
     }
-    if (p.name === "gone") return;
+    if (p.name === "gone" || p.name === "inside") return;
     const n = p.name;
     let row = 0;
     let f = 0;
     if (n === "walk") (row = p.b[0] > p.a[0] ? 2 : 3), (f = Math.floor(t * 10) % 7);
-    else if (n === "open" || n === "read" || n === "close" || n === "look" || n === "in") row = 1;
+    else if (n === "open" || n === "read" || n === "close" || n === "look" || n === "in" || n === "hold") row = 1;
     else if (n === "put" || n === "take") row = 2;
     let dx = 0;
     let dy = 0;
     if (n === "read") dy = Math.floor(t * 3) % 2 ? -1 : 0; // 背のびして、のぞきこむ
     if (n === "look" && k > 0.1) dy = -2;
+    if (n === "angry") (row = 0), (dx = Math.floor(t * 20) % 2 ? 2 : -2), (dy = k < 0.5 ? -Math.round(Math.abs(Math.sin(k * Math.PI * 4)) * 4) : 0); // 地団駄
     if (n === "eat") (dy = (t * 7) % 1 < 0.4 ? 3 : 0), (dx = Math.floor(t * 14) % 2 ? 1 : -1); // 前のめりに、速く、何度も
     // 戸口はぱっと出入りする(体を切って戸の影に隠すと、上から見て四角い入口が重なって見えた。11-15 監督、D747)
     if ((n === "out" && k < 0.5) || (n === "in" && k >= 0.5)) return;
-    ctx.drawImage(pi, f * 64, row * 64, 64, 64, Math.round(sx - 32 + dx), Math.round(sy - 47 + dy), 64, 64);
+    if (n === "angry") {
+      // 怒って赤くなる(きーが金星の熱でほてるのと同じ塗り方)
+      const b = kp2Buf;
+      b.width = 64;
+      b.height = 64;
+      const g = b.getContext("2d");
+      g.clearRect(0, 0, 64, 64);
+      g.globalCompositeOperation = "source-over";
+      g.drawImage(pi, f * 64, row * 64, 64, 64, 0, 0, 64, 64);
+      g.globalCompositeOperation = "source-atop";
+      g.fillStyle = `rgba(228, 40, 30, ${0.25 + 0.2 * (Math.floor(t * 8) % 2)})`;
+      g.fillRect(0, 0, 64, 64);
+      ctx.drawImage(b, Math.round(sx - 32 + dx), Math.round(sy - 47 + dy));
+    } else ctx.drawImage(pi, f * 64, row * 64, 64, 64, Math.round(sx - 32 + dx), Math.round(sy - 47 + dy), 64, 64);
     // 頭にのせたピール
     const carry = p.carry && n !== "in" ? api.image(p.carry === "raw" ? "k_peel_pizza_carry" : "k_peel_carry") : null;
     if (carry) ctx.drawImage(carry, Math.round(sx - carry.width / 2), Math.round(sy - 22 - carry.height + 3 + (n === "walk" ? Math.floor(t * 10) % 2 : 0)));
@@ -159,7 +189,35 @@ const kp2Obj = () => ({
       const ey = hy + (my - hy) * u;
       kp2Peel(ctx, hx, hy, ex, ey);
       if (n === "put" && k < 0.5) knPizza(ctx, ex, ey - 1, 6, "done");
-      if (n === "take" && k >= 0.5) kp2Burnt(ctx, ex, ey - 1, 8); // 黒焦げは少し大きく(D747)
+      if (n === "take" && k >= 0.5) {
+        if (kp2State().good) knPizza(ctx, ex, ey - 1, 8, "done"); // うまく焼けた(D829)
+        else kp2Burnt(ctx, ex, ey - 1, 8); // 黒焦げは少し大きく(D747)
+      }
+    }
+    if (n === "angry") {
+      kp2Peel(ctx, sx - 22, sy + 4, sx + 2, sy + 7);
+      kp2Burnt(ctx, sx + 2, sy + 6, 11);
+      // 怒りの印(四つの赤いかぎ、黒いふち。言葉なし)。ふくらんだり縮んだり
+      const ax = Math.round(sx + 14);
+      const ay = Math.round(sy - 42);
+      const gg = Math.floor(t * 8) % 2;
+      const hook = (col, w) => {
+        ctx.fillStyle = col;
+        for (const [qx, qy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+          const bx = ax + qx * (2 + gg);
+          const by = ay + qy * (2 + gg);
+          ctx.fillRect(bx - (qx < 0 ? 4 : 0) - w, by - w, 5 + 2 * w, 2 + 2 * w);
+          ctx.fillRect(bx - w, by - (qy < 0 ? 4 : 0) - w, 2 + 2 * w, 5 + 2 * w);
+        }
+      };
+      hook("#2a1210", 1);
+      hook("#f0382c", 0);
+      // 頭から湯気
+      for (let i = 0; i < 2; i++) {
+        const v = (t * 1.4 + i * 0.5) % 1;
+        ctx.fillStyle = `rgba(240, 236, 230, ${0.8 * (1 - v)})`;
+        ctx.fillRect(Math.round(sx - 8 + i * 12 + Math.sin(t * 6 + i) * 2), Math.round(sy - 34 - v * 14), 3, 3);
+      }
     }
     if (n === "eat") {
       kp2Peel(ctx, sx - 22, sy + 4, sx + 2, sy + 7);
@@ -178,8 +236,8 @@ const kp2Obj = () => ({
   // 焼いているあいだ、窯の口から細い煙
   drawOver(ctx, sx, sy, t, api) {
     if (!kp2Shown(api)) return;
-    const { tc } = kp2State();
-    if (tc < kp2Plan.baking[0] || tc > kp2Plan.baking[1]) return;
+    const { tc, P } = kp2State();
+    if (tc < P.baking[0] || tc > P.baking[1]) return;
     const mx = sx - this.x + KN_WINDOW.x;
     const my = sy - this.y + KN_WINDOW.y;
     for (let i = 0; i < 2; i++) {
