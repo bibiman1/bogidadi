@@ -43,8 +43,10 @@ const kp2Make = (good) => {
   const d = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1]) / KP2.speed;
   const add = (name, sec, a, b, carry) => P.push({ name, sec, a, b: b || a, carry });
   const { door, mid, oven, box, mast } = KP2;
-  add("out", 0.8, door, null, "raw"); // 中で作った生のピザ
-  add("walk", d(door, mid), door, mid, "raw");
+  // 中で作った生のピザをのせて、戸口から歩いて出てくる(11-26 監督「入り口から歩くようにして」)
+  const step = [door[0] + (mid[0] - door[0]) * 0.15, door[1] + (mid[1] - door[1]) * 0.15];
+  add("out", d(door, step), door, step, "raw");
+  add("walk", d(step, mid), step, mid, "raw");
   add("walk", d(mid, oven), mid, oven, "raw");
   add("put", 1.6, oven, null, null);
   add("walk", d(oven, box), oven, box, "peel");
@@ -189,7 +191,7 @@ const kp2Obj = () => ({
     const n = p.name;
     let row = 0;
     let f = 0;
-    if (n === "walk") (row = p.b[0] > p.a[0] ? 2 : 3), (f = Math.floor(t * 10) % 7);
+    if (n === "walk" || n === "out") (row = p.b[0] > p.a[0] ? 2 : 3), (f = Math.floor(t * 10) % 7);
     else if (n === "open" || n === "read" || n === "close" || n === "look" || n === "in" || n === "hold") row = 1;
     else if (n === "put" || n === "take") row = 2;
     let dx = 0;
@@ -198,8 +200,8 @@ const kp2Obj = () => ({
     if (n === "look" && k > 0.1) dy = -2;
     if (n === "angry") (row = 0), (dx = Math.floor(t * 20) % 2 ? 2 : -2), (dy = k < 0.5 ? -Math.round(Math.abs(Math.sin(k * Math.PI * 4)) * 4) : 0); // 地団駄
     if (n === "eat") (dy = (t * 7) % 1 < 0.4 ? 3 : 0), (dx = Math.floor(t * 14) % 2 ? 1 : -1); // 前のめりに、速く、何度も
-    // 戸口はぱっと出入りする(体を切って戸の影に隠すと、上から見て四角い入口が重なって見えた。11-15 監督、D747)
-    if ((n === "out" && k < 0.5) || (n === "in" && k >= 0.5)) return;
+    // 入るときは戸口でぱっと消える(体を切って戸の影に隠すと、上から見て四角い入口が重なって見えた。11-15 監督、D747)。出るときは戸口から歩いて出る
+    if (n === "in" && k >= 0.5) return;
     if (n === "angry") {
       // 怒って赤くなる(きーが金星の熱でほてるのと同じ塗り方)
       const b = kp2Buf;
@@ -216,7 +218,7 @@ const kp2Obj = () => ({
     } else ctx.drawImage(pi, f * 64, row * 64, 64, 64, Math.round(sx - 32 + dx), Math.round(sy - 47 + dy), 64, 64);
     // 頭にのせたピール
     const carry = p.carry && n !== "in" ? api.image(p.carry === "raw" ? "k_peel_pizza_carry" : "k_peel_carry") : null;
-    if (carry) ctx.drawImage(carry, Math.round(sx - carry.width / 2), Math.round(sy - 22 - carry.height + 3 + (n === "walk" ? Math.floor(t * 10) % 2 : 0)));
+    if (carry) ctx.drawImage(carry, Math.round(sx - carry.width / 2), Math.round(sy - 22 - carry.height + 3 + (n === "walk" || n === "out" ? Math.floor(t * 10) % 2 : 0)));
     // のばして、窯の口へ入れる / 黒焦げを取り出す
     if (n === "put" || n === "take") {
       const hx = sx + 6;
