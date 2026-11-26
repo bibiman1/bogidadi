@@ -405,7 +405,7 @@ const KN_NAKA = {
         else if (u < T0.sep) row = 2; // 台に向かって手を出す
         if (u >= T0.eat && u < T0.make) (dy = (t * 7) % 1 < 0.4 ? 3 : 0), (dx = Math.floor(t * 14) % 2 ? 1 : -1);
         if (making) dy = -Math.round(Math.abs(Math.sin((u - T0.make) * 10)) * 2); // こねて、のばして、のせる
-        ctx.drawImage(pi, f * 64, row * 64, 64, 64, Math.round(sx - 32 + dx), Math.round(sy - 47 + dy), 64, 64);
+        kp2Pi(ctx, api, f, row, Math.round(sx - 32 + dx), Math.round(sy - 47 + dy));
         // 行きは、焼けた回は焼けたピザをピールごと、焦げた回はからのピール。帰りは作った生のピザをピールにのせて
         const carry = api.image(u < T0.put ? (T0.good ? "k_peel_pizza_carry" : "k_peel_carry") : "k_peel_pizza_carry");
         if (carry && walking) ctx.drawImage(carry, Math.round(sx - carry.width / 2), Math.round(sy - 22 - carry.height + 3 + (Math.floor(t * 10) % 2)));

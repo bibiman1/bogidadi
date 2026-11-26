@@ -183,7 +183,7 @@ const kp2Obj = () => ({
       const row = Math.abs(ux) >= Math.abs(uy) ? (ux > 0 ? 2 : 3) : uy > 0 ? 0 : 1;
       const lx = Math.round(ux * lunge);
       const ly = Math.round(uy * lunge);
-      ctx.drawImage(pi, 0, row * 64, 64, 64, Math.round(sx - 32 + lx), Math.round(sy - 47 + ly), 64, 64);
+      kp2Pi(ctx, api, 0, row, Math.round(sx - 32 + lx), Math.round(sy - 47 + ly));
       const cim = p.carry ? api.image(p.carry === "raw" ? "k_peel_pizza_carry" : "k_peel_carry") : null;
       if (cim) ctx.drawImage(cim, Math.round(sx - cim.width / 2 + lx), Math.round(sy - 22 - cim.height + 3 + ly));
       return;
@@ -215,7 +215,9 @@ const kp2Obj = () => ({
       g.fillStyle = `rgba(228, 40, 30, ${0.25 + 0.2 * (Math.floor(t * 8) % 2)})`;
       g.fillRect(0, 0, 64, 64);
       ctx.drawImage(b, Math.round(sx - 32 + dx), Math.round(sy - 47 + dy));
-    } else ctx.drawImage(pi, f * 64, row * 64, 64, 64, Math.round(sx - 32 + dx), Math.round(sy - 47 + dy), 64, 64);
+      const gl = api.image("pi_glasses"); // メガネは赤くしない
+      if (gl) ctx.drawImage(gl, f * 64, row * 64, 64, 64, Math.round(sx - 32 + dx), Math.round(sy - 47 + dy), 64, 64);
+    } else kp2Pi(ctx, api, f, row, Math.round(sx - 32 + dx), Math.round(sy - 47 + dy));
     // 頭にのせたピール
     const carry = p.carry && n !== "in" ? api.image(p.carry === "raw" ? "k_peel_pizza_carry" : "k_peel_carry") : null;
     if (carry) ctx.drawImage(carry, Math.round(sx - carry.width / 2), Math.round(sy - 22 - carry.height + 3 + (n === "walk" || n === "out" ? Math.floor(t * 10) % 2 : 0)));

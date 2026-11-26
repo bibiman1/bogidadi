@@ -270,6 +270,7 @@ window.BOGI_WORLDS = {
           ["goron", "./assets/worlds/banana/goron.png"],
           ["ic_pizza", "./assets/icons/ic_pizza.png"], // 取り出したきこりのピザ(丸ごと)と、切るミニゲームの絵(D395)
           ["pi", "./assets/worlds/lake/pi_walk.png"], // 戻ってきたぴー(クイズのあと、山頂で観測とピザ D736〜D738)
+          ["pi_glasses", "./assets/worlds/kinsei/pi_glasses.png"], // 気象台のぴーのメガネ(pi_walk と同じ並びの重ね絵。todo 367、docs/record/2026-11-26/pi_glasses/make.py)
         ])
     ),
     playerSprite: { img: "ki", cell: 64, frames: 7, footY: 17 },

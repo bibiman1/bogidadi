@@ -196,3 +196,11 @@ const knImg = (key, x, y, extra) =>
     },
     extra
   );
+// 気象台のぴー(戻ってきたぴー)を、メガネをかけて描く(todo 367)。pi_walk の (列 f, 段 row) のこまを (x, y) に
+const kp2Pi = (ctx, api, f, row, x, y) => {
+  const pi = api.image("pi");
+  if (!pi) return;
+  ctx.drawImage(pi, f * 64, row * 64, 64, 64, x, y, 64, 64);
+  const gl = api.image("pi_glasses");
+  if (gl) ctx.drawImage(gl, f * 64, row * 64, 64, 64, x, y, 64, 64);
+};
