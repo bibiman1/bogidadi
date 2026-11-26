@@ -81,7 +81,7 @@ const kp2Make = (good) => {
 const kp2Plans = [kp2Make(false), kp2Make(true)];
 const kp2Plan = { afterPut: kp2Plans[0][4].t };
 const KP2_SHOVE = 0.8; // 突き飛ばすあいだ、ぴーの仕事は止まる(そのぶん遅れる)
-const kp2 = { t0: 0, bothered: false, shoveT0: -1, sx: 0, sy: 0 };
+const kp2 = { t0: 0, bothered: false, shoveT0: -1, nakaT: 0 }; // nakaT: 気象台の中にいた最後の時刻
 const kp2Shoving = () => kp2.shoveT0 >= 0 && knNow() - kp2.shoveT0 < KP2_SHOVE;
 const kp2State = () => {
   let tc = Math.max(0, knNow() - kp2.t0);
@@ -378,8 +378,12 @@ const KN_SANCHO = {
     door: { x: 5.35 * T, y: 4.0 * T, facing: "south" },
   },
   onEnter(api) {
-    kp2.t0 = knNow() - kp2Plan.afterPut; // 戻ってきたぴー: ピザを窯に入れたところから(D738)
-    kp2.bothered = false;
+    // 戻ってきたぴー: 山道から来たときは、ピザを窯に入れたところから(D738)。
+    // 気象台の中から出てきたときは、ぴーの時計をそのまま続ける(ぴーについて出ると、窯へ向かうところが見える。11-26 監督「ついていくと、ピザを入れ終わってる」)
+    if (!(kp2.nakaT > 0 && knNow() - kp2.nakaT < 2)) {
+      kp2.t0 = knNow() - kp2Plan.afterPut;
+      kp2.bothered = false;
+    }
     kp2.shoveT0 = -1;
     if (api.flag("dashed") && !api.flag("gone") && knS.phase !== "run") {
       knS.phase = "run";

@@ -328,6 +328,7 @@ const KN_NAKA = {
     if (api.flag("placed") && !api.flag("dashed")) api.later(400, () => knSetupStart(api));
   },
   drawOverlay(ctx, ox, oy, t, api) {
+    if (typeof kp2 !== "undefined") kp2.nakaT = knNow(); // 山頂に出たとき、ぴーの時計を続けるかの目じるし
     // 窓の外の嵐: ときどき稲光が部屋を白く照らす
     const f = (t * 0.37) % 7;
     if (f < 0.12 || (f > 0.2 && f < 0.26)) {
