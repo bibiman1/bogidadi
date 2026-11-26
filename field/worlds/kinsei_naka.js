@@ -207,6 +207,64 @@ const KP2I_T = (() => {
   t.end = t.walkOut + C.walk;
   return t;
 })();
+// ピザを作る(todo 364): ロケのきこりと同じ手順を、ぴーがまねる。段の秒
+const KP2I_MK = { knead: 2.4, ball: 0.8, press: 1.0, toss: 4.8, sauce: 1.4, cheese: 1.4, basil: 1.0, slide: 0.6 };
+const KP2I_MKLEN = Object.values(KP2I_MK).reduce((a, b) => a + b, 0);
+// 気象台の中の段(焼けた回: 分けて食べてから作る / 焦げた回: 入って台へ歩き、作る)。どちらも最後にピールにのせて出ていく
+const KP2I_TLG = (() => {
+  const t = Object.assign({}, KP2I_T, { good: true });
+  t.make = KP2I_T.walkOut;
+  t.out = t.make + KP2I_MKLEN;
+  t.end = t.out + KP2I.walk;
+  return t;
+})();
+const KP2I_TLB = (() => {
+  const N = 1e9;
+  const t = { good: false, walkIn: 0.2, put: 0.2 + KP2I.walk, cut1: N, cut2: N, sep: N, give1: N, give2: N, eat: N };
+  t.make = t.put;
+  t.out = t.make + KP2I_MKLEN;
+  t.end = t.out + KP2I.walk;
+  return t;
+})();
+const kp2TL = () => (typeof kp2State === "function" && kp2State().good ? KP2I_TLG : KP2I_TLB);
+// 作っている台の上のピザ(mu は作りはじめからの秒)。宙にある生地は null を返す
+const kp2MakeDraw = (ctx, px, py, mu, sx, sy, t) => {
+  const M = KP2I_MK;
+  let a = 0;
+  const seg = (k) => {
+    const s0 = a;
+    a += M[k];
+    return [s0, a];
+  };
+  const [k0, k1] = seg("knead");
+  const [b0, b1] = seg("ball");
+  const [p0, p1] = seg("press");
+  const [t0, t1] = seg("toss");
+  const [s0, s1] = seg("sauce");
+  const [c0, c1] = seg("cheese");
+  const [z0, z1] = seg("basil");
+  const u = (x0, x1) => Math.max(0, Math.min(1, (mu - x0) / (x1 - x0)));
+  if (mu < k1) {
+    const sq = Math.sin(mu * 12);
+    knEll(ctx, px, py, 5 + sq, 3.2 - sq * 0.8, KN_CRUST);
+    knEll(ctx, px, py - 0.5, 4 + sq, 2.4 - sq * 0.8, KN_DOUGH);
+  } else if (mu < b1) knPizza(ctx, px + Math.sin(mu * 7) * 1.5, py, 5, "ball");
+  else if (mu < p1) knPizza(ctx, px, py, knLerp(5, 11, u(p0, p1)), "flat");
+  else if (mu < t1) {
+    // 放り投げて回し、伸ばす(3 回、だんだん大きく)。ぴーの頭の上で
+    const per = M.toss / 3;
+    const k = Math.floor((mu - t0) / per);
+    const v = ((mu - t0) % per) / per;
+    const rx = knLerp(11, 19, (k + v) / 3);
+    const h = Math.sin(v * Math.PI) * (18 + k * 5);
+    const spin = Math.abs(Math.cos(mu * 16));
+    knEll(ctx, sx, sy - 34 - h, rx * (0.55 + 0.45 * spin), 3, KN_CRUST);
+    knEll(ctx, sx, sy - 34.5 - h, rx * (0.55 + 0.45 * spin) - 1, 2, KN_DOUGH);
+  } else if (mu < s1) knPizza(ctx, px, py, 19, "sauce", u(s0, s1));
+  else if (mu < c1) knPizza(ctx, px, py, 19, "cheese", u(c0, c1));
+  else if (mu < z1) knPizza(ctx, px, py, 19, "basil", u(z0, z1));
+  else knPizza(ctx, knLerp(px, sx, u(z1, z1 + M.slide)), knLerp(py, sy - 26, u(z1, z1 + M.slide)), 19 - 6 * u(z1, z1 + M.slide), "basil"); // ピールへすべらせる
+};
 const KP2I_MOUTH = { goron: [297, 133], kikikori: [353, 120] };
 const KP2I_MID = [-5.5, 5.5, 11]; // 切れごとの、ピザのまん中からの横のずれ(口や手に合わせるとき引く)
 // 切れ i(0 = 左、1 = まん中、2 = 右)を描く。clip で、縦の 2 本のあいだだけ
@@ -307,7 +365,7 @@ const KN_NAKA = {
       ctx.restore();
     }
     knCutDraw(ctx, api, t); // ピザを 3 つに切る(D395)
-    if (kp2InT() >= 0) kp2Zoom(ctx, api, kp2InT());
+    if (kp2InT() >= 0 && kp2TL().good) kp2Zoom(ctx, api, kp2InT());
   },
   triggers: [{ id: "toSancho", x: 5.55 * T, y: 8.75 * T, w: 1.9 * T, h: T, enabled: () => knS.cookT0 < 0, warp: { map: "sancho", spawn: "door" } }],
   objects: [
@@ -322,10 +380,10 @@ const KN_NAKA = {
       hidden: (api) => !(api.cleared("keiji") && api.cleared("kinsei")) || kp2InT() < 0,
       update() {
         const u = kp2InT();
-        const T0 = KP2I_T;
+        const T0 = kp2TL();
         const a = KP2I.door;
         const b = KP2I.stand;
-        const w = u < T0.put ? (u - T0.walkIn) / KP2I.walk : u < T0.walkOut ? 1 : 1 - (u - T0.walkOut) / KP2I.walk;
+        const w = u < T0.put ? (u - T0.walkIn) / KP2I.walk : u < T0.out ? 1 : 1 - (u - T0.out) / KP2I.walk;
         const v = Math.max(0, Math.min(1, w));
         this.x = a[0] + (b[0] - a[0]) * v;
         this.y = a[1] + (b[1] - a[1]) * v;
@@ -333,26 +391,29 @@ const KN_NAKA = {
       draw(ctx, sx, sy, t, api) {
         const pi = api.image("pi");
         const u = kp2InT();
-        if (!pi || u < 0 || u > KP2I_T.end) return;
-        const T0 = KP2I_T;
+        const T0 = kp2TL();
+        if (!pi || u < 0 || u > T0.end) return;
         const ox = sx - this.x;
         const oy = sy - this.y;
         let row = 1;
         let f = 0;
         let dx = 0;
         let dy = 0;
-        const walking = (u >= T0.walkIn && u < T0.put) || u >= T0.walkOut;
+        const walking = (u >= T0.walkIn && u < T0.put) || u >= T0.out;
+        const making = u >= T0.make && u < T0.out;
         if (walking) (row = u < T0.put ? 3 : 2), (f = Math.floor(t * 10) % 7);
         else if (u < T0.sep) row = 2; // 台に向かって手を出す
-        if (u >= T0.eat && u < T0.walkOut) (dy = (t * 7) % 1 < 0.4 ? 3 : 0), (dx = Math.floor(t * 14) % 2 ? 1 : -1);
+        if (u >= T0.eat && u < T0.make) (dy = (t * 7) % 1 < 0.4 ? 3 : 0), (dx = Math.floor(t * 14) % 2 ? 1 : -1);
+        if (making) dy = -Math.round(Math.abs(Math.sin((u - T0.make) * 10)) * 2); // こねて、のばして、のせる
         ctx.drawImage(pi, f * 64, row * 64, 64, 64, Math.round(sx - 32 + dx), Math.round(sy - 47 + dy), 64, 64);
-        // 行きは、焼けたピザをピールごと頭に。帰りはピールだけ
-        const carry = api.image(u < T0.put ? "k_peel_pizza_carry" : "k_peel_carry");
+        // 行きは、焼けた回は焼けたピザをピールごと、焦げた回はからのピール。帰りは作った生のピザをピールにのせて
+        const carry = api.image(u < T0.put ? (T0.good ? "k_peel_pizza_carry" : "k_peel_carry") : "k_peel_pizza_carry");
         if (carry && walking) ctx.drawImage(carry, Math.round(sx - carry.width / 2), Math.round(sy - 22 - carry.height + 3 + (Math.floor(t * 10) % 2)));
         // 台の上のピザ
         const px = ox + KN_PZ.x;
         const py = oy + KN_PZ.y;
-        if (u >= T0.put + 0.4 && u < T0.walkOut) {
+        if (making) kp2MakeDraw(ctx, px, py, u - T0.make, sx, sy, t);
+        if (T0.good && u >= T0.put + 0.4 && u < T0.make) {
           const sep = Math.min(1, Math.max(0, (u - T0.sep) / KP2I.sep)) * 2;
           for (let i = 0; i < 3; i++) {
             const go = i === 1 ? (u - T0.give1) / 0.8 : i === 2 ? (u - T0.give2) / 0.8 : -1;
@@ -383,7 +444,7 @@ const KN_NAKA = {
           });
         }
         // ぴーは台の前で、いちばん大きい左の切れを台の上で食べる(D830)。東から減っていく
-        if (u >= T0.eat && u < T0.walkOut) {
+        if (u >= T0.eat && u < T0.make) {
           const k2 = (u - T0.eat) / KP2I.eat;
           if (k2 < 0.85) {
             const L = px - 14;
@@ -626,7 +687,7 @@ const KN_NAKA = {
           knDraw(ctx, knCrew(api, key, d), x, y - chew);
           if (!ate) return;
           const u2 = kp2InT();
-          if (u2 >= 0) {
+          if (u2 >= 0 && kp2TL().good) {
             const got = key === "goron" ? KP2I_T.give1 + 0.8 : KP2I_T.give2 + 0.8;
             if (u2 < got) return; // 前の切れは食べ終わって、手がから
             const m = KP2I_MOUTH[key];

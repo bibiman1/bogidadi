@@ -33,16 +33,17 @@ const knPeelHeld = (ctx, x, y, d) => {
 };
 // ---- 戻ってきたぴー(D736〜D738): 形而アップダウンクイズのあとに来ると、ぴーが山頂で定時の観測を続けている ----
 // ピザをベネラの口(窯 D383)に入れ → 百葉箱の北の扉をのぞき → 風の塔を見上げ → 黒焦げを取り出して、その場で貪り食う → 気象台へ戻る。
-// 熱の中には入らない(D391)。さかいの手前からピールで出し入れする。きーは無視(調べる物はない)。試し絵 docs/record/2026-11-14/kisho/trial2.py
+// 熱の中には入らない(D391)。さかいの手前からピールで出し入れする。きーには答えない(話しかけると突き飛ばす D831)。試し絵 docs/record/2026-11-14/kisho/trial2.py
 const KP2 = { door: [170, 116], mid: [300, 210], oven: [428, 262], box: [352, 158], mast: [388, 122], speed: 55 };
-// D829: 一回りおきに、焦げる回(今まで)と、うまく焼ける回。焼けた回は、ピザを気象台の中へ持ち帰り、撮影隊と三人で分ける(縦の雑な 2 本)
-const KP2_IN = 14.8; // 焼けた回に、ぴーが気象台の中にいる秒(kp2In の段の合計)
+// D829、D831: 焼ける回と焦げる回。観測のあいだ(窯に入れてから取り出すまで)にきーが話しかけると、ぴーは答えずに突き飛ばし、その回は焦げる。
+// 邪魔されなければ、うまく焼けて気象台へ持ち帰り、撮影隊と分ける(D830)
+// ぴーが気象台の中にいる秒(kinsei_naka.js の kp2In の段の合計。中でピザを作る todo 364)
 const kp2Make = (good) => {
   const P = [];
   const d = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1]) / KP2.speed;
   const add = (name, sec, a, b, carry) => P.push({ name, sec, a, b: b || a, carry });
   const { door, mid, oven, box, mast } = KP2;
-  add("out", 0.8, door, null, "raw");
+  add("out", 0.8, door, null, "raw"); // 中で作った生のピザ
   add("walk", d(door, mid), door, mid, "raw");
   add("walk", d(mid, oven), mid, oven, "raw");
   add("put", 1.6, oven, null, null);
@@ -59,14 +60,14 @@ const kp2Make = (good) => {
     add("walk", d(oven, mid), oven, mid, "raw");
     add("walk", d(mid, door), mid, door, "raw");
     add("in", 0.8, door, null, "raw");
-    add("inside", KP2_IN, door, null, null);
+    add("inside", KP2I_TLG.end, door, null, null);
   } else {
     add("angry", 1.6, oven, null, null); // 黒焦げを見て怒る(D830)
     add("eat", 3.2, oven, null, null);
     add("walk", d(oven, mid), oven, mid, "peel");
     add("walk", d(mid, door), mid, door, "peel");
     add("in", 0.8, door, null, "peel");
-    add("gone", 2.0, door, null, null);
+    add("inside", KP2I_TLB.end, door, null, null);
   }
   let t = 0;
   for (const p of P) (p.t = t), (t += p.sec);
@@ -76,13 +77,19 @@ const kp2Make = (good) => {
   return P;
 };
 const kp2Plans = [kp2Make(false), kp2Make(true)];
-const kp2Plan = { afterPut: kp2Plans[0][4].t, cycle: kp2Plans[0].cycle + kp2Plans[1].cycle };
-const kp2 = { t0: 0 };
+const kp2Plan = { afterPut: kp2Plans[0][4].t };
+const KP2_SHOVE = 0.8; // 突き飛ばすあいだ、ぴーの仕事は止まる(そのぶん遅れる)
+const kp2 = { t0: 0, bothered: false, shoveT0: -1, sx: 0, sy: 0 };
+const kp2Shoving = () => kp2.shoveT0 >= 0 && knNow() - kp2.shoveT0 < KP2_SHOVE;
 const kp2State = () => {
-  let tc = (((knNow() - kp2.t0) % kp2Plan.cycle) + kp2Plan.cycle) % kp2Plan.cycle;
-  let P = kp2Plans[0];
-  let base = 0;
-  if (tc >= P.cycle) (base = P.cycle), (tc -= P.cycle), (P = kp2Plans[1]);
+  let tc = Math.max(0, knNow() - kp2.t0);
+  let P = kp2Plans[kp2.bothered ? 0 : 1];
+  while (tc >= P.cycle) {
+    kp2.t0 += P.cycle;
+    tc -= P.cycle;
+    kp2.bothered = false; // 次の一回りは、邪魔されなければ焼ける
+    P = kp2Plans[1];
+  }
   let p = P[P.length - 1];
   for (const q of P) if (tc >= q.t && tc < q.t + q.sec) p = q;
   const k = Math.min(1, (tc - p.t) / p.sec);
@@ -123,8 +130,26 @@ const kp2Obj = () => ({
   hidden: (api) => !kp2Shown(api),
   update() {
     const st = kp2State();
+    if (kp2Shoving()) return; // 突き飛ばすあいだは、その場で
     this.x = st.x;
     this.y = st.y;
+  },
+  range: 40,
+  canInteract: (api) => kp2Shown(api) && !kp2Shoving() && !["inside", "out", "in"].includes(kp2State().p.name),
+  // 話しかけても答えない。何も言わずにきーを突き飛ばす(D831)。観測のあいだなら、そのぶん遅れて、ピザが焦げる
+  interact(api) {
+    const st = kp2State();
+    const i = st.P.indexOf(st.p);
+    if (i >= 4 && i <= 10) kp2.bothered = true;
+    kp2.shoveT0 = knNow();
+    kp2.t0 += KP2_SHOVE;
+    const pl = api.player();
+    const dx = pl.x - this.x;
+    const dy = pl.y - this.y;
+    const L = Math.hypot(dx, dy) || 1;
+    api.knock((dx / L) * 320, (dy / L) * 320);
+    api.sfx("knock");
+    kp2.dirV = [dx / L, dy / L];
   },
   draw(ctx, sx, sy, t, api) {
     const pi = api.image("pi");
@@ -147,6 +172,20 @@ const kp2Obj = () => ({
       ctx.fillRect(ox + 342 + w, oy + 103 - Math.floor(w / 3), 1, 28);
     }
     if (p.name === "gone" || p.name === "inside") return;
+    if (kp2Shoving()) {
+      // 突き飛ばす: きーの方へ、ぐいっと体をぶつける
+      const e = knNow() - kp2.shoveT0;
+      const lunge = e < 0.25 ? (e / 0.25) * 6 : 6 * Math.max(0, 1 - (e - 0.25) / 0.4);
+      // きーのいる方を向いて、そちらへ体をぶつける(横なら横向き、下なら正面、上なら背中)
+      const [ux, uy] = kp2.dirV || [1, 0];
+      const row = Math.abs(ux) >= Math.abs(uy) ? (ux > 0 ? 2 : 3) : uy > 0 ? 0 : 1;
+      const lx = Math.round(ux * lunge);
+      const ly = Math.round(uy * lunge);
+      ctx.drawImage(pi, 0, row * 64, 64, 64, Math.round(sx - 32 + lx), Math.round(sy - 47 + ly), 64, 64);
+      const cim = p.carry ? api.image(p.carry === "raw" ? "k_peel_pizza_carry" : "k_peel_carry") : null;
+      if (cim) ctx.drawImage(cim, Math.round(sx - cim.width / 2 + lx), Math.round(sy - 22 - cim.height + 3 + ly));
+      return;
+    }
     const n = p.name;
     let row = 0;
     let f = 0;
@@ -248,6 +287,82 @@ const kp2Obj = () => ({
   },
 });
 
+// ---- 風の塔の風力計(todo 366): 嵐の中で、プロペラのお椀がいつも回っている。字も音もなし(調べなくても動く D742) ----
+// 塔は背景から切り抜いた fg_sancho(364, 18, 36, 95)を根元 y 111 で前後させる(もとの kFg と同じ)。お椀の所(x 364〜371、y 17〜44)だけ、
+// (x 364〜375、y 17〜44。軸の根もと y 27〜33 は残す)背景と切り抜きの両方から抜いて(背景は左どなりの空の色でうめる)、軸(boom)のまわりを回る 3 つのお椀を描く
+const KP2_ANE = { x0: 364, y0: 17, w: 12, h: 28, hubX: 373, hubY: 30, r: 8, spin: 9 };
+const kp2AneFill = { c: null };
+const kp2Anemo = () => ({
+  id: "anemo",
+  x: 364 + 18,
+  y: 111,
+  w: 1,
+  h: 1,
+  draw(ctx, sx, sy, t, api) {
+    const fg = api.image("fg_sancho");
+    const bg = api.image("bg_sancho");
+    if (!fg || !bg) return;
+    const ox = sx - this.x;
+    const oy = sy - this.y;
+    const A = KP2_ANE;
+    // 背景のお椀を、空の色でうめた下地(はじめに 1 回だけ作る)
+    if (!kp2AneFill.c) {
+      const c = Object.assign(document.createElement("canvas"), { width: A.w, height: A.h });
+      const g = c.getContext("2d");
+      const W = A.w + 4;
+      const tmp = Object.assign(document.createElement("canvas"), { width: W, height: A.h });
+      const tg = tmp.getContext("2d");
+      tg.drawImage(bg, A.x0 - 4, A.y0, W, A.h, 0, 0, W, A.h);
+      const d = tg.getImageData(0, 0, W, A.h).data;
+      const out = g.createImageData(A.w, A.h);
+      for (let y = 0; y < A.h; y++)
+        for (let x = 0; x < A.w; x++) {
+          const j = (y * W + 1 + (x % 2)) * 4; // 左どなりの空(2 列をまぜて、平らにしすぎない)
+          const i = (y * A.w + x) * 4;
+          out.data[i] = d[j];
+          out.data[i + 1] = d[j + 1];
+          out.data[i + 2] = d[j + 2];
+          out.data[i + 3] = 255;
+        }
+      g.putImageData(out, 0, 0);
+      kp2AneFill.c = c;
+    }
+    ctx.drawImage(kp2AneFill.c, ox + A.x0, oy + A.y0);
+    // 塔の切り抜き(お椀の所をのぞく)
+    ctx.drawImage(fg, 376, 18, 24, 95, ox + 376, oy + 18, 24, 95);
+    ctx.drawImage(fg, 364, 45, 12, 68, ox + 364, oy + 45, 12, 68);
+    ctx.drawImage(fg, 372, 27, 4, 7, ox + 372, oy + 27, 4, 7); // 軸の根もと
+    // 回るお椀: 軸は横(boom の向き)。横から見ると、お椀は上下に行き来し、手前のものが大きく明るい
+    const cups = [0, 1, 2].map((k) => {
+      const a = t * A.spin + (k * Math.PI * 2) / 3;
+      return { y: A.hubY + Math.sin(a) * A.r, z: Math.cos(a) };
+    });
+    const arm = (c) => {
+      ctx.fillStyle = c.z > 0 ? "#4a4642" : "#34312e";
+      const y0 = Math.min(A.hubY, c.y);
+      ctx.fillRect(Math.round(ox + A.hubX - 2 + c.z), Math.round(oy + y0), 2, Math.max(1, Math.round(Math.abs(c.y - A.hubY))));
+    };
+    const cup = (c) => {
+      // お椀: 手前は大きく明るく、奥は小さく暗い(もとの絵のお椀と同じ、黒いふちに薄い灰)
+      const cx = Math.round(ox + A.hubX - 4 + c.z * 1.5);
+      const cy = Math.round(oy + c.y);
+      const w = c.z > 0.3 ? 5 : c.z > -0.3 ? 4 : 3;
+      const h = c.z > 0.3 ? 4 : 3;
+      ctx.fillStyle = "#2a2724";
+      ctx.fillRect(cx - Math.floor(w / 2) - 1, cy - Math.floor(h / 2) - 1, w + 2, h + 2);
+      ctx.fillStyle = c.z > 0 ? "#cfcdc4" : "#8e8b83";
+      ctx.fillRect(cx - Math.floor(w / 2), cy - Math.floor(h / 2), w, h);
+      ctx.fillStyle = c.z > 0 ? "#eeece4" : "#a8a59c";
+      ctx.fillRect(cx - Math.floor(w / 2), cy - Math.floor(h / 2), w, 1);
+    };
+    const back = cups.filter((c) => c.z <= 0);
+    const front = cups.filter((c) => c.z > 0);
+    back.forEach((c) => (arm(c), cup(c)));
+    ctx.fillStyle = "#3a3632";
+    ctx.fillRect(Math.round(ox + A.hubX - 3), Math.round(oy + A.hubY - 1), 4, 3); // 軸の先
+    front.forEach((c) => (arm(c), cup(c)));
+  },
+});
 const KN_SANCHO = {
   tile: T,
   bg: "#5e5a54",
@@ -260,6 +375,8 @@ const KN_SANCHO = {
   },
   onEnter(api) {
     kp2.t0 = knNow() - kp2Plan.afterPut; // 戻ってきたぴー: ピザを窯に入れたところから(D738)
+    kp2.bothered = false;
+    kp2.shoveT0 = -1;
     if (api.flag("dashed") && !api.flag("gone") && knS.phase !== "run") {
       knS.phase = "run";
       knS.t0 = knNow();
@@ -301,7 +418,7 @@ const KN_SANCHO = {
   objects: [
     // 背景の前後(作者「背景の前後」): 百葉箱と風の塔は、背景から切り抜いた絵(fg_sancho。docs/assets/kinsei/fg_kinsei.py)を根元の y で前後させる
     kFg("fg_sancho", 298, 104, 45, 74, 176),
-    kFg("fg_sancho", 364, 18, 36, 95, 111),
+    kp2Anemo(), // 風の塔(てっぺんの風力計は、嵐でいつも回る todo 366)
     kWall(300, 166, 343, 177), // 百葉箱の脚
     kWall(374, 104, 389, 112), // 風の塔の根元
     kWall(86, 96, 158, 106), // 気象台の建物の下のふち(戸口の左)
