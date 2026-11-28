@@ -766,6 +766,8 @@ const ASSET_V = (() => {
     }
 
     function updateWalk(dt, input) {
+      // 上下と左右の入れかえ(map.invertInput(api) が true のあいだ。長門の幻覚の世界 todo 383)
+      if (map.invertInput && map.invertInput(world.api)) input = { ...input, x: -input.x, y: -input.y };
       // すべる床: 氷のタイル、または map.slippery(true か、追従の強さの数値。小さいほどつるつる)
       const slip = map.slippery ? map.slippery(world.api, player.x, player.y) : false;
       const iceTile = !!(tileAt(player.x, player.y) || {}).ice;

@@ -307,7 +307,11 @@
   // 目がさめる所は、キノコを食べたときに立っていた所(歩ける所)。テストのフラグで入ったときは、キノコの前の道のまんなか寄り。
   // (11-28、キノコを移したあと、目がさめる所が道の外の歩けないマスになり、動けなくなった。監督「キノコ食うと動けなくなる」)
   let eatAt = null;
-  function wake(api) {
+  // 3 度目のトリップ(3 段目の主観)から目がさめると、きーがぴーと同じようにひっくり返り、泡をはいてけいれんし、起き上がる(todo 383 の泡1)
+  const FOAM_LIE = 3.0; // ひっくり返って泡をはいている
+  const FOAM_UP = 0.6; // 起き上がる(体が返り、泡が薄れる)
+  let foamWake = null; // { t }
+  function wake(api, foam) {
     let x, y;
     if (eatAt) [x, y] = eatAt;
     else {
@@ -319,6 +323,11 @@
     api.freeze(0);
     endTrip();
     api.flash(1.6);
+    if (foam) {
+      api.face("east"); // 泡のきーは横向き(くちばしが東)。起き上がったあとも同じ向き
+      foamWake = { t: 0 };
+      api.freeze(FOAM_LIE + FOAM_UP);
+    }
   }
 
   // ---- 主観(D849、D850) ----
@@ -455,7 +464,7 @@
   function povEnd(api) {
     const pov = tS.pov;
     tS.pov = null;
-    if (pov.depth >= 3) return wake(api);
+    if (pov.depth >= 3) return wake(api, true); // 3 段目を見終えたら、泡をはいて目ざめる
     api.freeze(0);
     tS.level = pov.depth + 1;
     tS.time = Math.max(tS.time, 0);
@@ -1495,6 +1504,37 @@
     const v = Math.sin(n * 12.9898) * 43758.5453;
     return v - Math.floor(v);
   };
+  // 泡(D858)。くちばし (mx, my) から細かい泡がわいてははじけ、地面 gy へ垂れて泡だまりになる。a は濃さ(きーが起き上がるときに薄れる)
+  function drawFoam(ctx, mx, my, gy, t, a) {
+    const sy = gy;
+    const dot = (x, y, big, al) => {
+      x = Math.round(x);
+      y = Math.round(y);
+      ctx.fillStyle = `rgba(250, 252, 255, ${al * a})`;
+      if (big) ctx.fillRect(x, y, 2, 2);
+      else ctx.fillRect(x, y, 1, 1);
+      ctx.fillStyle = `rgba(160, 178, 205, ${al * a * 0.9})`;
+      if (big) ctx.fillRect(x + 1, y + 1, 1, 1);
+      else if ((x + y) % 3 === 0) ctx.fillRect(x, y, 1, 1);
+    };
+    const pool = 8 + Math.sin(t * 0.8);
+    for (let i = 0; i < 44; i++) {
+      const ang = hash(i) * Math.PI * 2;
+      const rr = Math.sqrt(hash(i + 50)) * pool;
+      dot(mx + 2 + Math.cos(ang) * rr * 1.6, sy + Math.sin(ang) * rr * 0.4, hash(i + 90) < 0.35, 0.9);
+    }
+    for (let i = 0; i < 14; i++) {
+      const ph = (t * 1.6 + hash(i + 7)) % 1;
+      const ang = hash(i + 3) * Math.PI * 2;
+      const rr = 1 + hash(i + 11) * 3;
+      if (ph < 0.9) dot(mx + Math.cos(ang) * rr * 1.3, my + Math.sin(ang) * rr, ph > 0.4, 0.95);
+    }
+    for (let i = 0; i < 28; i++) {
+      const u = (t * 0.9 + i / 28) % 1;
+      dot(mx + (i % 2) + Math.sin(i * 1.7 + u * 3) * 1.2 + u * 2, my + u * (sy + 1 - my), hash(i + 30) < 0.3, 0.9);
+    }
+  }
+
   const PI = {
     id: "tripPi",
     x: PI_XY[0],
@@ -1518,34 +1558,7 @@
       ctx.drawImage(im, 0, 128, 64, 64, -32, -30, 64, 64); // いつものピンク(色を変えると別の個体に見える D859)
       ctx.restore();
       // 泡: くちばし(横向きの絵の (48, 37) をさかさにした所)から、細かい泡がわいてははじけ、地面へ垂れて泡だまりになる
-      const mx = sx + 17 + tw;
-      const my = sy - 19 + tv;
-      const dot = (x, y, big, a) => {
-        x = Math.round(x);
-        y = Math.round(y);
-        ctx.fillStyle = `rgba(250, 252, 255, ${a})`;
-        if (big) ctx.fillRect(x, y, 2, 2);
-        else ctx.fillRect(x, y, 1, 1);
-        ctx.fillStyle = `rgba(160, 178, 205, ${a * 0.9})`;
-        if (big) ctx.fillRect(x + 1, y + 1, 1, 1);
-        else if ((x + y) % 3 === 0) ctx.fillRect(x, y, 1, 1);
-      };
-      const pool = 8 + Math.sin(t * 0.8);
-      for (let i = 0; i < 44; i++) {
-        const ang = hash(i) * Math.PI * 2;
-        const rr = Math.sqrt(hash(i + 50)) * pool;
-        dot(mx + 2 + Math.cos(ang) * rr * 1.6, sy + Math.sin(ang) * rr * 0.4, hash(i + 90) < 0.35, 0.9);
-      }
-      for (let i = 0; i < 14; i++) {
-        const ph = (t * 1.6 + hash(i + 7)) % 1;
-        const ang = hash(i + 3) * Math.PI * 2;
-        const rr = 1 + hash(i + 11) * 3;
-        if (ph < 0.9) dot(mx + Math.cos(ang) * rr * 1.3, my + Math.sin(ang) * rr, ph > 0.4, 0.95);
-      }
-      for (let i = 0; i < 28; i++) {
-        const u = (t * 0.9 + i / 28) % 1;
-        dot(mx + (i % 2) + Math.sin(i * 1.7 + u * 3) * 1.2 + u * 2, my + u * (sy + 1 - my), hash(i + 30) < 0.3, 0.9);
-      }
+      drawFoam(ctx, sx + 17 + tw, sy - 19 + tv, sy, t, 1);
     },
   };
 
@@ -1680,7 +1693,43 @@
       update(dt, api);
     },
   };
-  M.objects.push(...MATSUS, PI, HELD, CTL);
+  const KI_FOAM = {
+    id: "tripKiFoam",
+    x: -100,
+    y: -100,
+    w: 1,
+    h: 1,
+    hidden: () => !foamWake,
+    update(dt, t, api) {
+      if (!foamWake) return;
+      foamWake.t += dt;
+      const p = api.player();
+      this.x = p.x;
+      this.y = p.y;
+      if (foamWake.t >= FOAM_LIE + FOAM_UP) foamWake = null;
+    },
+    draw(ctx, sx, sy, t, api) {
+      const im = api.image(typeof ngKiImg === "function" ? ngKiImg() : "ki");
+      if (!im || !foamWake) return;
+      const e = foamWake.t;
+      const up = Math.max(0, Math.min(1, (e - FOAM_LIE) / FOAM_UP)); // 0 = ひっくり返っている、1 = 立っている
+      const fit = up === 0 && t % 1.5 < 0.5; // けいれん(ぴーと同じ)
+      const tw = fit ? Math.round(Math.sin(t * 55) * 2) : 0;
+      const tv = fit ? Math.round(Math.sin(t * 43)) : 0;
+      const sq = fit ? 1 + Math.sin(t * 31) * 0.08 : 1;
+      const flip = Math.cos(up * Math.PI); // -1 → 1(さかさから、くるりと返る)
+      ctx.save();
+      ctx.translate(Math.round(sx) + tw, Math.round(sy - 12) + tv);
+      ctx.scale(2 - sq, flip * sq);
+      ctx.drawImage(im, 0, 128, 64, 64, -32, flip < 0 ? -30 : -47 + 12, 64, 64); // 横向き(くちばしが東)。さかさで腹を見せる
+      ctx.restore();
+      if (up < 1) drawFoam(ctx, sx + 17 + tw, sy - 19 + tv, sy, t, 1 - up);
+    },
+  };
+  Object.defineProperty(M, "hidePlayer", { get: () => !!foamWake, configurable: true }); // ひっくり返っているあいだは、ふだんのきーを描かない
+  // トリップ中は、上下と左右が入れかわる(todo 383 の逆2)。色が変わりはじめる(食べて 3 秒)から、目がさめるまで。主観のあいだは動けない
+  M.invertInput = () => !!tS && !tS.pov && !tS.white && (!tS.ons || tS.time >= 3);
+  M.objects.push(...MATSUS, PI, HELD, KI_FOAM, CTL);
 
   // 来訪神の絵は、ふだんの色の画面から作る(トリップの最初のこま)
   const og = M.drawOverlay;
