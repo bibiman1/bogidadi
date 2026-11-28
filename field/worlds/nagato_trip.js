@@ -1311,6 +1311,57 @@
     const e = Math.sin(Math.min(1, miss.t / MISS_SEC) * Math.PI); // ふくらんで、しぼむ
     return { sat: 1 + 1.3 * e, con: 1 + 0.15 * e, hue: Math.round(Math.sin(miss.t * 4) * 70 * e), post: 0, shuf: 0, step: 0 };
   }
+  // iPhone の Safari は、キャンバスの filter(saturate、hue-rotate など)を受けつけず、色が変わらなかった(11-28、監督「トリップしているときに、フィールドの色が変わらなくなってないか」「iPhoneだね」)。
+  // 受けつけるかを 1 ドットで確かめ、受けつけなければ同じ計算(CSS の filter と同じ式)を 1 ドットずつ自分でする
+  let FILTER_OK = null;
+  function filterOk() {
+    if (FILTER_OK !== null) return FILTER_OK;
+    try {
+      const a = canvas(1, 1);
+      const ag = a.getContext("2d");
+      ag.fillStyle = "rgb(255,0,0)";
+      ag.fillRect(0, 0, 1, 1);
+      const b = canvas(1, 1);
+      const bg = b.getContext("2d", { willReadFrequently: true });
+      bg.filter = "hue-rotate(180deg)";
+      bg.drawImage(a, 0, 0);
+      FILTER_OK = bg.getImageData(0, 0, 1, 1).data[0] < 200 && !window.BOGI_NOFILTER; // テストで手計算の道を通すときは BOGI_NOFILTER
+    } catch (e) {
+      FILTER_OK = false;
+    }
+    return FILTER_OK;
+  }
+  function colorMatrix(g, W, H, L) {
+    // saturate → contrast → hue-rotate(CSS の順)。hue-rotate の行の和は 1 なので、out = con × (H × S × x) + 127.5 × (1 − con)
+    const s = L.sat;
+    const S = [0.213 + 0.787 * s, 0.715 - 0.715 * s, 0.072 - 0.072 * s, 0.213 - 0.213 * s, 0.715 + 0.285 * s, 0.072 - 0.072 * s, 0.213 - 0.213 * s, 0.715 - 0.715 * s, 0.072 + 0.928 * s];
+    const a = (L.hue * Math.PI) / 180;
+    const cs = Math.cos(a);
+    const sn = Math.sin(a);
+    const Hm = [
+      0.213 + cs * 0.787 - sn * 0.213, 0.715 - cs * 0.715 - sn * 0.715, 0.072 - cs * 0.072 + sn * 0.928,
+      0.213 - cs * 0.213 + sn * 0.143, 0.715 + cs * 0.285 + sn * 0.14, 0.072 - cs * 0.072 - sn * 0.283,
+      0.213 - cs * 0.213 - sn * 0.787, 0.715 - cs * 0.715 + sn * 0.715, 0.072 + cs * 0.928 + sn * 0.072,
+    ];
+    const M = [];
+    for (let r = 0; r < 3; r++) for (let q = 0; q < 3; q++) M.push(L.con * (Hm[r * 3] * S[q] + Hm[r * 3 + 1] * S[3 + q] + Hm[r * 3 + 2] * S[6 + q]));
+    const k = 127.5 * (1 - L.con);
+    const id = g.getImageData(0, 0, W, H);
+    const d = id.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const R = d[i];
+      const G = d[i + 1];
+      const B = d[i + 2];
+      d[i] = M[0] * R + M[1] * G + M[2] * B + k; // Uint8ClampedArray なので 0〜255 に収まる
+      d[i + 1] = M[3] * R + M[4] * G + M[5] * B + k;
+      d[i + 2] = M[6] * R + M[7] * G + M[8] * B + k;
+    }
+    if (L.post) {
+      const u = new Uint32Array(d.buffer);
+      for (let i = 0; i < u.length; i++) u[i] &= L.post;
+    }
+    g.putImageData(id, 0, 0);
+  }
   // 画面の加工は、画面の半分の細かさ(ゲームの 1 倍の絵)でする。絵はもともと 2 倍に拡大して描いているので、見た目は同じで軽い(D859)。
   // トリップ中は、きーもぴーも世界といっしょに色がずれる(D859。来訪神と非常口だけは、このあと drawFigures でふだんの色)
   function garish(ctx, ox, oy, L) {
@@ -1325,10 +1376,12 @@
     const step = L.step;
     const g = tmp.getContext("2d", { willReadFrequently: true });
     g.imageSmoothingEnabled = false;
-    g.filter = `saturate(${L.sat}) contrast(${L.con}) hue-rotate(${L.hue}deg)`;
+    const useFilter = filterOk();
+    if (useFilter) g.filter = `saturate(${L.sat}) contrast(${L.con}) hue-rotate(${L.hue}deg)`;
     g.drawImage(c, 0, 0, W, H);
     g.filter = "none";
-    if (L.post) {
+    if (!useFilter) colorMatrix(g, W, H, L);
+    else if (L.post) {
       const id = g.getImageData(0, 0, W, H);
       const u = new Uint32Array(id.data.buffer);
       const m = L.post;
