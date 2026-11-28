@@ -289,11 +289,18 @@
     regrow();
   }
   // 目がさめる: キノコの前(道の路肩)。白はゆっくり引く
+  // 目がさめる所は、キノコを食べたときに立っていた所(歩ける所)。テストのフラグで入ったときは、キノコの前の道のまんなか寄り。
+  // (11-28、キノコを移したあと、目がさめる所が道の外の歩けないマスになり、動けなくなった。監督「キノコ食うと動けなくなる」)
+  let eatAt = null;
   function wake(api) {
-    const pm = proj(SHROOMS[0][0], SHROOMS[0][1]);
-    const [x, y] = at(pm.s, Math.sign(pm.lat) * 34);
+    let x, y;
+    if (eatAt) [x, y] = eatAt;
+    else {
+      const pm = proj(SHROOMS[0][0], SHROOMS[0][1]);
+      [x, y] = at(pm.s, Math.sign(pm.lat) * 12);
+    }
     api.place(x, y);
-    api.face("east");
+    api.face(SHROOMS[0][0] > x ? "east" : "west");
     api.freeze(0);
     endTrip();
     api.flash(1.6);
@@ -644,6 +651,7 @@
       api.freeze(1.2);
       api.dent(0.9); // しゃがんで食べる
       eat = { t: 0, i, hit: i === shroom.hit };
+      eatAt = [p.x, p.y];
     },
     draw(ctx, sx, sy) {
       ctx.fillStyle = "rgba(0,0,0,0.27)";
