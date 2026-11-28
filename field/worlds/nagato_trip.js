@@ -1,14 +1,18 @@
 // 幻覚の世界(todo 369、D847〜D854)。秋の湖ぞいの道(akiWind)のかえでの根もとの松茸を食べると、トリップに入る。
 // - 上から見た画面はけばけばしくなる(色の濃さ、色相の回り、色数の減り、道の外のマスの入れかわり。D853)。来訪神と非常口だけはふだんの色のまま(きーとぴーもずれる D859)
 // - 道のはしが反対のはしにつながる(非ユークリッド)。来訪神がきーより少し遅く追う。逃げる非常口の走る人に追いつくと、白く飛んで目がさめる
-// - 来訪神につかまった瞬間だけ、きーの主観(D849)。世界を小さな四角に切って明るさの順で並べかえ、次の像を組み立てる(D850)。3 段目のモビールのあとも目がさめる
+// - 来訪神につかまった瞬間だけ、きーの主観(D849)。段ごとに出かたと拍子が変わる(D867): 1 段目はかけらが明るさの順で飛んで次の像を組み立てる(D850)。
+//   2 段目は渦。天体ははっきり、木星の穴は真円(D870)、月は爆散して欠け(円弧 D869)輪をまとう(D868)、ネオン街をきーがさまよう(D874)。
+//   3 段目はもぐる。ぼぎがまねて書いた字(ニセひらがな 1 文字 D873、D875)→ 写真 → 字 …。次の像は丸くぼけて広がる(D871)。モビールのあと目がさめる。
+//   試し絵は docs/record/2026-11-28/vision/(vision.py)、moon_burst/、usoji/
 // 仕様は docs/record/2026-11-28/trip/spec.md、試し絵は同じフォルダの mock/(来訪神・看板・松茸の形)と anim2.py(主観)。PixelLab 0 回(D852)。
 // 字も音もなし。見届けの条件にしない(D674 の寄り道)。テスト: 長門のフラグ tripD1〜3(その段のトリップから)、tripP1〜3(その段の主観から)
 (function () {
   const NG = window.BOGI_WORLDS.nagato;
   const M = NG.maps.akiWind;
-  const PICS = ["kinoko", "heitai", "iss", "jupiter", "moon", "kimokei", "usagi", "niwatori", "kao", "bento", "cake", "candle", "mobile"];
-  PICS.forEach((n) => (NG.images[`trip_${n}`] = `trip/trip_${n}.jpg`)); // 監督の写真の切り抜き(D851)と、NASA の公有の写真(出典はスタッフロール)
+  const PICS = ["kinoko", "heitai", "iss", "jupiter", "moon", "neon", "kimokei", "usagi", "niwatori", "kao", "bento", "cake", "candle", "mobile"];
+  PICS.forEach((n) => (NG.images[`trip_${n}`] = `trip/trip_${n}.jpg`)); // 監督の写真の切り抜き(D851)と、NASA の公有の写真(出典はスタッフロール)。neon は嘘字の繁華街(D874)
+  NG.images.trip_nise = "trip/trip_nise.png"; // ぼぎがまねて書いた字(D875)。256 の升を 8 × 6
 
   const KI_SPEED = 150;
   const GOD_SPEED = 110; // きーより少し遅い
@@ -360,12 +364,11 @@
   const cellX = (i) => (i % GW) * PS;
   const cellY = (i) => Math.floor(i / GW) * PS;
 
-  // 段ごとの並び(D851)。sec は 1 枚ごとの (飛ぶ, 浮かぶ) 秒。深いほど速く乗りかわる
+  // 段ごとの出かたと拍子(D867): 1 段目はかけらが飛ぶ(ゆっくり)、2 段目は渦(天体ははっきり、月の爆散、ネオン街)、3 段目はもぐる(ぼぎの字 1 文字 → 写真)
   const DEPTHS = {
-    1: { seq: ["kinoko", "heitai"], fly: 0.75, em: 0.45 },
-    2: { seq: ["iss", "jupiter", "moon"], fly: 1.2, em: 0.7 },
-    3: { seq: ["kimokei", "usagi", "niwatori", "kao", "bento", "cake", "candle"], fly: 1.0, em: 0.6 },
+    1: { seq: ["kinoko", "heitai"], fly: 1.4, em: 1.0 },
   };
+  const D3 = ["kimokei", "usagi", "niwatori", "kao", "bento", "cake", "candle"];
   function povStart(depth, api) {
     const R = canvas(PW, PH);
     if (cv) R.getContext("2d").drawImage(cv, 0, 0, PW, PH); // つかまった所の画面(けばけばしいまま)
@@ -379,26 +382,54 @@
       vg.imageSmoothingEnabled = false;
       vg.drawImage(gods[0], PW / 2 - 90, 20, 180, 250);
     }
-    const D = DEPTHS[depth];
     const steps = [];
-    const seq = D.seq;
-    steps.push({ k: "fly", to: V, dur: 0.9 });
-    steps.push({ k: "em", to: V, dur: 0.45, upto: 0.7, ghost: seq[0] });
-    seq.forEach((key, i) => {
-      const deep = depth === 3 ? i / seq.length : 0;
-      const next = seq[i + 1] || (depth === 3 ? "mobile" : R);
-      steps.push({ k: "fly", to: key, dur: D.fly * (1 - 0.35 * deep), stuck: key === "moon" });
-      steps.push({ k: "em", to: key, dur: D.em * (1 - 0.3 * deep), upto: 0.75 - 0.25 * deep, ghost: next });
-    });
-    if (depth === 3) {
-      steps.push({ k: "fly", to: "mobile", dur: 2.0 });
-      steps.push({ k: "em", to: "mobile", dur: 1.3, upto: 1 });
-      steps.push({ k: "hold", to: "mobile", dur: 0.8 });
-      steps.push({ k: "hold", to: "mobile", dur: 1.4, cross: true }); // 非常口の走る人が横切る(ここだけ定まる)
-      steps.push({ k: "white", dur: 0.5 });
+    if (depth === 1) {
+      const D = DEPTHS[1];
+      const seq = D.seq;
+      steps.push({ k: "fly", to: V, dur: 1.2 });
+      steps.push({ k: "em", to: V, dur: 0.7, upto: 0.75, ghost: seq[0] });
+      seq.forEach((key, i) => {
+        steps.push({ k: "fly", to: key, dur: D.fly });
+        steps.push({ k: "em", to: key, dur: D.em, upto: 0.75, ghost: seq[i + 1] || R });
+      });
+      steps.push({ k: "fly", to: R, dur: 1.1 });
+      steps.push({ k: "em", to: R, dur: 0.5, upto: 1 });
+    } else if (depth === 2) {
+      // 渦に吸いこまれ、短く切りかわる。宇宙ステーションと木星ははっきり(D867)、木星の穴は真円(D870)。月は爆散(D868、D869)。ネオン街をきーがさまよう(D874)
+      steps.push({ k: "swirl", from: R, to: V, dur: 0.7 });
+      steps.push({ k: "clear", to: V, dur: 0.25, z1: 1 });
+      steps.push({ k: "swirl", from: V, to: "iss", dur: 0.6 });
+      steps.push({ k: "clear", to: "iss", dur: 1.1, z1: 1.06 });
+      steps.push({ k: "swirl", from: "iss", to: "jupiter", dur: 0.5 });
+      steps.push({ k: "clear", to: "jupiter", dur: 1.1, z1: 1.06 });
+      steps.push({ k: "swirl", from: "jupiter", to: "moon", dur: 0.5 });
+      steps.push({ k: "burst", dur: BURST_SEC });
+      steps.push({ k: "swirl", from: "prev", to: "neon", dur: 0.6 });
+      steps.push({ k: "neon", dur: 4.6 });
+      steps.push({ k: "swirl", from: "prev", to: R, dur: 0.8 });
     } else {
-      steps.push({ k: "fly", to: R, dur: 0.7 });
-      steps.push({ k: "em", to: R, dur: 0.3, upto: 1 });
+      // もぐる。ぼぎの字 1 文字 → 写真 → ぼぎの字 → 写真(D872、D873、D875)。だんだん遅く、モビールで止まる
+      const seq = [{ c: R }, { c: V }];
+      const used = new Set();
+      D3.forEach((key) => {
+        let n;
+        do n = Math.floor(Math.random() * NISE_N);
+        while (used.has(n) && used.size < NISE_N);
+        used.add(n);
+        seq.push({ nise: n });
+        seq.push({ key });
+      });
+      seq.push({ key: "mobile" });
+      const n = seq.length - 1;
+      for (let i = 0; i < n; i++) {
+        const q = i / (n - 1);
+        const toWord = !!seq[i + 1].nise || seq[i + 1].nise === 0;
+        steps.push({ k: "dive", from: seq[i], to: seq[i + 1], dur: toWord ? 0.45 + 0.4 * q : 0.6 + 1.3 * q * q });
+        if (i + 1 < n) steps.push({ k: "dhold", to: seq[i + 1], dur: toWord ? 0.4 : 0.15 + 0.25 * q });
+      }
+      steps.push({ k: "dhold", to: { key: "mobile" }, dur: 0.6 });
+      steps.push({ k: "dhold", to: { key: "mobile" }, dur: 1.4, cross: true }); // 非常口の走る人が横切る(ここだけ定まる)
+      steps.push({ k: "white", dur: 0.5 });
     }
     let total = 0;
     steps.forEach((s) => {
@@ -407,7 +438,16 @@
     });
     // 主観の途中で、非常口の走る人が一度横切る(触れない。D850)
     const cross = depth === 3 ? null : total * 0.45;
-    tS.pov = { depth, t0: tS.time, steps, total, i: -1, R, cross, rnd: rng(depth * 101 + tS.level) };
+    tS.pov = { depth, t0: tS.time, steps, total, i: -1, R, V, cross, out: pc, rnd: rng(depth * 101 + tS.level) };
+    // もぐる所と両はしの像は、はじめに決めておく(途中で画面を読み直して止まらない)
+    steps.forEach((st) => {
+      if (st.k === "dive") {
+        st.A = diveSide(st.from, api);
+        st.B = diveSide(st.to, api);
+        st.p = diveSpot(st.A);
+      }
+    });
+    if (depth === 2 && !BU) BU = burstInit(api); // 月の割れ方も先に作っておく
     api.freeze(999);
   }
   function povEnd(api) {
@@ -462,7 +502,25 @@
       st.gh = st.ghost ? picture(st.ghost, api) : null;
     } else if (st.k === "hold") {
       st.tgt = picture(st.to, api);
+    } else if (st.k === "swirl") {
+      st.a = swirlSrc(st.from, api);
+      st.b = swirlSrc(st.to, api);
+    } else if (st.k === "clear") {
+      st.tgt = picture(st.to, api);
+    } else if (st.k === "dive") {
+      if (!st.A) {
+        st.A = diveSide(st.from, api);
+        st.B = diveSide(st.to, api);
+        st.p = diveSpot(st.A);
+      }
+      tS.pov.out = hc;
+    } else if (st.k === "dhold") {
+      st.S = diveSide(st.to, api);
+      tS.pov.out = hc;
+    } else if (st.k === "neon" || st.k === "burst") {
+      tS.pov.out = pc;
     }
+    if (st.k === "swirl" || st.k === "clear" || st.k === "fly") tS.pov.out = pc;
   }
   function drawFly(st, t) {
     pg.fillStyle = "#000";
@@ -514,6 +572,644 @@
       pg.drawImage(strip, Math.round((R() - 0.5) * 60), y0);
     }
   }
+  // ---- 2 段目: 渦(D867)。半分の細かさで、中心へ巻きこまれて消え、次の像が中心からほどける ----
+  const SW = PW / 2;
+  const SH = PH / 2;
+  const swc = canvas(SW, SH);
+  const swg = swc.getContext("2d", { willReadFrequently: true });
+  const swOut = swg.createImageData(SW, SH);
+  const SWR = new Float32Array(SW * SH);
+  const SWT = new Float32Array(SW * SH);
+  let SWRM = 0;
+  for (let y = 0; y < SH; y++)
+    for (let x = 0; x < SW; x++) {
+      const dx = x - SW / 2;
+      const dy = y - SH / 2;
+      SWR[y * SW + x] = Math.hypot(dx, dy);
+      SWT[y * SW + x] = Math.atan2(dy, dx);
+      SWRM = Math.max(SWRM, SWR[y * SW + x]);
+    }
+  function smallData(c) {
+    swg.imageSmoothingEnabled = true;
+    swg.clearRect(0, 0, SW, SH);
+    swg.drawImage(c, 0, 0, SW, SH);
+    return swg.getImageData(0, 0, SW, SH).data;
+  }
+  function swirlSrc(x, api) {
+    if (x === "prev") return smallData(copyOf(pc));
+    if (x === "neon") return smallData(neonBase(api));
+    return smallData(picture(x, api));
+  }
+  function drawSwirl(st, t) {
+    const a = t < 0.5;
+    const tt = a ? ease(t * 2) : ease((1 - t) * 2);
+    const src = a ? st.a : st.b;
+    const o = swOut.data;
+    const sc = 1 + 7 * tt * tt;
+    const dim = 1 - 0.5 * tt;
+    for (let i = 0; i < SW * SH; i++) {
+      const r = SWR[i];
+      const tw = 7 * tt * Math.pow(1 - r / SWRM, 1.5) + 2.5 * tt;
+      const th = SWT[i] + tw;
+      const sx = Math.floor(SW / 2 + Math.cos(th) * r * sc);
+      const sy = Math.floor(SH / 2 + Math.sin(th) * r * sc);
+      const k = i * 4;
+      if (sx >= 0 && sx < SW && sy >= 0 && sy < SH) {
+        const j = (sy * SW + sx) * 4;
+        o[k] = src[j] * dim;
+        o[k + 1] = src[j + 1] * dim;
+        o[k + 2] = src[j + 2] * dim;
+      } else o[k] = o[k + 1] = o[k + 2] = 0;
+      o[k + 3] = 255;
+    }
+    swg.putImageData(swOut, 0, 0);
+    pg.imageSmoothingEnabled = false;
+    pg.drawImage(swc, 0, 0, PW, PH);
+  }
+  function drawClear(st, t) {
+    // 天体ははっきり。ゆっくり寄る(D867)
+    const z = 1 + (st.z1 - 1) * t;
+    const w = PW / z;
+    const h = PH / z;
+    pg.imageSmoothingEnabled = true;
+    pg.drawImage(st.tgt, (PW - w) / 2, (PH - h) / 2, w, h, 0, 0, PW, PH);
+  }
+
+  // ---- 2 段目: 月の爆散(D868)。満月の右上に落ちて、破片と粉に割れ、欠けたへりは円弧(D869)、粉は傾いた輪になる ----
+  // 試し絵 docs/record/2026-11-28/moon_burst/burst.py と同じ数
+  const BURST_SEC = 6.0;
+  const B_HIT = 0.9;
+  let BU = null;
+  function burstInit(api) {
+    const im = api.image("trip_moon");
+    if (!im) return null;
+    const R0 = 96;
+    const C = [PW / 2, PH / 2 + 4];
+    const ang = (-42 * Math.PI) / 180;
+    const D = [Math.cos(ang), Math.sin(ang)];
+    const I = [C[0] + R0 * D[0], C[1] + R0 * D[1]];
+    const CC = [C[0] + 0.98 * R0 * D[0], C[1] + 0.98 * R0 * D[1]];
+    const CR = 0.62 * R0;
+    const O = [C[0] + 0.55 * R0 * D[0], C[1] + 0.55 * R0 * D[1]];
+    const src = canvas(PW, PH);
+    const sg = src.getContext("2d", { willReadFrequently: true });
+    sg.drawImage(im, 0, 0, PW, PH);
+    const sd = sg.getImageData(0, 0, PW, PH).data;
+    const R = rng(868);
+    const inDisk = (x, y) => (x - C[0]) ** 2 + (y - C[1]) ** 2 <= (R0 - 0.5) ** 2;
+    const dC = (x, y) => Math.hypot(x - CC[0], y - CC[1]);
+    // 残る月(欠けたへりのきわは影で落ちこむ)と、焼けたへり(粒)
+    const keep = canvas(PW, PH);
+    const kg = keep.getContext("2d");
+    const kd = kg.createImageData(PW, PH);
+    const rim = canvas(PW, PH);
+    const rgx = rim.getContext("2d");
+    const rd = rgx.createImageData(PW, PH);
+    const craterPx = [];
+    for (let y = 0; y < PH; y++)
+      for (let x = 0; x < PW; x++) {
+        if (!inDisk(x, y)) continue;
+        const k = (y * PW + x) * 4;
+        const d = dC(x, y);
+        if (d <= CR) {
+          craterPx.push(x, y);
+          continue;
+        }
+        const sh = d < CR + 12 ? 1 - 0.45 * (1 - (d - CR) / 12) : 1;
+        kd.data[k] = sd[k] * sh;
+        kd.data[k + 1] = sd[k + 1] * sh;
+        kd.data[k + 2] = sd[k + 2] * sh;
+        kd.data[k + 3] = 255;
+        if (d < CR + 3 && R() < 0.85) {
+          rd.data[k] = 255;
+          rd.data[k + 1] = 255;
+          rd.data[k + 2] = 255;
+          rd.data[k + 3] = 255;
+        }
+      }
+    kg.putImageData(kd, 0, 0);
+    rgx.putImageData(rd, 0, 0);
+    const tint = (c, col) => {
+      const t = canvas(c.width, c.height);
+      const g = t.getContext("2d");
+      g.drawImage(c, 0, 0);
+      g.globalCompositeOperation = "source-in";
+      g.fillStyle = col;
+      g.fillRect(0, 0, t.width, t.height);
+      return t;
+    };
+    const rimHot = tint(rim, "rgb(255,245,225)");
+    const rimCool = tint(rim, "rgb(255,95,25)");
+    const rimGlow = canvas(PW, PH);
+    const rgg = rimGlow.getContext("2d");
+    rgg.filter = "blur(5px)";
+    rgg.drawImage(rimCool, 0, 0);
+    rgg.filter = "none";
+    // 破片(ふぞろいなボロノイ、46)
+    const NS = 46;
+    const nC = craterPx.length / 2;
+    const seeds = [];
+    for (let i = 0; i < NS; i++) {
+      const j = Math.floor(R() * nC);
+      seeds.push([craterPx[j * 2], craterPx[j * 2 + 1]]);
+    }
+    const groups = seeds.map(() => []);
+    for (let j = 0; j < nC; j++) {
+      const x = craterPx[j * 2];
+      const y = craterPx[j * 2 + 1];
+      let b = 0;
+      let bd = Infinity;
+      for (let s = 0; s < NS; s++) {
+        const d = (x - seeds[s][0]) ** 2 + (y - seeds[s][1]) ** 2;
+        if (d < bd) {
+          bd = d;
+          b = s;
+        }
+      }
+      groups[b].push(x, y);
+    }
+    const frags = [];
+    groups.forEach((g) => {
+      const n = g.length / 2;
+      if (n < 6) return;
+      let x0 = PW;
+      let y0 = PH;
+      let x1 = 0;
+      let y1 = 0;
+      let gx = 0;
+      let gy = 0;
+      for (let j = 0; j < n; j++) {
+        const x = g[j * 2];
+        const y = g[j * 2 + 1];
+        x0 = Math.min(x0, x);
+        y0 = Math.min(y0, y);
+        x1 = Math.max(x1, x + 1);
+        y1 = Math.max(y1, y + 1);
+        gx += x;
+        gy += y;
+      }
+      gx /= n;
+      gy /= n;
+      const w = x1 - x0;
+      const h = y1 - y0;
+      const mk = () => {
+        const c = canvas(w, h);
+        return [c, c.getContext("2d"), c.getContext("2d").createImageData(w, h)];
+      };
+      const [face, fg, fd] = mk();
+      const [back, bg, bd] = mk();
+      const [edge, eg, ed] = mk();
+      const has = new Uint8Array(w * h);
+      for (let j = 0; j < n; j++) has[(g[j * 2 + 1] - y0) * w + (g[j * 2] - x0)] = 1;
+      for (let j = 0; j < n; j++) {
+        const x = g[j * 2];
+        const y = g[j * 2 + 1];
+        const lx = x - x0;
+        const ly = y - y0;
+        const k = (ly * w + lx) * 4;
+        const s = (y * PW + x) * 4;
+        fd.data[k] = sd[s] * 0.92;
+        fd.data[k + 1] = sd[s + 1] * 0.92;
+        fd.data[k + 2] = sd[s + 2] * 0.92;
+        fd.data[k + 3] = 255;
+        const nz = (R() - 0.5) * 36;
+        bd.data[k] = 92 + nz;
+        bd.data[k + 1] = 84 + nz;
+        bd.data[k + 2] = 78 + nz;
+        bd.data[k + 3] = 255;
+        const isE = lx === 0 || ly === 0 || lx === w - 1 || ly === h - 1 || !has[ly * w + lx - 1] || !has[ly * w + lx + 1] || !has[(ly - 1) * w + lx] || !has[(ly + 1) * w + lx];
+        if (isE) {
+          ed.data[k] = 255;
+          ed.data[k + 1] = 120;
+          ed.data[k + 2] = 30;
+          ed.data[k + 3] = 255;
+        }
+      }
+      fg.putImageData(fd, 0, 0);
+      bg.putImageData(bd, 0, 0);
+      eg.putImageData(ed, 0, 0);
+      const dx = gx - O[0];
+      const dy = gy - O[1];
+      const dl = Math.hypot(dx, dy) || 1;
+      const sp = (40 + R() * 130) * (n < 60 ? 1.25 : 1);
+      const jit = (R() - 0.5) * 0.7;
+      frags.push({
+        face,
+        back,
+        edge,
+        side: tint(face, "rgb(52,46,42)"),
+        dark: tint(face, "#000"),
+        g: [gx, gy],
+        v: [((dx / dl) * Math.cos(jit) - (dy / dl) * Math.sin(jit)) * sp, ((dx / dl) * Math.sin(jit) + (dy / dl) * Math.cos(jit)) * sp],
+        w: (R() - 0.5) * 320,
+        grow: R() * 0.5,
+        n,
+        shade: 0.45 + R() * 0.5,
+        fw: (1.5 + R() * 3.5) * (R() < 0.5 ? -1 : 1),
+        fp: R() * 6.28,
+        th: Math.min(4, 1 + n / 120),
+      });
+    });
+    frags.sort((a, b) => a.n - b.n);
+    // 粉 9000(はじめは飛び、あとで傾いた輪に寄る)
+    const NP = 9000;
+    const gauss = () => (R() + R() + R() - 1.5) * 1.6;
+    const p0 = new Float32Array(NP * 2);
+    const pv = new Float32Array(NP * 2);
+    const pdrag = new Float32Array(NP);
+    const pbr = new Float32Array(NP);
+    const pth = new Float32Array(NP);
+    const prad = new Float32Array(NP);
+    const base = Math.atan2(D[1], D[0]);
+    for (let i = 0; i < NP; i++) {
+      const a = base + (R() * 2 - 1) * (R() < 0.8 ? 1.2 : 3.1);
+      let sp = 15;
+      for (let k = 0; k < 4; k++) sp -= Math.log(R() + 1e-6) * 27; // ガンマ分布のかわり
+      p0[i * 2] = O[0] + gauss() * 10;
+      p0[i * 2 + 1] = O[1] + gauss() * 10;
+      pv[i * 2] = Math.cos(a) * sp;
+      pv[i * 2 + 1] = Math.sin(a) * sp;
+      pdrag[i] = 0.6 + R() * 0.8;
+      pbr[i] = 0.35 + R() * 0.65;
+      pth[i] = R() * 6.283;
+      prad[i] = 1 + gauss() * 0.1;
+    }
+    const stars = canvas(PW, PH);
+    const stg = stars.getContext("2d");
+    stg.fillStyle = "#000";
+    stg.fillRect(0, 0, PW, PH);
+    for (let i = 0; i < 110; i++) {
+      const b = Math.round(255 * (0.2 + R() * 0.6));
+      stg.fillStyle = `rgb(${b},${b},${b})`;
+      stg.fillRect(Math.floor(R() * PW), Math.floor(R() * PH), 1, 1);
+    }
+    const dustC = [canvas(PW, PH), canvas(PW, PH)];
+    const dustD = dustC.map((c) => c.getContext("2d").createImageData(PW, PH));
+    return { im, C, R0, I, O, D, keep, rimHot, rimCool, rimGlow, frags, NP, p0, pv, pdrag, pbr, pth, prad, stars, dustC, dustD };
+  }
+  const B_TILT = (-14 * Math.PI) / 180;
+  function drawBurst(t, api) {
+    if (!BU) BU = burstInit(api);
+    const B = BU;
+    if (!B) return;
+    const u = t - B_HIT;
+    pg.globalAlpha = 1;
+    pg.globalCompositeOperation = "source-over";
+    pg.imageSmoothingEnabled = true;
+    pg.drawImage(B.stars, 0, 0);
+    // 粉: 奥(月のうしろ)と手前に分けて点を打つ
+    let haveDust = false;
+    if (u > 0) {
+      haveDust = true;
+      const RA = 1.85 * B.R0;
+      const RB = 0.3 * B.R0;
+      const sr = ease(Math.max(0, Math.min(1, (u - 1.2) / 2.6)));
+      const heat = Math.exp(-u * 1.3);
+      const cr = 255 * (0.55 + 0.45 * heat);
+      const cgc = 255 * (0.52 + 0.1 * heat);
+      const cb = 255 * (0.5 - 0.25 * heat);
+      const fade = Math.max(0.55, Math.min(1, 1.2 - u * 0.15));
+      const bufs = B.dustD.map((d) => {
+        const u32 = new Uint32Array(d.data.buffer);
+        u32.fill(0);
+        return d.data;
+      });
+      const ct = Math.cos(B_TILT);
+      const stl = Math.sin(B_TILT);
+      for (let i = 0; i < B.NP; i++) {
+        const dr = 0.55 * B.pdrag[i];
+        const kk = (1 - Math.exp(-dr * u)) / dr;
+        let x = B.p0[i * 2] + B.pv[i * 2] * kk;
+        let y = B.p0[i * 2 + 1] + B.pv[i * 2 + 1] * kk;
+        let sa = 1;
+        if (sr > 0) {
+          const a = B.pth[i] + 0.18 * t;
+          const ex = Math.cos(a) * RA * B.prad[i];
+          const ey = Math.sin(a) * RB * B.prad[i];
+          const rx = B.C[0] + ex * ct - ey * stl;
+          const ry = B.C[1] + ex * stl + ey * ct;
+          x = x * (1 - sr) + rx * sr;
+          y = y * (1 - sr) + ry * sr;
+          sa = Math.sin(a);
+        }
+        const ix = x | 0;
+        const iy = y | 0;
+        if (ix < 0 || iy < 0 || ix >= PW || iy >= PH) continue;
+        const d = bufs[sa < 0 && sr > 0.5 ? 0 : 1];
+        const k = (iy * PW + ix) * 4;
+        const f = B.pbr[i] * fade * 0.55;
+        d[k] = Math.min(255, d[k] + cr * f);
+        d[k + 1] = Math.min(255, d[k + 1] + cgc * f);
+        d[k + 2] = Math.min(255, d[k + 2] + cb * f);
+        d[k + 3] = 255;
+      }
+      B.dustC.forEach((c, j) => c.getContext("2d").putImageData(B.dustD[j], 0, 0));
+      pg.globalCompositeOperation = "lighter";
+      pg.drawImage(B.dustC[0], 0, 0);
+      pg.globalCompositeOperation = "source-over";
+    }
+    // 月
+    if (u <= 0) pg.drawImage(B.im, 0, 0, PW, PH);
+    else {
+      pg.drawImage(B.keep, 0, 0);
+      const hot = Math.exp(-u * 0.9);
+      pg.drawImage(B.rimCool, 0, 0);
+      pg.globalAlpha = hot;
+      pg.drawImage(B.rimHot, 0, 0);
+      pg.globalAlpha = Math.min(1, 0.2 + 1.6 * hot);
+      pg.globalCompositeOperation = "lighter";
+      pg.drawImage(B.rimGlow, 0, 0);
+      pg.globalCompositeOperation = "source-over";
+      pg.globalAlpha = 1;
+      // 破片: 回り、軸のまわりにも転がり(裏は割れた岩)、厚み(暗い側面)、熱いうちはふちが焼ける
+      const kk = (1 - Math.exp(-0.12 * u)) / 0.12;
+      const fhot = Math.exp(-u * 1.1);
+      for (const f of B.frags) {
+        const gx = f.g[0] + f.v[0] * kk;
+        const gy = f.g[1] + f.v[1] * kk;
+        if (gx < -60 || gy < -60 || gx > PW + 60 || gy > PH + 60) continue;
+        const sc = 1 + f.grow * Math.min(u, 3) * 0.25;
+        const flip = Math.cos(f.fw * kk + f.fp);
+        const sx = Math.max(0.12, Math.abs(flip)) * sc;
+        const la = f.fw * kk * 0.7 + f.fp;
+        const thick = Math.max(1, Math.round(f.th * sc));
+        const w = f.face.width;
+        const h = f.face.height;
+        const draw = (img) => pg.drawImage(img, -w / 2, -h / 2);
+        for (let k = thick; k >= 1; k--) {
+          pg.save();
+          pg.translate(gx + Math.cos(la + 0.6) * k, gy + Math.sin(la + 0.6) * k);
+          pg.rotate((f.w * kk * Math.PI) / 180);
+          pg.scale(sx, sc);
+          draw(f.side);
+          pg.restore();
+        }
+        pg.save();
+        pg.translate(gx, gy);
+        pg.rotate((f.w * kk * Math.PI) / 180);
+        pg.scale(sx, sc);
+        draw(flip >= 0 ? f.face : f.back);
+        pg.globalAlpha = 1 - Math.min(1, f.shade * (0.55 + 0.45 * Math.abs(flip)));
+        draw(f.dark);
+        pg.globalAlpha = Math.min(1, 1.3 * fhot);
+        pg.globalCompositeOperation = "lighter";
+        draw(f.edge);
+        pg.restore();
+      }
+    }
+    if (haveDust) {
+      pg.globalCompositeOperation = "lighter";
+      pg.drawImage(B.dustC[1], 0, 0);
+    }
+    // 落ちてくる光(当たる前)
+    pg.globalCompositeOperation = "lighter";
+    if (u <= 0) {
+      const q = ease(t / B_HIT);
+      const sx = B.I[0] + 260 * (1 - q);
+      const sy = B.I[1] - 150 * (1 - q);
+      const gr = pg.createLinearGradient(sx, sy, sx + 45, sy - 26);
+      gr.addColorStop(0, "rgba(255,255,255,1)");
+      gr.addColorStop(1, "rgba(255,255,255,0)");
+      pg.strokeStyle = gr;
+      pg.lineWidth = 2;
+      pg.beginPath();
+      pg.moveTo(sx, sy);
+      pg.lineTo(sx + 45, sy - 26);
+      pg.stroke();
+    }
+    // 閃光、火の玉、衝撃の輪
+    if (u > -0.05) {
+      const uu = Math.max(u, 0);
+      const fl = Math.exp(-uu * 3.2);
+      const fr = 18 + 60 * Math.min(uu, 1);
+      let g = pg.createRadialGradient(B.I[0], B.I[1], 0, B.I[0], B.I[1], fr * 2.2);
+      g.addColorStop(0, `rgba(255,245,225,${Math.min(1, 1.6 * fl)})`);
+      g.addColorStop(1, "rgba(255,245,225,0)");
+      pg.fillStyle = g;
+      pg.fillRect(0, 0, PW, PH);
+      if (uu > 0) {
+        const rr = 14 + 75 * (1 - Math.exp(-uu * 1.6));
+        const fo = [B.O[0] + B.D[0] * 40 * Math.min(uu, 2), B.O[1] + B.D[1] * 40 * Math.min(uu, 2)];
+        const cool = Math.exp(-uu);
+        const a = Math.exp(-uu * 0.75) * 0.9;
+        g = pg.createRadialGradient(fo[0], fo[1], 0, fo[0], fo[1], rr * 2);
+        g.addColorStop(0, `rgba(255,${Math.round(70 + 150 * cool)},${Math.round(20 + 120 * cool)},${a})`);
+        g.addColorStop(1, "rgba(255,60,20,0)");
+        pg.fillStyle = g;
+        pg.fillRect(0, 0, PW, PH);
+      }
+      if (uu > 0 && uu < 1.6) {
+        const rr = 10 + uu * 230;
+        const al = (1 - uu / 1.6) * 0.9;
+        for (const [lw, aa] of [[10, 0.15], [5, 0.35], [2, 0.8]]) {
+          pg.strokeStyle = `rgba(200,210,255,${al * aa})`;
+          pg.lineWidth = lw + uu * 4;
+          pg.beginPath();
+          pg.arc(B.I[0], B.I[1], rr, 0, Math.PI * 2);
+          pg.stroke();
+        }
+      }
+      pg.globalCompositeOperation = "source-over";
+      pg.fillStyle = `rgba(255,255,255,${0.45 * fl ** 4})`;
+      pg.fillRect(0, 0, PW, PH);
+      tS.pov.shake = uu > 0 && uu < 0.7 ? (0.7 - uu) * 6 : 0;
+    }
+    pg.globalCompositeOperation = "source-over";
+    pg.globalAlpha = 1;
+  }
+
+  // ---- 2 段目: ネオン街をきーがさまよう(D874) ----
+  function neonBase(api) {
+    const c = canvas(PW, PH);
+    const g = c.getContext("2d");
+    const im = api.image("trip_neon");
+    if (im) g.drawImage(im, 0, 0, PW, PH);
+    return c;
+  }
+  const NEON_GY = 238;
+  const NEON_PATH = [
+    ["w", 2, 30, 170, 1.6],
+    ["s", 1, 170, 170, 0.7],
+    ["s", 3, 170, 170, 0.35],
+    ["w", 3, 170, 130, 0.8],
+    ["s", 0, 130, 130, 9],
+  ]; // 右へ歩く → 見上げる → 左を向く → 少し戻る → こちらを向いて止まる
+  function drawNeon(st, t, api) {
+    const tt = t * st.dur;
+    pg.imageSmoothingEnabled = false;
+    const im = api.image("trip_neon");
+    if (im) pg.drawImage(im, 0, 0, PW, PH);
+    // 看板がときどきまたたく
+    const R = tS.pov.rnd;
+    if (R() < 0.18) {
+      pg.fillStyle = "rgba(0,0,0,0.45)";
+      pg.fillRect(Math.floor(R() * (PW - 50)), 0, 44, NEON_GY);
+    }
+    let acc = 0;
+    let row = 0;
+    let col = 0;
+    let x = 30;
+    for (const [kind, r, x0, x1, d] of NEON_PATH) {
+      if (tt < acc + d) {
+        const k = (tt - acc) / d;
+        x = x0 + (x1 - x0) * k;
+        row = r;
+        col = kind === "w" ? Math.floor(tt * 9) % 7 : 0;
+        break;
+      }
+      acc += d;
+    }
+    const ki = api.image(typeof ngKiImg === "function" ? ngKiImg() : "ki");
+    if (ki) {
+      const ky = NEON_GY + 6 - 40;
+      pg.drawImage(ki, col * 64, row * 64, 64, 64, Math.round(x) - 32, ky, 64, 64);
+      pg.save();
+      pg.globalAlpha = 0.3; // 路面に映る
+      pg.translate(Math.round(x) - 32, ky + 104);
+      pg.scale(1, -1);
+      pg.drawImage(ki, col * 64, row * 64, 64, 64, 0, 0, 64, 64);
+      pg.restore();
+    }
+  }
+
+  // ---- 3 段目: もぐる(D867)。ぼぎの字(D875)と写真。次の像は丸く、ぼけたふちで広がり、外は折り返して続く(D871) ----
+  const HW = PW * 2;
+  const HH = PH * 2;
+  const hc = canvas(HW, HH);
+  const hg = hc.getContext("2d");
+  const tc = canvas(HW, HH);
+  const tg = tc.getContext("2d");
+  const NISE_N = 48;
+  const NISE_CELL = 256;
+  const niseCache = new Map();
+  function niseCanvas(n, api) {
+    if (niseCache.has(n)) return niseCache.get(n);
+    const c = canvas(HW, HH);
+    const g = c.getContext("2d");
+    g.fillStyle = "rgb(6,4,6)";
+    g.fillRect(0, 0, HW, HH);
+    const sh = api.image("trip_nise");
+    if (!sh) return c;
+    // 白い字を、生成りの色で。真ん中に 320 ドット
+    const t = canvas(NISE_CELL, NISE_CELL);
+    const tg2 = t.getContext("2d");
+    tg2.drawImage(sh, (n % 8) * NISE_CELL, Math.floor(n / 8) * NISE_CELL, NISE_CELL, NISE_CELL, 0, 0, NISE_CELL, NISE_CELL);
+    tg2.globalCompositeOperation = "source-in";
+    tg2.fillStyle = "rgb(236,226,214)";
+    tg2.fillRect(0, 0, NISE_CELL, NISE_CELL);
+    g.imageSmoothingEnabled = true;
+    g.drawImage(t, HW / 2 - 160, HH / 2 - 160, 320, 320);
+    niseCache.set(n, c);
+    return c;
+  }
+  // もぐる端の像: { c: 480 × 300 のキャンバス, s: 倍率, smooth }
+  function diveSide(x, api) {
+    if (x.nise != null) return { c: niseCanvas(x.nise, api), s: 2, smooth: true };
+    return { c: x.c || picture(x.key, api), s: 1, smooth: false };
+  }
+  function diveSpot(side) {
+    // いちばん目を引く所(明るさの差が大きいマス)へもぐる。はしは避ける。字は線の上
+    const c = side.c;
+    const g = c.getContext("2d", { willReadFrequently: true });
+    const d = g.getImageData(0, 0, c.width, c.height).data;
+    const S = 10 * side.s;
+    const gw = Math.floor(c.width / S);
+    const gh = Math.floor(c.height / S);
+    let best = -1;
+    let bx = c.width / 2;
+    let by = c.height / 2;
+    for (let cy = 3; cy < gh - 3; cy++)
+      for (let cx = 4; cx < gw - 4; cx++) {
+        let s = 0;
+        let s2 = 0;
+        let n = 0;
+        for (let y = cy * S; y < cy * S + S; y += side.s)
+          for (let x = cx * S; x < cx * S + S; x += side.s) {
+            const k = (y * c.width + x) * 4;
+            const l = d[k] * 0.3 + d[k + 1] * 0.59 + d[k + 2] * 0.11;
+            s += l;
+            s2 += l * l;
+            n++;
+          }
+        const v = s2 / n - (s / n) ** 2;
+        if (v > best) {
+          best = v;
+          bx = cx * S + S / 2;
+          by = cy * S + S / 2;
+        }
+      }
+    return [bx / side.s, by / side.s]; // 480 × 300 の座標で
+  }
+  function drawDive(st, t) {
+    const e = ease(t);
+    const Z = (PW / 10) * 0.5;
+    const z = Math.pow(Z, e);
+    const [px, py] = st.p;
+    const ax = px + (PW / 2 - px) * e;
+    const ay = py + (PH / 2 - py) * e;
+    // 今の像を、もぐる所を中心に拡大(写真はマスになる。字はなめらか)
+    const A = st.A;
+    hg.globalAlpha = 1;
+    hg.fillStyle = "#000";
+    hg.fillRect(0, 0, HW, HH);
+    hg.imageSmoothingEnabled = A.smooth;
+    hg.drawImage(A.c, (px - ax / z) * A.s, (py - ay / z) * A.s, (PW / z) * A.s, (PH / z) * A.s, 0, 0, HW, HH);
+    // 次の像: 画面の上で、左上 (bx, by)、大きさ (bw, bh)。外は折り返して 3 × 3 に並べる
+    const B = st.B;
+    const k = z / Z;
+    const bw = PW * k * 2;
+    const bh = PH * k * 2;
+    const bx = (ax - (PW / 2) * k) * 2;
+    const by = (ay - (PH / 2) * k) * 2;
+    // 丸く、ぼけたふち。だんだん広がって画面をおおう。描くのは丸の外わくの中だけ(軽くする)
+    const al = Math.min(1, e * 1.3) ** 2;
+    if (al < 0.01) return;
+    const rad = (0.4 * PH + Math.pow(e, 2.5) * PW) * 2 * k;
+    const cx = bx + bw / 2;
+    const cy = by + bh / 2;
+    const x0 = Math.max(0, Math.floor(cx - rad));
+    const y0 = Math.max(0, Math.floor(cy - rad));
+    const x1 = Math.min(HW, Math.ceil(cx + rad));
+    const y1 = Math.min(HH, Math.ceil(cy + rad));
+    if (x1 <= x0 || y1 <= y0) return;
+    tg.globalCompositeOperation = "source-over";
+    tg.globalAlpha = 1;
+    tg.clearRect(x0, y0, x1 - x0, y1 - y0);
+    tg.save();
+    tg.beginPath();
+    tg.rect(x0, y0, x1 - x0, y1 - y0);
+    tg.clip();
+    tg.imageSmoothingEnabled = B.smooth;
+    for (let j = -1; j <= 1; j++)
+      for (let i = -1; i <= 1; i++) {
+        const tx = bx + i * bw;
+        const ty = by + j * bh;
+        if (tx > x1 || ty > y1 || tx + bw < x0 || ty + bh < y0) continue; // 丸にかからない折り返しは描かない
+        tg.save();
+        tg.translate(i > 0 ? bx + 2 * bw : i < 0 ? bx : bx, j > 0 ? by + 2 * bh : by);
+        tg.scale(i ? -1 : 1, j ? -1 : 1);
+        tg.drawImage(B.c, 0, 0, B.c.width, B.c.height, 0, 0, bw, bh);
+        tg.restore();
+      }
+    const gr = tg.createRadialGradient(cx, cy, rad * 0.45, cx, cy, Math.max(rad, 1));
+    gr.addColorStop(0, "rgba(0,0,0,1)");
+    gr.addColorStop(1, "rgba(0,0,0,0)");
+    tg.globalCompositeOperation = "destination-in";
+    tg.fillStyle = gr;
+    tg.fillRect(x0, y0, x1 - x0, y1 - y0);
+    tg.restore();
+    tg.globalCompositeOperation = "source-over";
+    hg.globalAlpha = al;
+    hg.drawImage(tc, x0, y0, x1 - x0, y1 - y0, x0, y0, x1 - x0, y1 - y0);
+    hg.globalAlpha = 1;
+  }
+  function drawDHold(st) {
+    const S = st.S;
+    hg.globalAlpha = 1;
+    hg.imageSmoothingEnabled = S.smooth;
+    hg.drawImage(S.c, 0, 0, HW, HH);
+  }
+
   function drawPov(ctx, api, dt) {
     const pov = tS.pov;
     const e = tS.time - pov.t0;
@@ -526,20 +1222,37 @@
     }
     const st = pov.steps[pov.i];
     const t = Math.min(1, (e - st.at) / st.dur);
+    pov.shake = 0;
     if (st.k === "fly") drawFly(st, t);
     else if (st.k === "em") drawEmerge(st, t, dt);
     else if (st.k === "hold") pg.drawImage(st.tgt, 0, 0);
+    else if (st.k === "swirl") drawSwirl(st, t);
+    else if (st.k === "clear") drawClear(st, t);
+    else if (st.k === "burst") drawBurst(t * st.dur, api);
+    else if (st.k === "neon") drawNeon(st, t, api);
+    else if (st.k === "dive") drawDive(st, t);
+    else if (st.k === "dhold") drawDHold(st);
     // 非常口の走る人が横切る
     const ct = st.cross ? t : pov.cross != null ? (e - pov.cross) / 1.3 : -1;
     if (ct >= 0 && ct <= 1) {
       const x = Math.round(-50 + ct * (PW + 100));
       const y = Math.round(212 - Math.abs(Math.sin(ct * 14)) * 10);
-      pg.drawImage(runBig, x, y);
+      if (pov.out === hc) {
+        hg.imageSmoothingEnabled = false;
+        hg.drawImage(runBig, x * 2, y * 2, runBig.width * 2, runBig.height * 2);
+      } else pg.drawImage(runBig, x, y);
     }
     const W = ctx.canvas.width / ctx.getTransform().a;
     const H = ctx.canvas.height / ctx.getTransform().d;
+    ctx.imageSmoothingEnabled = pov.out === hc;
+    if (pov.shake) {
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, W, H);
+    }
+    const sx = pov.shake ? (pov.rnd() - 0.5) * 2 * pov.shake * (W / PW) : 0;
+    const sy = pov.shake ? (pov.rnd() - 0.5) * 2 * pov.shake * (H / PH) : 0;
+    ctx.drawImage(pov.out, sx, sy, W, H);
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(pc, 0, 0, W, H);
     if (st.k === "white") {
       ctx.fillStyle = `rgba(255, 252, 240, ${0.6 + 0.4 * t})`;
       ctx.fillRect(0, 0, W, H);
