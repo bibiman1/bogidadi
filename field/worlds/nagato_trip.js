@@ -3,16 +3,18 @@
 // - 道のはしが反対のはしにつながる(非ユークリッド)。来訪神がきーより少し遅く追う。逃げる非常口の走る人に追いつくと、白く飛んで目がさめる
 // - 来訪神につかまった瞬間だけ、きーの主観(D849)。段ごとに出かたと拍子が変わる(D867): 1 段目はかけらが明るさの順で飛んで次の像を組み立てる(D850)。
 //   2 段目は渦。天体ははっきり、木星の穴は真円(D870)、月は爆散して欠け(円弧 D869)輪をまとう(D868)、ネオン街をきーがさまよう(D874)。
-//   3 段目はもぐる。ぼぎがまねて書いた字(ニセひらがな 1 文字 D873、D875)→ 写真 → 字 …。次の像は丸くぼけて広がる(D871)。モビールのあと目がさめる。
+//   3 段目はもぐる。ぼぎがまねて書いた字(ニセひらがな 1 文字 D873、D875)→ 写真のモチーフの切り抜き(D877)→ 字 …。次の像は丸くぼけて広がる(D871)。モビールのあと目がさめる。
 //   試し絵は docs/record/2026-11-28/vision/(vision.py)、moon_burst/、usoji/
 // 仕様は docs/record/2026-11-28/trip/spec.md、試し絵は同じフォルダの mock/(来訪神・看板・松茸の形)と anim2.py(主観)。PixelLab 0 回(D852)。
 // 字も音もなし。見届けの条件にしない(D674 の寄り道)。テスト: 長門のフラグ tripD1〜3(その段のトリップから)、tripP1〜3(その段の主観から)
 (function () {
   const NG = window.BOGI_WORLDS.nagato;
   const M = NG.maps.akiWind;
-  const PICS = ["kinoko", "heitai", "iss", "jupiter", "moon", "neon", "kimokei", "usagi", "niwatori", "kao", "bento", "cake", "candle", "mobile"];
+  const PICS = ["kinoko", "heitai", "iss", "jupiter", "moon", "neon"];
   PICS.forEach((n) => (NG.images[`trip_${n}`] = `trip/trip_${n}.jpg`)); // 監督の写真の切り抜き(D851)と、NASA の公有の写真(出典はスタッフロール)。neon は嘘字の繁華街(D874)
   NG.images.trip_nise = "trip/trip_nise.png"; // ぼぎがまねて書いた字(D875)。256 の升を 8 × 6
+  const CUTS = ["kimokei", "usagi", "niwatori", "kao", "bento", "cake", "candle", "mobile"];
+  CUTS.forEach((n) => (NG.images[`trip_cut_${n}`] = `trip/trip_cut_${n}.png`)); // 3 段目は、監督の写真のモチーフの切り抜き(D877。地は透明。docs/record/2026-11-28/cutout/cut.py)
 
   const KI_SPEED = 150;
   const GOD_SPEED = 110; // きーより少し遅い
@@ -1102,13 +1104,26 @@
     niseCache.set(n, c);
     return c;
   }
-  // もぐる端の像: { c: 480 × 300 のキャンバス, s: 倍率, smooth }
+  // もぐる端の像: { c: 480 × 300 のキャンバス, s: 倍率, smooth, cut(切り抜き。地は透明) }
+  const cutCache = new Map();
+  function cutCanvas(key, api) {
+    if (cutCache.has(key)) return cutCache.get(key);
+    const c = canvas(PW, PH);
+    const im = api.image(`trip_cut_${key}`);
+    if (!im) return c; // 読めていなければ空(覚えない)
+    c.getContext("2d").drawImage(im, 0, 0, PW, PH);
+    cutCache.set(key, c);
+    return c;
+  }
   function diveSide(x, api) {
     if (x.nise != null) return { c: niseCanvas(x.nise, api), s: 2, smooth: true };
-    return { c: x.c || picture(x.key, api), s: 1, smooth: false };
+    if (x.key) return { c: cutCanvas(x.key, api), s: 1, smooth: true, cut: true, key: x.key }; // 拡大してもマスにしない(D877)
+    return { c: x.c, s: 1, smooth: false };
   }
+  const SPOT = { candle: [255, 40] }; // ろうそくは炎へもぐる(名札をぼかした所へ寄らない)
   function diveSpot(side) {
     // いちばん目を引く所(明るさの差が大きいマス)へもぐる。はしは避ける。字は線の上
+    if (side.key && SPOT[side.key]) return SPOT[side.key];
     const c = side.c;
     const g = c.getContext("2d", { willReadFrequently: true });
     const d = g.getImageData(0, 0, c.width, c.height).data;
@@ -1123,15 +1138,17 @@
         let s = 0;
         let s2 = 0;
         let n = 0;
+        let clear = false;
         for (let y = cy * S; y < cy * S + S; y += side.s)
           for (let x = cx * S; x < cx * S + S; x += side.s) {
             const k = (y * c.width + x) * 4;
+            if (side.cut && d[k + 3] < 250) clear = true; // 切り抜きのふちや外は選ばない
             const l = d[k] * 0.3 + d[k + 1] * 0.59 + d[k + 2] * 0.11;
             s += l;
             s2 += l * l;
             n++;
           }
-        const v = s2 / n - (s / n) ** 2;
+        const v = clear ? -1 : s2 / n - (s / n) ** 2;
         if (v > best) {
           best = v;
           bx = cx * S + S / 2;
@@ -1150,7 +1167,7 @@
     // 今の像を、もぐる所を中心に拡大(写真はマスになる。字はなめらか)
     const A = st.A;
     hg.globalAlpha = 1;
-    hg.fillStyle = "#000";
+    hg.fillStyle = A.cut ? "rgb(6,4,6)" : "#000";
     hg.fillRect(0, 0, HW, HH);
     hg.imageSmoothingEnabled = A.smooth;
     hg.drawImage(A.c, (px - ax / z) * A.s, (py - ay / z) * A.s, (PW / z) * A.s, (PH / z) * A.s, 0, 0, HW, HH);
@@ -1180,7 +1197,8 @@
     tg.rect(x0, y0, x1 - x0, y1 - y0);
     tg.clip();
     tg.imageSmoothingEnabled = B.smooth;
-    for (let j = -1; j <= 1; j++)
+    if (B.cut) tg.drawImage(B.c, 0, 0, B.c.width, B.c.height, bx, by, bw, bh); // 切り抜きは折り返さない(物がふえて見える)
+    else for (let j = -1; j <= 1; j++)
       for (let i = -1; i <= 1; i++) {
         const tx = bx + i * bw;
         const ty = by + j * bh;
@@ -1199,6 +1217,11 @@
     tg.fillRect(x0, y0, x1 - x0, y1 - y0);
     tg.restore();
     tg.globalCompositeOperation = "source-over";
+    if (B.cut) {
+      // 切り抜きのまわりは、前の像がうすれて暗がりになる(最後は黒地に切り抜きだけ)
+      hg.fillStyle = `rgba(6,4,6,${al * e * e})`;
+      hg.fillRect(0, 0, HW, HH);
+    }
     hg.globalAlpha = al;
     hg.drawImage(tc, x0, y0, x1 - x0, y1 - y0, x0, y0, x1 - x0, y1 - y0);
     hg.globalAlpha = 1;
@@ -1206,6 +1229,10 @@
   function drawDHold(st) {
     const S = st.S;
     hg.globalAlpha = 1;
+    if (S.cut) {
+      hg.fillStyle = "rgb(6,4,6)";
+      hg.fillRect(0, 0, HW, HH);
+    }
     hg.imageSmoothingEnabled = S.smooth;
     hg.drawImage(S.c, 0, 0, HW, HH);
   }
