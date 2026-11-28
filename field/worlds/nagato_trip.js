@@ -1423,6 +1423,7 @@
     h: 1,
     headY: 20,
     solid: { w: 32, h: 10, dy: -8 }, // きーが重ならない(倒れた体の大きさ)
+    hidden: (api) => api.flag("akiPiCame"), // 峠道の焚き火にぴーが来たら、ここのぴーは消えたまま(同じ個体 D876)
     draw(ctx, sx, sy, t, api) {
       const im = api.image("pi");
       if (!im) return;

@@ -197,7 +197,10 @@ function akiBonfire() {
         const seen = Math.abs(pl.x - x0) < 500 && Math.abs(pl.y - y0) < 320; // 現れる所がきーの画面に入っているあいだは待つ
         aki.pi = { x: x0, y: y0 };
         aki.warmT = Math.hypot(pl.x - AKI_FIRE.x, pl.y - AKI_FIRE.y) < AKI_WARM ? aki.warmT + dt : 0;
-        if (aki.warmT >= AKI_PI_WAIT && !seen) aki.piIn = "walk";
+        if (aki.warmT >= AKI_PI_WAIT && !seen) {
+          aki.piIn = "walk";
+          api.setFlag("akiPiCame"); // 湖ぞいの道で倒れていたぴーは、このあと消えたまま(D876)
+        }
       } else if (aki.piIn === "walk") {
         // ふらふら: 速さが波打ち、ときどき立ち止まる。体は左右によろける
         const stop = t % 2.6 > 2.0;
@@ -567,9 +570,20 @@ function akiPi() {
     w: 1,
     h: 1,
     headY: 26,
-    update() {
+    // 当たり(D876): 焚き火のそばに立っているあいだだけ。歩いてくる途中と、イモを取りに跳ぶあいだはなし。
+    // きーがもう重なっているときは外す(重なったまま動けなくならないように)
+    update(dt, t, api) {
       this.x = aki.pi.x;
       this.y = aki.pi.y;
+      // 当たり(D876): 焚き火のそばに立っているあいだだけ。歩いてくる途中と、イモを取りに跳ぶあいだはなし。
+      // きーがもう重なっているときは外す(重なったまま動けなくならないように)
+      const box = { w: 30, h: 20, dy: -2 }; // 丸い体の下半分(きーが横から重ならない高さ)
+      this.solid = null;
+      if (api && aki.piIn === "here" && aki.phase !== "dash" && aki.phase !== "back") {
+        const p = api.player();
+        const over = Math.abs(p.x - this.x) < (box.w + 22) / 2 && Math.abs(p.y - (this.y + box.dy)) < (box.h + 10) / 2;
+        if (!over) this.solid = box;
+      }
     },
     draw(ctx, sx, sy, t, api) {
       const pi = api.image("pi");
