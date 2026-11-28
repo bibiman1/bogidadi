@@ -41,6 +41,7 @@ const ASSET_V = (() => {
     let freezeUntil = 0; // この時刻まで、きーを動かせない(演出の途中)
     let autoWalk = null; // 演出で、きーを決まった道ぞいに歩かせている間 { pts, i, speed, onDone }
     let held = null; // { img, t0, sec, onDone } 手に入れた物を、きーの頭の上に掲げて見せる
+    let peckFx = null; // { t0, sec } ついばむ: 体が少しかがんで、すぐ戻る(キノコを食べる D865)
     let dentFx = null; // { t0, sec } 上から何かがぶつかって、きーがへこむ(上下につぶれて、ばねのように戻る)
     let observeFx = null; // { t0 } 見届けたしるし: 小さな光が、きーに降りてくる(D189)
     let toast = null; // { text, until }
@@ -296,6 +297,10 @@ const ASSET_V = (() => {
         // きーをへこませる(上からぶつかったとき。sec 秒で元に戻る)
         dent(sec = 0.9) {
           dentFx = { t0: clock, sec };
+        },
+        // きーが小さくかがんで、ついばむ(sec 秒で戻る。へこむよりずっと小さい D865)
+        peck(sec = 0.24) {
+          peckFx = { t0: clock, sec };
         },
         observe() {
           if (api.flag("observed")) return;
@@ -1240,6 +1245,13 @@ const ASSET_V = (() => {
         const h = Math.round(p.cell * k);
         const w = Math.round(p.cell / Math.sqrt(k));
         ctx.drawImage(im, frame * p.cell, row * p.cell, p.cell, p.cell, Math.round(sx - w / 2), sy - Math.round((p.cell - p.footY) * k) - jz, w, h);
+        return;
+      }
+      if (peckFx && clock - peckFx.t0 < peckFx.sec && !tint) {
+        // ついばむ: 体の上が 3 ドットほど下がって、すぐ戻る。足もとと横幅はそのまま
+        const k = 1 - 0.09 * Math.sin(((clock - peckFx.t0) / peckFx.sec) * Math.PI);
+        const h = Math.round(p.cell * k);
+        ctx.drawImage(im, frame * p.cell, row * p.cell, p.cell, p.cell, sx - p.cell / 2, sy - Math.round((p.cell - p.footY) * k) - jz, p.cell, h);
         return;
       }
       if (!tint) {

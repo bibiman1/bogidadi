@@ -144,7 +144,7 @@ const AKI_PI_WAIT = 3; // きーが焚き火にあたりはじめてから、ぴ
 const AKI_WARM = 2.5 * T; // ここまで焚き火に寄っていると、あたっている
 const AKI_PI_V = 65; // よろけて歩く速さ(ドット/秒)
 const aki = { phase: "idle", t0: 0, armed: true, pi: { x: AKI_PI.x, y: AKI_PI.y }, imo: null, hand: null, burn: false, burnT: -99, outT: -99, spin: 0, dropT: -99, ground: false, piIn: "away", warmT: 0, walkD: 0, face: 0 };
-const akiReset = () => Object.assign(aki, { phase: "idle", t0: 0, armed: true, pi: { x: AKI_PI_PATH[0][0], y: AKI_PI_PATH[0][1] }, imo: null, hand: null, burn: false, burnT: -99, outT: -99, spin: 0, dropT: -99, ground: false, piIn: "away", warmT: 0, walkD: 0, face: 0 });
+const akiReset = () => Object.assign(aki, { kiEat: null, phase: "idle", t0: 0, armed: true, pi: { x: AKI_PI_PATH[0][0], y: AKI_PI_PATH[0][1] }, imo: null, hand: null, burn: false, burnT: -99, outT: -99, spin: 0, dropT: -99, ground: false, piIn: "away", warmT: 0, walkD: 0, face: 0 });
 // 道のり d の所の位置と、進む向き
 function akiPiPath(d) {
   for (let i = 0; i < AKI_PI_PATH.length - 1; i++) {
@@ -449,6 +449,20 @@ function akiSoot(img, a) {
   return cv;
 }
 // 枝にさしたイモ(手で描いた絵の、イモのところだけ)
+// かじりかけのイモ(todo 378、キノコ D865 と同じ食べ方): 上から欠け、残りの上はいつも口(mx, my)に付く。left は残り(1〜0)
+const akiImoBit = (ctx, api, mx, my, left) => {
+  const im = api.image("aki_imo");
+  if (!im || left <= 0) return;
+  const H = 9;
+  const cut = Math.round(H * (1 - left));
+  ctx.drawImage(im, 9, 1 + cut, 13, H - cut, Math.round(mx - 6), Math.round(my), 13, H - cut);
+  if (cut > 0) {
+    ctx.fillStyle = "#f2c35a"; // かじった跡: 黄色い身
+    ctx.fillRect(Math.round(mx - 4), Math.round(my), 9, 1);
+  }
+};
+const AKI_BITES = [0.75, 1.15, 1.55]; // かじる時刻(3 口。キノコと同じ)
+const AKI_KI_EAT = 2.0; // きーがイモを食べるあいだ
 const akiImo = (ctx, api, x, y, a = 1) => {
   const im = api.image("aki_imo");
   if (!im || a <= 0) return;
@@ -495,14 +509,53 @@ function akiGroundImo() {
     h: 1,
     headY: 14,
     range: 30,
-    hidden: () => !aki.ground,
+    hidden: () => !aki.ground || !!aki.kiEat,
+    canInteract: () => !aki.kiEat,
     draw(ctx, sx, sy, t, api) {
       akiImo(ctx, api, sx, sy - 3);
     },
     interact(api) {
-      aki.ground = false;
+      // つまみ上げて、こちらを向き、口の前にくわえて 3 口でかじる。字は出さない(todo 378、キノコ D865 と同じ)
+      const p = api.player();
+      api.face(Math.abs(this.x - p.x) > Math.abs(this.y - p.y) ? (this.x > p.x ? "east" : "west") : this.y > p.y ? "south" : "north");
+      api.freeze(AKI_KI_EAT);
+      api.peck();
       api.sfx("pop");
-      api.mutter("もぐもぐ", 1800);
+      aki.kiEat = { t: 0, bites: 0, turned: false };
+    },
+  };
+}
+// きーが食べているイモ(todo 378)。きーの手前に描く
+function akiKiEat() {
+  return {
+    id: "aki_ki_eat",
+    x: -100,
+    y: -100,
+    w: 1,
+    h: 1,
+    update(dt, t, api) {
+      const p = api.player();
+      this.x = p.x;
+      this.y = p.y + 1;
+      const k = aki.kiEat;
+      if (!k) return;
+      k.t += dt;
+      if (k.t >= 0.3 && !k.turned) {
+        k.turned = true;
+        aki.ground = false;
+        api.face("south");
+      }
+      if (k.bites < AKI_BITES.length && k.t >= AKI_BITES[k.bites]) {
+        k.bites++;
+        api.peck();
+      }
+      if (k.t >= AKI_KI_EAT) aki.kiEat = null;
+    },
+    draw(ctx, sx, sy, t, api) {
+      const k = aki.kiEat;
+      if (!k || !k.turned) return;
+      const dip = AKI_BITES.some((b) => k.t >= b && k.t < b + 0.24) ? 2 : 0;
+      akiImoBit(ctx, api, sx + 1, sy - 11 + dip, 1 - k.bites / AKI_BITES.length); // きーの正面の口は足もとから 11 ドット上
     },
   };
 }
@@ -539,9 +592,14 @@ function akiPi() {
         ctx.rotate(aki.spin);
         ctx.translate(-Math.round(sx), -Math.round(sy - 10));
       }
-      ctx.drawImage(src, f * 64, row * 64, 64, 64, Math.round(sx - 32), Math.round(sy - 47), 64, 64);
-      if (aki.withPi && aki.phase !== "roll") akiImo(ctx, api, sx + (aki.phase === "back" ? -10 : 0), sy - 26 + (aki.phase === "lit" || aki.phase === "keep" ? Math.round(Math.sin(t * 5)) : 0));
-      akiPiFoam(ctx, sx + (row === 2 ? 16 : row === 3 ? -17 : 4), sy - 10, t, row); // 口のまわりの泡(D861)
+      // 燃えなかった回: 元の場所で、口の前にくわえて 3 口でかじる(todo 378、きーと同じ食べ方)。かじるとき体が小さくかがむ
+      const ke = t - aki.t0;
+      const keep = aki.withPi && aki.phase === "keep";
+      const dip = keep && AKI_BITES.some((b) => ke >= b - 0.4 && ke < b - 0.16) ? 2 : 0;
+      ctx.drawImage(src, f * 64, row * 64, 64, 64, Math.round(sx - 32), Math.round(sy - 47 + dip), 64, 64 - dip);
+      akiPiFoam(ctx, sx + (row === 2 ? 16 : row === 3 ? -17 : 4), sy - 10 + dip, t, row); // 口のまわりの泡(D861)
+      if (keep) akiImoBit(ctx, api, sx + 5, sy - 11 + dip, 1 - AKI_BITES.filter((b) => ke >= b - 0.4).length / AKI_BITES.length);
+      else if (aki.withPi && aki.phase !== "roll") akiImo(ctx, api, sx + (aki.phase === "back" ? -10 : 0), sy - 26 + (aki.phase === "lit" ? Math.round(Math.sin(t * 5)) : 0));
       ctx.restore();
       // 燃える前の煙(D729)
       if (aki.phase === "lit") akiSmolder(ctx, sx, sy, t - aki.smokeT, t);
@@ -633,6 +691,7 @@ const NA_ROAD = {
     akiSewa(),
     akiPi(),
     akiGroundImo(),
+    akiKiEat(),
   ].concat(forest(roadMapGrid, 8, [[8, 0, 13, 14], [43, 4, 48, 11]]).map(akiTree)),
 };
 

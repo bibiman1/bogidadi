@@ -13,6 +13,9 @@
   const KI_SPEED = 150;
   const GOD_SPEED = 110; // きーより少し遅い
   const STEP = 0.14;
+  const EAT_SEC = 2.0; // キノコを食べるあいだ(D865)
+  const EAT_PICK = 0.3; // つまみ上げて、地面から消える
+  const EAT_BITES = [0.75, 1.15, 1.55]; // かじる時刻(3 口)
   const MISS_SEC = 2.2; // はずれの色のゆらぎ(D857) // 色相が回る、来訪神のかけらが入れかわる拍子(試し絵の 1 こま)
   // 深さ(つかまった回数 + 1)ごとの、上から見た画面の色(garish.py と同じ数)
   const SAT = [1, 2.2, 3.0, 3.6];
@@ -667,14 +670,14 @@
     x: mx,
     y: my,
     range: 58,
-    hidden: () => !!tS || shroom.eaten[i] || !!(eat && eat.i === i && eat.t > 0.45),
+    hidden: () => !!tS || shroom.eaten[i] || !!(eat && eat.i === i && eat.t > EAT_PICK),
     canInteract: () => !tS && !eat && !miss,
     interact(api) {
       const p = api.player();
       api.face(Math.abs(mx - p.x) > Math.abs(my - p.y) ? (mx > p.x ? "east" : "west") : my > p.y ? "south" : "north");
-      api.freeze(1.2);
-      api.dent(0.9); // しゃがんで食べる
-      eat = { t: 0, i, hit: shroom.hits.includes(i) };
+      api.freeze(EAT_SEC);
+      api.peck(); // かがんで、つまみ上げる(D865。へこむのはやめた)
+      eat = { t: 0, i, hit: shroom.hits.includes(i), bites: 0 };
       eatAt = [p.x, p.y];
     },
     draw(ctx, sx, sy) {
@@ -752,6 +755,42 @@
     },
   };
 
+  // 食べている 1 本(D865): つまみ上げたキノコを、こちらを向いて口の前に持ち、3 口かじって食べきる。かじるたびに上から欠ける。峠道のイモも同じ食べ方(todo 378)
+  const HELD = {
+    id: "tripHeld",
+    x: -100,
+    y: -100,
+    w: 1,
+    h: 1,
+    update(dt, t, api) {
+      const p = api.player();
+      this.x = p.x;
+      this.y = p.y + 1; // きーの手前に描く
+    },
+    draw(ctx, sx, sy) {
+      if (!eat || eat.t < EAT_PICK) return;
+      const k = SHROOM_PLAN[eat.i][2];
+      const left = 1 - eat.bites / EAT_BITES.length; // 残り
+      if (left <= 0) return;
+      const H = matsu.height;
+      const cut = Math.round(H * (1 - left)); // 上(かさ)からかじる
+      const dip = EAT_BITES.some((b) => eat.t >= b && eat.t < b + 0.24) ? 2 : 0; // かじるとき、体といっしょに下がる
+      ctx.save();
+      // くちばし(正面の絵で足もとから 11 ドット上)にかさの上が来るように、体の前に持つ。顔(目)にはかからない
+      // かじった分だけ持ち上げて、残りの上がいつも口に付くようにする
+      const sc = k * 0.85;
+      ctx.translate(Math.round(sx + 1), Math.round(sy + 3 + dip - cut * sc));
+      ctx.scale(sc, sc);
+      ctx.drawImage(matsu, 0, cut, matsu.width, H - cut, -6, -H + cut, matsu.width, H - cut);
+      // かじった跡: 欠けた所に白い身が見える
+      if (cut > 0 && cut < H) {
+        ctx.fillStyle = "#efe6d2";
+        ctx.fillRect(-4, -H + cut, 8, 1);
+      }
+      ctx.restore();
+    },
+  };
+
   // ---- 動き(毎こま) ----
   function update(dt, api) {
     if (miss) {
@@ -760,7 +799,16 @@
     }
     if (eat && !tS) {
       eat.t += dt;
-      if (eat.t > 1.2) {
+      // つまみ上げたら、こちらを向いて、3 口かじる(D865)
+      if (eat.t >= EAT_PICK && !eat.turned) {
+        eat.turned = true;
+        api.face("south");
+      }
+      if (eat.bites < EAT_BITES.length && eat.t >= EAT_BITES[eat.bites]) {
+        eat.bites++;
+        api.peck(); // 字は出さず、動きで見せる(監督「もぐもぐはいらない」todo 378)
+      }
+      if (eat.t > EAT_SEC) {
         const e = eat;
         eat = null;
         shroom.eaten[e.i] = true;
@@ -838,7 +886,7 @@
       update(dt, api);
     },
   };
-  M.objects.push(...MATSUS, PI, CTL);
+  M.objects.push(...MATSUS, PI, HELD, CTL);
 
   // 来訪神の絵は、ふだんの色の画面から作る(トリップの最初のこま)
   const og = M.drawOverlay;
