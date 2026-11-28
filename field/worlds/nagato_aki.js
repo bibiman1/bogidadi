@@ -137,8 +137,25 @@ const AKI_SEWA = { x: 9.1 * T, y: 45.5 * T }; // お世話係(呪いの野犬の
 const AKI_PI = { x: 5.7 * T, y: 45.6 * T }; // ぴーは焚き火の西(道のきわ)
 const AKI_NEAR = 1.9 * T; // ここまで寄ると、イモを差し出す
 const AKI_AWAY = 3.6 * T; // ここまで離れると、また差し出す
-const aki = { phase: "idle", t0: 0, armed: true, pi: { x: AKI_PI.x, y: AKI_PI.y }, imo: null, hand: null, burn: false, burnT: -99, outT: -99, spin: 0, dropT: -99, ground: false };
-const akiReset = () => Object.assign(aki, { phase: "idle", t0: 0, armed: true, pi: { x: AKI_PI.x, y: AKI_PI.y }, imo: null, hand: null, burn: false, burnT: -99, outT: -99, spin: 0, dropT: -99, ground: false });
+// はじめはお世話係だけ。きーが焚き火にあたっていると、口に泡のついたぴー(湖ぞいの道でキノコに当たった D858)が、道の北(画面の外)からふらふら下りてくる(D861、D862)
+// piIn: "away"(まだ来ていない)→ "walk"(よろけて歩いてくる)→ "here"(焚き火の西に着いた)。着くまで、お世話係はイモを差し出さない
+const AKI_PI_PATH = [[11 * T, 32 * T], [10.4 * T, 36 * T], [8 * T, 39.2 * T], [6.4 * T, 42.6 * T], [AKI_PI.x, AKI_PI.y]]; // 道の中心をたどって下り、焚き火の西へ
+const AKI_PI_WAIT = 3; // きーが焚き火にあたりはじめてから、ぴーが来はじめるまで(D862)
+const AKI_WARM = 2.5 * T; // ここまで焚き火に寄っていると、あたっている
+const AKI_PI_V = 65; // よろけて歩く速さ(ドット/秒)
+const aki = { phase: "idle", t0: 0, armed: true, pi: { x: AKI_PI.x, y: AKI_PI.y }, imo: null, hand: null, burn: false, burnT: -99, outT: -99, spin: 0, dropT: -99, ground: false, piIn: "away", warmT: 0, walkD: 0, face: 0 };
+const akiReset = () => Object.assign(aki, { phase: "idle", t0: 0, armed: true, pi: { x: AKI_PI_PATH[0][0], y: AKI_PI_PATH[0][1] }, imo: null, hand: null, burn: false, burnT: -99, outT: -99, spin: 0, dropT: -99, ground: false, piIn: "away", warmT: 0, walkD: 0, face: 0 });
+// 道のり d の所の位置と、進む向き
+function akiPiPath(d) {
+  for (let i = 0; i < AKI_PI_PATH.length - 1; i++) {
+    const [x0, y0] = AKI_PI_PATH[i];
+    const [x1, y1] = AKI_PI_PATH[i + 1];
+    const len = Math.hypot(x1 - x0, y1 - y0);
+    if (d <= len) return { x: x0 + ((x1 - x0) * d) / len, y: y0 + ((y1 - y0) * d) / len, dx: (x1 - x0) / len, dy: (y1 - y0) / len, end: false };
+    d -= len;
+  }
+  return { x: AKI_PI.x, y: AKI_PI.y, dx: 0, dy: 1, end: true };
+}
 const AKI_OFFER = 0.7; // 枝を差し出す
 const AKI_HOLD = 0.7; // 差し出したまま
 const AKI_DASH = 0.32; // ぴーが焚き火を跳び越えて飛んでくる
@@ -174,9 +191,31 @@ function akiBonfire() {
         aki.t0 = t;
       };
       const e = t - aki.t0;
+      // ぴーが来るまで(D861、D862): きーが焚き火にあたって 3 秒たつと歩きだす。歩きだしたら、きーが離れても来る
+      if (aki.piIn === "away") {
+        const [x0, y0] = AKI_PI_PATH[0];
+        const seen = Math.abs(pl.x - x0) < 500 && Math.abs(pl.y - y0) < 320; // 現れる所がきーの画面に入っているあいだは待つ
+        aki.pi = { x: x0, y: y0 };
+        aki.warmT = Math.hypot(pl.x - AKI_FIRE.x, pl.y - AKI_FIRE.y) < AKI_WARM ? aki.warmT + dt : 0;
+        if (aki.warmT >= AKI_PI_WAIT && !seen) aki.piIn = "walk";
+      } else if (aki.piIn === "walk") {
+        // ふらふら: 速さが波打ち、ときどき立ち止まる。体は左右によろける
+        const stop = t % 2.6 > 2.0;
+        aki.walkD += stop ? 0 : AKI_PI_V * (0.55 + 0.45 * Math.abs(Math.sin(t * 2.2))) * dt;
+        const p = akiPiPath(aki.walkD);
+        const sw = Math.sin(t * 3.1) * 4 + Math.sin(t * 7.3) * 1.5;
+        aki.pi = { x: p.x - p.dy * sw, y: p.y + p.dx * sw * 0.5 };
+        aki.face = Math.abs(p.dx) > Math.abs(p.dy) * 1.2 ? (p.dx > 0 ? 2 : 3) : 0;
+        aki.walkStop = stop;
+        if (p.end) {
+          aki.piIn = "here";
+          aki.face = 0;
+          aki.pi = { x: AKI_PI.x, y: AKI_PI.y };
+        }
+      }
       if (aki.phase === "idle") {
         if (d > AKI_AWAY) aki.armed = true;
-        if (aki.armed && d < AKI_NEAR) {
+        if (aki.armed && d < AKI_NEAR && aki.piIn === "here") {
           aki.armed = false;
           aki.to = { x: akiLerp(AKI_SEWA.x, pl.x, 0.62), y: Math.min(pl.y, AKI_SEWA.y) - 22 }; // きーの前、少し上
           go("offer");
@@ -258,7 +297,7 @@ function akiBonfire() {
       } else if (aki.phase === "lit" || aki.phase === "keep") imo = null;
       else if (aki.phase === "eat") imo = null;
       else if (aki.phase === "redo") imo = null;
-      aki.pi = pi;
+      if (aki.piIn === "here") aki.pi = pi; // 着くまでは、上で決めた歩く位置のまま(着くまでイモの流れは始まらない)
       aki.imo = imo;
       aki.withPi = aki.phase === "back" || aki.phase === "lit" || aki.phase === "keep" || aki.phase === "notice" || (aki.phase === "roll" && aki.dropT < aki.t0);
       if (aki.phase !== "roll") {
@@ -482,10 +521,14 @@ function akiPi() {
     draw(ctx, sx, sy, t, api) {
       const pi = api.image("pi");
       if (!pi) return;
+      if (aki.piIn === "away") return; // まだ来ていない(D861)
+      const walk = aki.piIn === "walk";
       const run = aki.phase === "dash" || aki.phase === "back";
-      // 向き: 飛んでいくときは東、戻るときは西、ふだんは正面(焚き火を見ている)
-      const row = aki.phase === "dash" ? 2 : aki.phase === "back" ? 3 : 0;
-      const f = run ? Math.floor(t * 12) % 7 : 0;
+      // 向き: 飛んでいくときは東、戻るときは西、歩いてくるときは進む向き、ふだんは正面(焚き火を見ている)
+      const row = aki.phase === "dash" ? 2 : aki.phase === "back" ? 3 : walk ? aki.face : 0;
+      const f = run ? Math.floor(t * 12) % 7 : walk && !aki.walkStop ? Math.floor(t * 6) % 7 : 0;
+      // 着いてからも、イモが差し出されるまではふらふら揺れている。差し出された瞬間にぴたっと止まる(D861)
+      if (aki.phase === "idle" && !walk) sx += Math.round(Math.sin(t * 2.4) * 2 + Math.sin(t * 5.7));
       // 火が消えたあと、しばらくすすける(D726)
       const soot = Math.max(0, 1 - (t - aki.outT) / 4.5);
       const src = soot > 0 ? akiSoot(pi, soot) : pi;
@@ -498,6 +541,7 @@ function akiPi() {
       }
       ctx.drawImage(src, f * 64, row * 64, 64, 64, Math.round(sx - 32), Math.round(sy - 47), 64, 64);
       if (aki.withPi && aki.phase !== "roll") akiImo(ctx, api, sx + (aki.phase === "back" ? -10 : 0), sy - 26 + (aki.phase === "lit" || aki.phase === "keep" ? Math.round(Math.sin(t * 5)) : 0));
+      akiPiFoam(ctx, sx + (row === 2 ? 16 : row === 3 ? -17 : 4), sy - 10, t, row); // 口のまわりの泡(D861)
       ctx.restore();
       // 燃える前の煙(D729)
       if (aki.phase === "lit") akiSmolder(ctx, sx, sy, t - aki.smokeT, t);
@@ -518,6 +562,34 @@ function akiPi() {
       akiSmoke(ctx, sx, sy, t - aki.outT);
     },
   };
+}
+
+// ぴーの口のまわりの泡(D861)。湖ぞいの道で倒れていたぴー(D858)と同じ粒を小さく: 口のまわりで泡がわいてははじけ、ときどき 1 粒たれる
+function akiPiFoam(ctx, mx, my, t, row) {
+  const hash = (n) => {
+    const v = Math.sin(n * 12.9898) * 43758.5453;
+    return v - Math.floor(v);
+  };
+  const dot = (x, y, big, a) => {
+    x = Math.round(x);
+    y = Math.round(y);
+    ctx.fillStyle = `rgba(250, 252, 255, ${a})`;
+    ctx.fillRect(x, y, big ? 2 : 1, big ? 2 : 1);
+    ctx.fillStyle = `rgba(160, 178, 205, ${a * 0.9})`;
+    if (big) ctx.fillRect(x + 1, y + 1, 1, 1);
+  };
+  const wx = row === 0 ? 4 : 2; // 正面は口が横に広い
+  for (let i = 0; i < 7; i++) {
+    const ph = (t * 1.3 + hash(i + 7)) % 1;
+    const ang = hash(i + 3) * Math.PI * 2;
+    const rr = 1 + hash(i + 11) * 2;
+    if (ph < 0.85) dot(mx + Math.cos(ang) * (wx + rr), my + 1 + Math.sin(ang) * rr * 0.8, ph > 0.5, 0.95);
+  }
+  // たれる粒: 口の下から、ゆっくり落ちて消える
+  for (let i = 0; i < 2; i++) {
+    const u = (t * 0.5 + i * 0.5) % 1;
+    dot(mx + (i ? 2 : -2), my + 3 + u * 8, false, 0.9 * (1 - u));
+  }
 }
 
 const NA_ROAD = {

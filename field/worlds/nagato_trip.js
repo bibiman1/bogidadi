@@ -262,11 +262,14 @@
   let tS = null; // トリップ中だけ。{ level, time, t0, gods, run, pov, white, ... }
   let eat = null; // 食べている最中 { t, i, hit }
   let miss = null; // はずれを食べたあとの、短い色のゆらぎ { t }(D857)
-  // キノコは 3 本。当たりは 1 本で、生え直すたびにくじ(D856、D857)
-  const shroom = { hit: 0, eaten: [false, false, false] };
+  // キノコは 7 本。当たりは 2 本で、生え直すたびにくじ(D856、D857、D864)
+  const N_SHROOM = 7;
+  const shroom = { hits: [0, 1], eaten: Array(N_SHROOM).fill(false) };
   const regrow = () => {
-    shroom.hit = Math.floor(Math.random() * 3);
-    shroom.eaten = [false, false, false];
+    const a = Math.floor(Math.random() * N_SHROOM);
+    const b = (a + 1 + Math.floor(Math.random() * (N_SHROOM - 1))) % N_SHROOM;
+    shroom.hits = [a, b];
+    shroom.eaten = Array(N_SHROOM).fill(false);
   };
   regrow();
   let gods = []; // 来訪神の絵(3 とおり)
@@ -274,10 +277,13 @@
   let tmp = null;
   let tmp2 = null;
 
-  function startTrip(level, api) {
+  // 当たりを食べたときは、じわじわ始まる(D863): 3 秒は何も起きない → 3〜6 秒は色がかすかに波打つ → 6〜10 秒で色が深さ 1 まで回る
+  // → 10〜12 秒で来訪神がうっすら現れ、非常口の看板も出る → 12 秒で追いはじめる。テストのフラグで入ったときは、すぐ(ons 0)
+  const ONSET = 12;
+  function startTrip(level, api, ons = 0) {
     const p = api.player();
     const ps = proj(p.x, p.y).s;
-    tS = { level, time: 0, gods: [], run: { state: "in", s: proj(SIGN_XY[0], SIGN_XY[1] + 4).s, lat: 30, t: 0, face: 1 }, pov: null, white: null, snapAt: 0 };
+    tS = { level, ons, time: 0, gods: [], run: { state: "in", s: proj(SIGN_XY[0], SIGN_XY[1] + 4).s, lat: 30, t: 0, face: 1 }, pov: null, white: null, snapAt: 0 };
     const n = level >= 3 ? 3 : 2;
     for (let i = 0; i < n; i++) tS.gods.push({ s: wrapS(ps + (i === 2 ? LOOP / 2 : i ? 240 : -240)), lat: 0, v: i });
     gods = [];
@@ -541,8 +547,21 @@
   // トリップの段の色(D853)。はずれのときは、色相と濃さだけが短くゆらぐ(D857)
   function tripLook() {
     const lv = tS.level;
-    const k = Math.min(1, tS.time / 1.5); // 食べたあと、少しずつずれる
-    const step = Math.floor(tS.time / STEP);
+    const tt = tS.time;
+    const step = Math.floor(tt / STEP);
+    if (tS.ons && tt < 6) {
+      // じわじわ(D863): はじめの 3 秒は何も起きない。3〜6 秒は、色がかすかに波打っては戻る
+      const w = Math.max(0, (tt - 3) / 3);
+      const e = w * (0.5 + 0.5 * Math.sin(tt * 2.1));
+      return { sat: 1 + 0.35 * e, con: 1 + 0.05 * e, hue: Math.round(Math.sin(tt * 1.3) * 14 * e), post: 0, shuf: 0, step };
+    }
+    if (tS.ons && tt < 10) {
+      // 6〜10 秒: 色相は拍子で跳ばさず、ゆっくり流れながら振れ幅を広げる。濃さも少しずつ(D863)
+      const k = (tt - 6) / 4;
+      const e = k * k;
+      return { sat: 1 + (SAT[lv] - 1) * (0.25 + 0.75 * k), con: 1 + 0.25 * lv * k, hue: Math.round(Math.sin(tt * 0.9) * (25 + 110 * e)), post: 0, shuf: 0, step };
+    }
+    const k = tS.ons ? 1 : Math.min(1, tt / 1.5); // 食べたあと、少しずつずれる
     return { sat: 1 + (SAT[lv] - 1) * k, con: 1 + 0.25 * lv * k, hue: Math.round(((step * HUE[lv]) % 360) * k), post: POST[lv], shuf: SHUF[lv], step };
   }
   function missLook() {
@@ -600,7 +619,9 @@
   function drawFigures(ctx, ox, oy) {
     const step = Math.floor(tS.time / STEP);
     const list = [];
-    const show = Math.min(1, Math.max(0, (tS.time - 0.6) / 0.6)); // 来訪神は、色がずれはじめてから立つ
+    // 来訪神は、色がずれはじめてから立つ。じわじわのときは 10 秒から 2 秒かけて、うっすら濃くなる(D863)
+    const show = tS.ons ? Math.min(1, Math.max(0, (tS.time - 10) / 2)) : Math.min(1, Math.max(0, (tS.time - 0.6) / 0.6));
+    const signOn = !tS.ons || tS.time >= 10; // 非常口の看板も、じわじわのときは 10 秒から
     if (show > 0 && gods.length)
       tS.gods.forEach((g) => {
         const [x, y] = at(g.s, g.lat);
@@ -615,7 +636,7 @@
         } });
       });
     const r = tS.run;
-    list.push({ y: SIGN_XY[1], f: () => ctx.drawImage(r.state === "in" ? signFull : signEmpty, Math.round(SIGN_XY[0] + ox - 11), Math.round(SIGN_XY[1] + oy - 17)) });
+    if (signOn) list.push({ y: SIGN_XY[1], f: () => ctx.drawImage(r.state === "in" ? signFull : signEmpty, Math.round(SIGN_XY[0] + ox - 11), Math.round(SIGN_XY[1] + oy - 17)) });
     if (r.state !== "in") {
       const [x, y] = at(r.s, r.lat);
       list.push({ y, f: () => {
@@ -637,7 +658,10 @@
   // 版 639 の (60, 632) あたりはガードレールの外で、監督「ガードレールの外にあるのが嫌だな」)
   const SHROOM_S = 312;
   const SHROOM_SIDE = -1;
-  const SHROOMS = [[304, 60], [318, 68], [326, 57]].map(([ss, l]) => at(ss, SHROOM_SIDE * l));
+  // 7 本(D864): かえでの根もとに大小 4 本の群れ、かえで寄りに散らして 3 本。[道ぞいの位置, 道の中心からのへだたり, 大きさ]。
+  // 試し絵 docs/record/2026-11-28/kinoko7/。道ぞいに一列に並べるとガードレールの端に重なったので、かえで寄りに散らした
+  const SHROOM_PLAN = [[306, 62, 1], [314, 70, 0.8], [321, 58, 1.1], [298, 71, 0.7], [336, 66, 0.9], [343, 55, 0.75], [351, 64, 1]];
+  const SHROOMS = SHROOM_PLAN.map(([ss, l]) => at(ss, SHROOM_SIDE * l));
   const MATSUS = SHROOMS.map(([mx, my], i) => ({
     id: `tripMatsu${i}`,
     x: mx,
@@ -650,15 +674,20 @@
       api.face(Math.abs(mx - p.x) > Math.abs(my - p.y) ? (mx > p.x ? "east" : "west") : my > p.y ? "south" : "north");
       api.freeze(1.2);
       api.dent(0.9); // しゃがんで食べる
-      eat = { t: 0, i, hit: i === shroom.hit };
+      eat = { t: 0, i, hit: shroom.hits.includes(i) };
       eatAt = [p.x, p.y];
     },
     draw(ctx, sx, sy) {
+      const k = SHROOM_PLAN[i][2];
+      ctx.save();
+      ctx.translate(sx, sy);
+      ctx.scale(k, k);
       ctx.fillStyle = "rgba(0,0,0,0.27)";
       ctx.beginPath();
-      ctx.ellipse(sx, sy - 1, 6, 2, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, -1, 6, 2, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.drawImage(matsu, sx - 6, sy - 13);
+      ctx.drawImage(matsu, -6, -13);
+      ctx.restore();
     },
   }));
 
@@ -735,7 +764,7 @@
         const e = eat;
         eat = null;
         shroom.eaten[e.i] = true;
-        if (e.hit) startTrip(1, api);
+        if (e.hit) startTrip(1, api, ONSET);
         else miss = { t: 0 }; // はずれ: 2 秒ほど色がゆらいで戻る(来訪神は出ない)
       }
       return;
@@ -756,7 +785,7 @@
     const pp = proj(p.x, p.y);
     const ps = pp.s;
     // 来訪神: 道ぞいに、きーへ(輪の近いほうから回ってくる)
-    if (tS.time > 0.9 && tS.time - (tS.caughtAt || -9) > 0.8)
+    if (tS.time > (tS.ons ? tS.ons : 0.9) && tS.time - (tS.caughtAt || -9) > 0.8)
       for (const g of tS.gods) {
         const d = loopD(g.s, ps);
         g.s = wrapS(g.s + Math.sign(d) * Math.min(Math.abs(d), GOD_SPEED * dt));
@@ -771,7 +800,7 @@
     // 非常口: 近づくと、看板から走る人が抜けて、道ぞいに逃げる。ときどき止まって振りかえる
     const r = tS.run;
     if (r.state === "in") {
-      if (Math.hypot(SIGN_XY[0] - p.x, SIGN_XY[1] - p.y) < 80) {
+      if ((!tS.ons || tS.time >= 10) && Math.hypot(SIGN_XY[0] - p.x, SIGN_XY[1] - p.y) < 80) {
         r.state = "out";
         r.t = 0;
         r.pause = 0;
