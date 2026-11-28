@@ -609,6 +609,7 @@ const F_CREDITS_TAIL = [
   ["音楽", ["「Accordion Passion of the Roma」", "「Melancholic Accordion in the Rain」", "Music by Iskander from Pixabay"]],
   ["ジュークボックス", ["「Sock Hop」", "「Sax, Rock, and Roll」", "Kevin MacLeod（CC BY 3.0）", "「Surfing」 Komiku（CC0）", "Wikimedia Commons"]],
   ["音", ["赤ちゃんの笑い声", "reinsamba（CC BY 3.0）", "公園の遊び場", "foongaz（CC0）", "Wikimedia Commons"]],
+  ["写真", ["国際宇宙ステーション、木星、月", "NASA（パブリックドメイン）", "Wikimedia Commons"]],
   ["スペシャルサンクス", ["あそんでくれた", "あなた"]],
 ];
 function fRollDrawOverlay(ctx, ox, oy, t, api) {
