@@ -1,5 +1,5 @@
 // 幻覚の世界(todo 369、D847〜D854)。秋の湖ぞいの道(akiWind)のかえでの根もとの松茸を食べると、トリップに入る。
-// - 上から見た画面はけばけばしくなる(色の濃さ、色相の回り、色数の減り、道の外のマスの入れかわり。D853)。きー、来訪神、非常口はふだんの色のまま
+// - 上から見た画面はけばけばしくなる(色の濃さ、色相の回り、色数の減り、道の外のマスの入れかわり。D853)。来訪神と非常口だけはふだんの色のまま(きーとぴーもずれる D859)
 // - 道のはしが反対のはしにつながる(非ユークリッド)。来訪神がきーより少し遅く追う。逃げる非常口の走る人に追いつくと、白く飛んで目がさめる
 // - 来訪神につかまった瞬間だけ、きーの主観(D849)。世界を小さな四角に切って明るさの順で並べかえ、次の像を組み立てる(D850)。3 段目のモビールのあとも目がさめる
 // 仕様は docs/record/2026-11-28/trip/spec.md、試し絵は同じフォルダの mock/(来訪神・看板・松茸の形)と anim2.py(主観)。PixelLab 0 回(D852)。
@@ -19,7 +19,6 @@
   const HUE = [0, 25, 45, 70]; // 1 拍子あたりの色相の回り(度)
   const POST = [0, 0, 0xfff0f0f0, 0xffe0e0e0]; // 色数を減らす(4 ビット、3 ビット)
   const SHUF = [0, 0, 0.06, 0.18]; // 道の外のマスの入れかわる割合(D853)
-  const MATSU_XY = [60, 632]; // 道に近いかえで(43, 606)の、道の側の根もと。試し絵の位置 (302, 561) は道から 90 ドット離れていて、歩いて届かなかった
   const SIGN_XY = [340, 406]; // 非常口の看板(道の上手、右の路肩)
 
   // ---- 道の中心線(WIND_PX)にそった、道のりと横のずれ ----
@@ -272,7 +271,6 @@
   regrow();
   let gods = []; // 来訪神の絵(3 とおり)
   let cv = null; // ゲームの画面(主観の材料を撮る)
-  const kiCap = { a: null, b: null, box: null, layer: canvas(1, 1) };
   let tmp = null;
   let tmp2 = null;
 
@@ -292,7 +290,7 @@
   }
   // 目がさめる: キノコの前(道の路肩)。白はゆっくり引く
   function wake(api) {
-    const pm = proj(MATSU_XY[0], MATSU_XY[1]);
+    const pm = proj(SHROOMS[0][0], SHROOMS[0][1]);
     const [x, y] = at(pm.s, Math.sign(pm.lat) * 34);
     api.place(x, y);
     api.face("east");
@@ -544,33 +542,25 @@
     const e = Math.sin(Math.min(1, miss.t / MISS_SEC) * Math.PI); // ふくらんで、しぼむ
     return { sat: 1 + 1.3 * e, con: 1 + 0.15 * e, hue: Math.round(Math.sin(miss.t * 4) * 70 * e), post: 0, shuf: 0, step: 0 };
   }
+  // 画面の加工は、画面の半分の細かさ(ゲームの 1 倍の絵)でする。絵はもともと 2 倍に拡大して描いているので、見た目は同じで軽い(D859)。
+  // トリップ中は、きーもぴーも世界といっしょに色がずれる(D859。来訪神と非常口だけは、このあと drawFigures でふだんの色)
   function garish(ctx, ox, oy, L) {
     const c = ctx.canvas;
     const Z = ctx.getTransform().a;
-    if (!tmp || tmp.width !== c.width || tmp.height !== c.height) {
-      tmp = canvas(c.width, c.height);
-      tmp2 = canvas(c.width, c.height);
+    const W = Math.round(c.width / Z);
+    const H = Math.round(c.height / Z);
+    if (!tmp || tmp.width !== W || tmp.height !== H) {
+      tmp = canvas(W, H);
+      tmp2 = canvas(W, H);
     }
     const step = L.step;
-    if (kiCap.box) {
-      // きーのあとに描かれた物(手前の木など)に隠れた所は、戻さない
-      const b = kiCap.box;
-      const F = ctx.getImageData(...b).data;
-      const B = kiCap.B;
-      const d = B.data;
-      for (let i = 0; i < d.length; i += 4) if (d[i + 3] && Math.abs(d[i] - F[i]) + Math.abs(d[i + 1] - F[i + 1]) + Math.abs(d[i + 2] - F[i + 2]) > 6) d[i + 3] = 0;
-      if (kiCap.layer.width !== b[2] || kiCap.layer.height !== b[3]) {
-        kiCap.layer.width = b[2];
-        kiCap.layer.height = b[3];
-      }
-      kiCap.layer.getContext("2d").putImageData(B, 0, 0);
-    }
     const g = tmp.getContext("2d", { willReadFrequently: true });
+    g.imageSmoothingEnabled = false;
     g.filter = `saturate(${L.sat}) contrast(${L.con}) hue-rotate(${L.hue}deg)`;
-    g.drawImage(c, 0, 0);
+    g.drawImage(c, 0, 0, W, H);
     g.filter = "none";
     if (L.post) {
-      const id = g.getImageData(0, 0, c.width, c.height);
+      const id = g.getImageData(0, 0, W, H);
       const u = new Uint32Array(id.data.buffer);
       const m = L.post;
       for (let i = 0; i < u.length; i++) u[i] &= m;
@@ -581,8 +571,6 @@
       const g2 = tmp2.getContext("2d");
       g2.drawImage(tmp, 0, 0);
       const C = 16;
-      const W = c.width / Z;
-      const H = c.height / Z;
       const cells = [];
       for (let y = 0; y < H; y += C) for (let x = 0; x < W; x += C) if (offroad(x - ox + C / 2, y - oy + C / 2) && offroad(x - ox, y - oy) && offroad(x - ox + C, y - oy + C)) cells.push([x, y]);
       const R = rng(step + 1);
@@ -593,14 +581,13 @@
       const n = Math.floor(cells.length * L.shuf);
       const src = cells.slice(0, n);
       const dst = src.slice(1).concat(src.slice(0, 1));
-      for (let i = 0; i < n; i++) g.drawImage(tmp2, src[i][0] * Z, src[i][1] * Z, C * Z, C * Z, dst[i][0] * Z, dst[i][1] * Z, C * Z, C * Z);
+      for (let i = 0; i < n; i++) g.drawImage(tmp2, src[i][0], src[i][1], C, C, dst[i][0], dst[i][1], C, C);
     }
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.drawImage(tmp, 0, 0);
-    if (kiCap.box) ctx.drawImage(kiCap.layer, kiCap.box[0], kiCap.box[1]); // きーはふだんの色(ドット絵がきーの現実)
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(tmp, 0, 0, c.width, c.height);
     ctx.restore();
-    kiCap.box = null;
   }
   // 来訪神、看板、走る人は、ずれた世界の上にふだんの色で浮く
   function drawFigures(ctx, ox, oy) {
@@ -638,57 +625,12 @@
     list.sort((a, b) => a.y - b.y).forEach((d) => d.f());
   }
 
-  // ---- きーだけを抜き出す(きーを描く前と後の画面を比べる) ----
-  const KB = [-26, -56, 52, 64]; // 足もとからの箱(ドット)
-  function kiBox(ctx, sx, sy) {
-    const Z = ctx.getTransform().a;
-    const x = Math.max(0, Math.round((sx + KB[0]) * Z));
-    const y = Math.max(0, Math.round((sy + KB[1]) * Z));
-    const w = Math.min(ctx.canvas.width - x, Math.round(KB[2] * Z));
-    const h = Math.min(ctx.canvas.height - y, Math.round(KB[3] * Z));
-    return w > 0 && h > 0 ? [x, y, w, h] : null;
-  }
-  const tripTopDown = () => (tS && !tS.pov && !tS.white) || !!miss;
-  const KI_A = {
-    id: "tripKiA",
-    x: 0,
-    y: 0,
-    hidden(api) {
-      const p = api.player();
-      KI_A.x = p.x;
-      KI_A.y = p.y - 0.01;
-      return !tripTopDown();
-    },
-    draw(ctx, sx, sy) {
-      const b = kiBox(ctx, sx, sy);
-      kiCap.a = b ? ctx.getImageData(...b) : null;
-      kiCap.abox = b;
-    },
-  };
-  const KI_B = {
-    id: "tripKiB",
-    x: 0,
-    y: 0,
-    hidden(api) {
-      const p = api.player();
-      KI_B.x = p.x;
-      KI_B.y = p.y + 0.01;
-      return !tripTopDown();
-    },
-    draw(ctx) {
-      const b = kiCap.abox;
-      if (!b || !kiCap.a) return;
-      const B = ctx.getImageData(...b);
-      const A = kiCap.a.data;
-      const d = B.data;
-      for (let i = 0; i < d.length; i += 4) if (Math.abs(d[i] - A[i]) + Math.abs(d[i + 1] - A[i + 1]) + Math.abs(d[i + 2] - A[i + 2]) < 6) d[i + 3] = 0;
-      kiCap.B = B;
-      kiCap.box = b;
-    },
-  };
-
   // ---- 松茸 3 本(かえでの根もと)。当たりの 1 本だけがトリップに入る(D856)。目がさめるとまた生えている ----
-  const SHROOMS = [MATSU_XY, [71, 617], [68, 647]];
+  // 場所は、長門から入ってすぐの内回り、かえで (271, 62) の根もと。道とのあいだにガードレールがない(D858。
+  // 版 639 の (60, 632) あたりはガードレールの外で、監督「ガードレールの外にあるのが嫌だな」)
+  const SHROOM_S = 312;
+  const SHROOM_SIDE = -1;
+  const SHROOMS = [[304, 60], [318, 68], [326, 57]].map(([ss, l]) => at(ss, SHROOM_SIDE * l));
   const MATSUS = SHROOMS.map(([mx, my], i) => ({
     id: `tripMatsu${i}`,
     x: mx,
@@ -712,64 +654,64 @@
     },
   }));
 
-  // ---- 中毒のぴー(D856、D857)。先にキノコを食べていて、色が回り続け、回る → 道を横切る → 真上を見上げて固まる、をくり返す ----
-  const PI_S = proj(MATSU_XY[0], MATSU_XY[1]).s - 70; // キノコより少し道の上手
-  const PI_SIDE = Math.sign(proj(MATSU_XY[0], MATSU_XY[1]).lat) || 1;
-  const PI_PH = [["spin", 1.8], ["cross", 2.8], ["look", 2.4]];
-  const piS = { t: 0, ph: 0, side: PI_SIDE, ang: 0, x: 0, y: 0, dir: 1 };
+  // ---- 中毒のぴー(D856、D858)。先にキノコを食べていて、キノコのそばでひっくり返り、口から泡をブクブクと垂れ流し、ときどきけいれんする。色はピンクのまま(D859) ----
+  // 試し絵は docs/record/2026-11-28/trip/game/place_inject.js、foam.gif。
+  // ぴーは足のない丸い体なので、正面をさかさにしても倒れて見えない。横向き(くちばしが東)の絵をさかさにすると、影が上・つやが下になって腹を見せて見える
+  const PI_XY = at(SHROOM_S - 30, SHROOM_SIDE * 66);
+  const hash = (n) => {
+    const v = Math.sin(n * 12.9898) * 43758.5453;
+    return v - Math.floor(v);
+  };
   const PI = {
     id: "tripPi",
-    x: 0,
-    y: 0,
+    x: PI_XY[0],
+    y: PI_XY[1],
     w: 1,
     h: 1,
-    headY: 26,
-    update(dt) {
-      piS.t += dt;
-      const [ph, len] = PI_PH[piS.ph];
-      if (piS.t > len) {
-        piS.t = 0;
-        piS.ph = (piS.ph + 1) % PI_PH.length;
-        if (PI_PH[piS.ph][0] === "cross") piS.dir = -piS.side;
-        if (ph === "cross") piS.side = -piS.side;
-        piS.ang = 0;
-      }
-      const cur = PI_PH[piS.ph][0];
-      const u = Math.min(1, piS.t / PI_PH[piS.ph][1]);
-      let lat = piS.side * 30;
-      let ds = 0;
-      if (cur === "cross") {
-        lat = piS.side * 30 * (1 - ease(u) * 2); // 反対の路肩へ
-        ds = Math.sin(piS.t * 4.5) * 9; // ふらふら
-      }
-      if (cur === "spin") piS.ang += dt * 10;
-      const [x, y] = at(PI_S + ds, lat);
-      piS.vx = x - PI.x;
-      PI.x = x;
-      PI.y = y;
-    },
+    headY: 20,
+    solid: { w: 32, h: 10, dy: -8 }, // きーが重ならない(倒れた体の大きさ)
     draw(ctx, sx, sy, t, api) {
-      const pi = api.image("pi");
-      if (!pi) return;
-      const cur = PI_PH[piS.ph][0];
-      const row = cur === "cross" ? (piS.vx >= 0 ? 2 : 3) : 0;
-      const f = cur === "cross" ? Math.floor(t * 9) % 7 : 0;
+      const im = api.image("pi");
+      if (!im) return;
+      // けいれん: 1.5 秒おきに 0.5 秒、体が小刻みにふるえ、縮んではのびる
+      const fit = t % 1.5 < 0.5;
+      const tw = fit ? Math.round(Math.sin(t * 55) * 2) : 0;
+      const tv = fit ? Math.round(Math.sin(t * 43)) : 0;
+      const sq = fit ? 1 + Math.sin(t * 31) * 0.08 : 1;
       ctx.save();
-      ctx.filter = `hue-rotate(${Math.round((t * 140) % 360)}deg) saturate(1.8)`; // 色が回り続ける
-      if (cur === "spin") {
-        ctx.translate(Math.round(sx), Math.round(sy - 10));
-        ctx.rotate(piS.ang);
-        ctx.translate(-Math.round(sx), -Math.round(sy - 10));
-      }
-      if (cur === "look") {
-        // 真上を見上げて固まる: 少し伸び上がる(足もとはそのまま)
-        const k = Math.min(1, piS.t / 0.25);
-        ctx.translate(Math.round(sx), Math.round(sy));
-        ctx.scale(1 - 0.06 * k, 1 + 0.14 * k);
-        ctx.translate(-Math.round(sx), -Math.round(sy));
-      }
-      ctx.drawImage(pi, f * 64, row * 64, 64, 64, Math.round(sx - 32), Math.round(sy - 47), 64, 64);
+      ctx.translate(Math.round(sx) + tw, Math.round(sy - 12) + tv);
+      ctx.scale(2 - sq, -sq);
+      ctx.drawImage(im, 0, 128, 64, 64, -32, -30, 64, 64); // いつものピンク(色を変えると別の個体に見える D859)
       ctx.restore();
+      // 泡: くちばし(横向きの絵の (48, 37) をさかさにした所)から、細かい泡がわいてははじけ、地面へ垂れて泡だまりになる
+      const mx = sx + 17 + tw;
+      const my = sy - 19 + tv;
+      const dot = (x, y, big, a) => {
+        x = Math.round(x);
+        y = Math.round(y);
+        ctx.fillStyle = `rgba(250, 252, 255, ${a})`;
+        if (big) ctx.fillRect(x, y, 2, 2);
+        else ctx.fillRect(x, y, 1, 1);
+        ctx.fillStyle = `rgba(160, 178, 205, ${a * 0.9})`;
+        if (big) ctx.fillRect(x + 1, y + 1, 1, 1);
+        else if ((x + y) % 3 === 0) ctx.fillRect(x, y, 1, 1);
+      };
+      const pool = 8 + Math.sin(t * 0.8);
+      for (let i = 0; i < 44; i++) {
+        const ang = hash(i) * Math.PI * 2;
+        const rr = Math.sqrt(hash(i + 50)) * pool;
+        dot(mx + 2 + Math.cos(ang) * rr * 1.6, sy + Math.sin(ang) * rr * 0.4, hash(i + 90) < 0.35, 0.9);
+      }
+      for (let i = 0; i < 14; i++) {
+        const ph = (t * 1.6 + hash(i + 7)) % 1;
+        const ang = hash(i + 3) * Math.PI * 2;
+        const rr = 1 + hash(i + 11) * 3;
+        if (ph < 0.9) dot(mx + Math.cos(ang) * rr * 1.3, my + Math.sin(ang) * rr, ph > 0.4, 0.95);
+      }
+      for (let i = 0; i < 28; i++) {
+        const u = (t * 0.9 + i / 28) % 1;
+        dot(mx + (i % 2) + Math.sin(i * 1.7 + u * 3) * 1.2 + u * 2, my + u * (sy + 1 - my), hash(i + 30) < 0.3, 0.9);
+      }
     },
   };
 
@@ -859,7 +801,7 @@
       update(dt, api);
     },
   };
-  M.objects.push(...MATSUS, PI, KI_A, KI_B, CTL);
+  M.objects.push(...MATSUS, PI, CTL);
 
   // 来訪神の絵は、ふだんの色の画面から作る(トリップの最初のこま)
   const og = M.drawOverlay;

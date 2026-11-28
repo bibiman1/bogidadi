@@ -632,11 +632,23 @@ const NA_WIND = {
     "=": { wang: "road" },
   },
   wang: { road: { img: "aki_wang_road", size: 32, lookup: WANG16 } },
+  // 地面は動かないので、絵がそろったら一度だけ別の紙に描き、毎こまは貼るだけにする(11-28、毎こま描き直して重かった。スマホ並みの遅さで 1 秒 21 → 48 こま)
   drawGround(ctx, ox, oy, img) {
     if (typeof img !== "function") return;
+    if (!this.groundCache && img("road_asphalt") && img("aki_houtou")) {
+      const c = document.createElement("canvas");
+      c.width = WIND_COLS * T;
+      c.height = WIND_ROWS * T;
+      this.paintGround(c.getContext("2d"), 0, 0, img);
+      this.groundCache = c;
+    }
+    if (this.groundCache) ctx.drawImage(this.groundCache, Math.round(ox), Math.round(oy));
+    else this.paintGround(ctx, ox, oy, img);
+  },
+  paintGround(ctx, ox, oy, img) {
     const tile = img("road_asphalt");
     if (!tile) return;
-    if (!this.pattern) this.pattern = ctx.createPattern(tile, "repeat");
+    const pattern = ctx.createPattern(tile, "repeat");
     ctx.save();
     ctx.translate(ox, oy);
     ctx.lineCap = "butt";
@@ -659,8 +671,8 @@ const NA_WIND = {
     };
     line(96, AKI_GRASS);
     dots(48, AKI_GRASS);
-    line(88, this.pattern);
-    dots(44, this.pattern);
+    line(88, pattern);
+    dots(44, pattern);
     ctx.restore();
     centerLine(ctx, ox, oy, WIND_PX);
     if (!this.leaves) this.leaves = akiLeaves(windGrid, "", { ".": 22, "=": 8 });
